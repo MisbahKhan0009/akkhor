@@ -1,0 +1,21 @@
+engine,producer,files,words_intact_pct,words_found_pct,reflow_cer_pct,block_starts_precision_pct,block_starts_recall_pct,headings_pct,footnotes_pct,furniture_leaks
+Akkhor,chrome,6,98.62,98.62,0.0,100.0,100.0,100.0,100.0,0
+Akkhor,typst,4,99.78,99.78,0.03,100.0,100.0,100.0,100.0,0
+Akkhor,writer,6,100.0,100.0,0.0,100.0,100.0,100.0,100.0,0
+Akkhor,xelatex,6,93.2,93.2,3.83,82.14,82.14,79.17,66.67,0
+Akkhor (+ device fonts),chrome,6,98.62,98.62,0.0,100.0,100.0,100.0,100.0,0
+Akkhor (+ device fonts),typst,4,99.78,99.78,0.03,100.0,100.0,100.0,100.0,0
+Akkhor (+ device fonts),writer,6,100.0,100.0,0.0,100.0,100.0,100.0,100.0,0
+Akkhor (+ device fonts),xelatex,6,99.92,99.92,0.07,100.0,100.0,100.0,100.0,0
+MuPDF,chrome,6,92.86,94.0,,,,,,
+MuPDF,typst,4,88.0,90.16,,,,,,
+MuPDF,writer,6,97.81,97.81,,,,,,
+MuPDF,xelatex,6,5.38,58.71,,,,,,
+PDFium,chrome,6,49.46,49.65,,,,,,
+PDFium,typst,4,81.05,96.78,,,,,,
+PDFium,writer,6,93.44,98.81,,,,,,
+PDFium,xelatex,6,55.66,57.31,,,,,,
+Poppler,chrome,6,95.72,95.8,,,,,,
+Poppler,typst,4,88.74,93.24,,,,,,
+Poppler,writer,6,96.03,96.03,,,,,,
+Poppler,xelatex,6,53.71,55.05,,,,,,

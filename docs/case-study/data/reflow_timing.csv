@@ -1,0 +1,3 @@
+document,pages,chapters,page_text_all_ms,structure_and_reflow_total_ms,worst_chapter_ms,machine
+"big.pdf (2,000 pages, 308 MB)",2000,125,3609.8,29.4,0.65,cloud VM 2 cores
+"Bangla book, 204 pages (real, not committed)",204,13,804.3,4.8,0.42,cloud VM 2 cores

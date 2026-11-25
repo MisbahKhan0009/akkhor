@@ -38,3 +38,12 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-25,Phase 4.2,XeLaTeX two-column Hindi PDF words intact,89.4,%,cloud VM,score_books.py (before per-line word gaps)
 2026-11-25,Phase 4.2,XeLaTeX two-column Hindi PDF words intact,99.8,%,cloud VM,score_books.py (after; line-end hyphens are the rest)
 2026-11-25,Phase 4.2,book corpus words intact line-end hyphens joined (Akkhor + device fonts),99.97,%,cloud VM,crates/akkhor-pdf/tests/books.rs (19 of 20 files 100%)
+2026-11-25,Phase 4.1,book corpus words intact Akkhor + device fonts (22 PDFs),94.1,%,cloud VM,score_books.py (start of Phase 4)
+2026-11-25,Phase 4.2,book corpus words intact Akkhor + device fonts (22 PDFs),99.6,%,cloud VM,data/books.csv (after Phase 4 fixes; the rest are line-end hyphens in page text)
+2026-11-25,Phase 4.4,book corpus reflow character error rate (Akkhor + device fonts),0.0,%,cloud VM,data/books.csv
+2026-11-25,Phase 4.4,book corpus reflow block starts recall (Akkhor + device fonts),100.0,%,cloud VM,data/books.csv
+2026-11-25,Phase 4.4,structure and reflow worst 16-page chapter,0.65,ms,cloud VM 2 cores,data/reflow_timing.csv
+2026-11-25,Phase 4 real world,Bangla book words intact Akkhor bundled fonts only,68.2,%,cloud VM,data/real_world_book.csv
+2026-11-25,Phase 4 real world,Bangla book words intact MuPDF,26.1,%,cloud VM,data/real_world_book.csv
+2026-11-25,Phase 4.7,x86_64 stripped library default build (before Phase 4),5.77,MB,cloud VM,commit 74a0e69
+2026-11-25,Phase 4.7,x86_64 stripped library default build (Phase 4 so far; standard fonts now a switch),7.53,MB,cloud VM,uncommitted; growth under investigation

@@ -1,0 +1,6 @@
+finding,metric,before,after,unit,reproduced_by
+Bold drawn twice (fill then stroke pass),letters doubled,yes,no,,tests/corpus/pdf/*.fakebold.raw.pdf
+Bold drawn twice (fill then stroke pass),character error rate (bn.chrome.fakebold.raw.pdf),69.0,0.0,%,crates/akkhor-pdf/tests/quirks.rs
+Ghostscript-rewritten font programs,glyphs matched to the right font (Hind Siliguri Bold heading),61 of 127,127 of 127,glyphs,tests/corpus/pdf/*.rewritten.raw.pdf
+Ghostscript-rewritten font programs,character error rate (bn.chrome.rewritten.raw.pdf),35.3,0.0,%,crates/akkhor-pdf/tests/quirks.rs
+Kalpurush body text without the font,Bangla words intact (whole book),68.2,100.0,%,register Kalpurush (OFL)

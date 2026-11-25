@@ -1,0 +1,111 @@
+engine,file,footnotes,furniture,headings,images,reflow_cer,starts_p,starts_r,words_found,words_intact
+Akkhor,bn.chrome.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.chrome.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,bn.chrome.one.pdf,,,,,,,,0.9307228915662651,0.9307228915662651
+PDFium,bn.chrome.one.pdf,,,,,,,,0.3253012048192771,0.3253012048192771
+Poppler,bn.chrome.one.pdf,,,,,,,,0.9608433734939759,0.9608433734939759
+Akkhor,bn.chrome.two.hind.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9698795180722891,0.9698795180722891
+Akkhor (+ device fonts),bn.chrome.two.hind.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9698795180722891,0.9698795180722891
+MuPDF,bn.chrome.two.hind.pdf,,,,,,,,0.9066265060240963,0.891566265060241
+PDFium,bn.chrome.two.hind.pdf,,,,,,,,0.32831325301204817,0.3192771084337349
+Poppler,bn.chrome.two.hind.pdf,,,,,,,,0.9608433734939759,0.9608433734939759
+Akkhor,bn.chrome.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9728915662650602,0.9728915662650602
+Akkhor (+ device fonts),bn.chrome.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9728915662650602,0.9728915662650602
+MuPDF,bn.chrome.two.pdf,,,,,,,,0.9036144578313253,0.9036144578313253
+PDFium,bn.chrome.two.pdf,,,,,,,,0.3253012048192771,0.3253012048192771
+Poppler,bn.chrome.two.pdf,,,,,,,,0.9367469879518072,0.9367469879518072
+Akkhor,bn.typst.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.typst.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,bn.typst.one.pdf,,,,,,,,0.8343373493975904,0.8102409638554217
+PDFium,bn.typst.one.pdf,,,,,,,,0.9487951807228916,0.8433734939759037
+Poppler,bn.typst.one.pdf,,,,,,,,0.9186746987951807,0.8463855421686747
+Akkhor,bn.typst.two.pdf,1.0,0,1.0,0,0.0005941770647653001,1.0,1.0,0.9911242603550295,0.9911242603550295
+Akkhor (+ device fonts),bn.typst.two.pdf,1.0,0,1.0,0,0.0005941770647653001,1.0,1.0,0.9911242603550295,0.9911242603550295
+MuPDF,bn.typst.two.pdf,,,,,,,,0.8313609467455622,0.8076923076923077
+PDFium,bn.typst.two.pdf,,,,,,,,0.9408284023668639,0.834319526627219
+Poppler,bn.typst.two.pdf,,,,,,,,0.9112426035502958,0.8402366863905325
+Akkhor,bn.writer.one.kalpurush.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.writer.one.kalpurush.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,bn.writer.one.kalpurush.pdf,,,,,,,,0.9728915662650602,0.9728915662650602
+PDFium,bn.writer.one.kalpurush.pdf,,,,,,,,0.9939759036144579,0.9939759036144579
+Poppler,bn.writer.one.kalpurush.pdf,,,,,,,,0.963855421686747,0.963855421686747
+Akkhor,bn.writer.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.writer.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,bn.writer.one.pdf,,,,,,,,0.963855421686747,0.963855421686747
+PDFium,bn.writer.one.pdf,,,,,,,,0.9698795180722891,0.9698795180722891
+Poppler,bn.writer.one.pdf,,,,,,,,0.9608433734939759,0.9608433734939759
+Akkhor,bn.writer.two.kalpurush.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.writer.two.kalpurush.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,bn.writer.two.kalpurush.pdf,,,,,,,,0.9728915662650602,0.9728915662650602
+PDFium,bn.writer.two.kalpurush.pdf,,,,,,,,0.9969879518072289,0.9969879518072289
+Poppler,bn.writer.two.kalpurush.pdf,,,,,,,,0.963855421686747,0.963855421686747
+Akkhor,bn.writer.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.writer.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,bn.writer.two.pdf,,,,,,,,0.963855421686747,0.963855421686747
+PDFium,bn.writer.two.pdf,,,,,,,,0.9698795180722891,0.9698795180722891
+Poppler,bn.writer.two.pdf,,,,,,,,0.9608433734939759,0.9608433734939759
+Akkhor,bn.xelatex.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.xelatex.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,bn.xelatex.one.pdf,,,,,,,,0.37349397590361444,0.018072289156626505
+PDFium,bn.xelatex.one.pdf,,,,,,,,0.37349397590361444,0.3493975903614458
+Poppler,bn.xelatex.one.pdf,,,,,,,,0.3493975903614458,0.3253012048192771
+Akkhor,bn.xelatex.two.hind.pdf,0.0,0,0.0,0,0.1408199643493761,0.2857142857142857,0.2857142857142857,0.7751479289940828,0.7751479289940828
+Akkhor (+ device fonts),bn.xelatex.two.hind.pdf,1.0,0,1.0,0,0.0005941770647653001,1.0,1.0,1.0,1.0
+MuPDF,bn.xelatex.two.hind.pdf,,,,,,,,0.29289940828402367,0.04142011834319527
+PDFium,bn.xelatex.two.hind.pdf,,,,,,,,0.29289940828402367,0.2692307692307692
+Poppler,bn.xelatex.two.hind.pdf,,,,,,,,0.28106508875739644,0.257396449704142
+Akkhor,bn.xelatex.two.pdf,1.0,0,1.0,0,0.0005941770647653001,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.xelatex.two.pdf,1.0,0,1.0,0,0.0005941770647653001,1.0,1.0,1.0,1.0
+MuPDF,bn.xelatex.two.pdf,,,,,,,,0.3698224852071006,0.038461538461538464
+PDFium,bn.xelatex.two.pdf,,,,,,,,0.3698224852071006,0.34615384615384615
+Poppler,bn.xelatex.two.pdf,,,,,,,,0.3343195266272189,0.3106508875739645
+Akkhor,hi.chrome.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.chrome.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,hi.chrome.one.pdf,,,,,,,,0.9793103448275862,0.9724137931034482
+PDFium,hi.chrome.one.pdf,,,,,,,,0.671264367816092,0.671264367816092
+Poppler,hi.chrome.one.pdf,,,,,,,,0.9563218390804598,0.9563218390804598
+Akkhor,hi.chrome.two.mukta.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9885057471264368,0.9885057471264368
+Akkhor (+ device fonts),hi.chrome.two.mukta.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9885057471264368,0.9885057471264368
+MuPDF,hi.chrome.two.mukta.pdf,,,,,,,,0.9540229885057471,0.9149425287356322
+PDFium,hi.chrome.two.mukta.pdf,,,,,,,,0.664367816091954,0.6620689655172414
+Poppler,hi.chrome.two.mukta.pdf,,,,,,,,0.9885057471264368,0.9839080459770115
+Akkhor,hi.chrome.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9862068965517241,0.9862068965517241
+Akkhor (+ device fonts),hi.chrome.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,0.9862068965517241,0.9862068965517241
+MuPDF,hi.chrome.two.pdf,,,,,,,,0.9655172413793104,0.9586206896551724
+PDFium,hi.chrome.two.pdf,,,,,,,,0.664367816091954,0.664367816091954
+Poppler,hi.chrome.two.pdf,,,,,,,,0.9448275862068966,0.9448275862068966
+Akkhor,hi.typst.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.typst.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,hi.typst.one.pdf,,,,,,,,0.9701149425287356,0.9517241379310345
+PDFium,hi.typst.one.pdf,,,,,,,,0.9908045977011494,0.7724137931034483
+Poppler,hi.typst.one.pdf,,,,,,,,0.9494252873563218,0.9310344827586207
+Akkhor,hi.typst.two.pdf,1.0,0,1.0,0,0.0005868544600938967,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.typst.two.pdf,1.0,0,1.0,0,0.0005868544600938967,1.0,1.0,1.0,1.0
+MuPDF,hi.typst.two.pdf,,,,,,,,0.9705882352941176,0.9502262443438914
+PDFium,hi.typst.two.pdf,,,,,,,,0.9909502262443439,0.7918552036199095
+Poppler,hi.typst.two.pdf,,,,,,,,0.9502262443438914,0.9321266968325792
+Akkhor,hi.writer.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.writer.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,hi.writer.one.pdf,,,,,,,,0.9977011494252873,0.9977011494252873
+PDFium,hi.writer.one.pdf,,,,,,,,1.0,0.8068965517241379
+Poppler,hi.writer.one.pdf,,,,,,,,0.9563218390804598,0.9563218390804598
+Akkhor,hi.writer.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.writer.two.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,hi.writer.two.pdf,,,,,,,,0.9977011494252873,0.9977011494252873
+PDFium,hi.writer.two.pdf,,,,,,,,0.9977011494252873,0.8689655172413793
+Poppler,hi.writer.two.pdf,,,,,,,,0.9563218390804598,0.9563218390804598
+Akkhor,hi.xelatex.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.xelatex.one.pdf,1.0,0,1.0,0,0.0,1.0,1.0,1.0,1.0
+MuPDF,hi.xelatex.one.pdf,,,,,,,,0.8551724137931035,0.05517241379310345
+PDFium,hi.xelatex.one.pdf,,,,,,,,0.8183908045977012,0.8114942528735632
+Poppler,hi.xelatex.one.pdf,,,,,,,,0.7908045977011494,0.7908045977011494
+Akkhor,hi.xelatex.two.mukta.pdf,0.0,0,0.75,0,0.0880281690140845,0.6428571428571429,0.6428571428571429,0.8167420814479638,0.8167420814479638
+Akkhor (+ device fonts),hi.xelatex.two.mukta.pdf,1.0,0,1.0,0,0.002347417840375587,1.0,1.0,0.995475113122172,0.995475113122172
+MuPDF,hi.xelatex.two.mukta.pdf,,,,,,,,0.7737556561085973,0.09276018099547512
+PDFium,hi.xelatex.two.mukta.pdf,,,,,,,,0.7624434389140271,0.755656108597285
+Poppler,hi.xelatex.two.mukta.pdf,,,,,,,,0.755656108597285,0.751131221719457
+Akkhor,hi.xelatex.two.pdf,1.0,0,1.0,0,0.0005868544600938967,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.xelatex.two.pdf,1.0,0,1.0,0,0.0005868544600938967,1.0,1.0,1.0,1.0
+MuPDF,hi.xelatex.two.pdf,,,,,,,,0.8574660633484162,0.07692307692307693
+PDFium,hi.xelatex.two.pdf,,,,,,,,0.8212669683257918,0.8076923076923077
+Poppler,hi.xelatex.two.pdf,,,,,,,,0.7918552036199095,0.7873303167420814

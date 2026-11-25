@@ -1,0 +1,8 @@
+fix,file_or_case,metric,before,after,unit,source
+Typst ActualText spans cut mid-cluster,bn.typst.one.pdf,words intact,85.2,100.0,%,scripts/bench/score_books.py
+Per-line word gaps (XeLaTeX draws no spaces),hi.xelatex.two.pdf,words intact,89.4,100.0,%,scripts/bench/score_books.py
+Per-line word gaps (XeLaTeX draws no spaces),hi.xelatex.two.mukta.pdf,words intact,64.7,99.5,%,scripts/bench/score_books.py
+Type 3 advances 1000x too wide,bn.chrome.one.pdf heading line width,12928,137,pt,examples/lines.rs
+Glyphs outside the clip (Chrome next-page lines),hi.chrome.two.pdf reflow CER,1.00,0.00,%,tests/reflow.rs
+Type 3 synthetic bold with no text layer,indic.raw.pdf bold headings read,0 of 2,2 of 2,headings,tests/quirks.rs
+Night theme with 100000 images on a page (Phase 3 review),imgs100000.pdf extra over paper at 2x,450,40,ms,docs/reviews/phase-3.md

@@ -13,6 +13,12 @@ run: `environment.json`.
 | `memory.csv` | resident memory added to open a file and render one page | Peak (`VmHWM`, reset through `/proc/self/clear_refs`) minus resident memory just before opening; median of 3 fresh processes. Poppler: peak of the `pdftoppm` child minus that of `pdftoppm -v`. |
 | `size.csv` | library size | `strip --strip-unneeded` on a copy of each engine's main shared library, x86_64 Linux |
 | `robustness.csv` | 200 damaged PDFs: opened, refused with an error, crashed, hung | Deterministic mutations (seed 20261125) of four PDFs: bytes flipped, file cut short, a block duplicated or zeroed. Each file opened, page 1 rendered at 0.5x and its text read, in a fresh process with a 30 s limit. |
+| `books.csv` | book-layout corpus (tests/corpus/books, 22 PDFs from Chrome, Word via LibreOffice, XeLaTeX, Typst): per engine and file, words intact and found in the page text; for Akkhor also reflow scores | `scripts/bench/score_books.py`. Words intact: the truth's words found as whole words (not run together or split). Reflow: CER against the truth blocks (footnotes and images apart), block-start precision and recall, headings at the right level, footnotes found, running headers or page numbers leaked |
+| `books_summary.csv` | `books.csv` averaged per engine and producer | same |
+| `real_world_book.csv` | a real 204-page Bangla book (copyrighted: measured locally, not committed), Bangla words intact per engine | `scripts/bench/score_local.py`; reference = Akkhor with the book's fonts (Kalpurush, Hind Siliguri, both OFL) registered, spot-checked on 3 page images; bag of words, so reading order does not count |
+| `real_world_findings.csv` | defects that book exposed, before and after the fix, and the corpus file that now reproduces each | `crates/akkhor-pdf/tests/quirks.rs` |
+| `phase4_fixes.csv` | each Phase 4 text-layer fix, before and after | named per row |
+| `reflow_timing.csv` | page structure and reflow time alone (page text already built), per document | `crates/akkhor-pdf/examples/reflowtime.rs` |
 | `history.csv` | one row per milestone and metric | each row names where it was measured and its source |
 
 ## What to keep in mind

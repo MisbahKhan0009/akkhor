@@ -1,0 +1,6 @@
+book,pages_measured,engine,words_intact_pct,reference,note
+"Bangla book (Word, Acrobat, Ghostscript; Kalpurush and Hind Siliguri)",200,Akkhor (book's fonts registered),100.0,self,"reference text; spot-checked against 3 page images"
+"Bangla book (Word, Acrobat, Ghostscript; Kalpurush and Hind Siliguri)",200,Akkhor (bundled fonts only),68.2,Akkhor with fonts,
+"Bangla book (Word, Acrobat, Ghostscript; Kalpurush and Hind Siliguri)",200,MuPDF 1.28.6,26.1,Akkhor with fonts,
+"Bangla book (Word, Acrobat, Ghostscript; Kalpurush and Hind Siliguri)",200,PDFium 156,25.9,Akkhor with fonts,
+"Bangla book (Word, Acrobat, Ghostscript; Kalpurush and Hind Siliguri)",200,Poppler 24.02,25.7,Akkhor with fonts,
