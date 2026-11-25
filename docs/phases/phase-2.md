@@ -89,9 +89,10 @@ Glyphs come in drawing order. Per line, per script:
 ## 2.4 Lines, words, reading order
 
 Glyphs are grouped into lines by baseline (tolerance relative to font size),
-sorted left to right, spaces inserted where gaps exceed a fraction of the
-font size, blocks split at large vertical gaps, and simple two-column pages
-read column by column. Output: `PageText { text, char boxes, lines }`, where
+taken in drawing order, spaces inserted where gaps exceed a fraction of the
+font size, blocks split at large vertical gaps. Pages are read in drawing
+order, which is reading order for every producer tested; column detection
+moves to Phase 4. Output: `PageText { text, char boxes, lines }`, where
 every character of `text` points back to a box on the page.
 
 ## 2.5 Legacy encodings
@@ -166,7 +167,8 @@ Bijoy conversion is also checked by round trip: Unicode → Bijoy (with
   the 130 ms deep build only runs for fonts without names)
 - [x] Search finds words in PDFs that the raw text layer misses
 - [x] Robustness test covers the text layer; CI green; PLAN.md updated
-- [ ] Review of Phase 2 written and its findings fixed
+- [x] Review of Phase 2 written and its findings fixed
+  ([reviews/phase-2.md](../reviews/phase-2.md))
 
 ## Known limits (stated up front)
 

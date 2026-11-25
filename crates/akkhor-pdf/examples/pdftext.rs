@@ -15,10 +15,39 @@ fn main() {
             akkhor_pdf::register_reference_font(std::sync::Arc::new(d));
         }
     }
+    if let Ok(dir) = std::env::var("REFDIR") {
+        let mut n = 0;
+        for e in std::fs::read_dir(dir).unwrap().flatten() {
+            if e.path()
+                .extension()
+                .is_some_and(|x| x == "ttf" || x == "otf")
+            {
+                akkhor_pdf::register_reference_font(std::sync::Arc::new(
+                    std::fs::read(e.path()).unwrap(),
+                ));
+                n += 1;
+            }
+        }
+        eprintln!("registered {n} reference fonts");
+    }
+    if std::env::var("TIME").is_ok() {
+        let pdf = PdfDocument::open(&Source::open(&path).unwrap()).unwrap();
+        let t = std::time::Instant::now();
+        let text = pdf.page_text(page).unwrap();
+        println!(
+            "first page_text {:.1} ms, {} chars",
+            t.elapsed().as_secs_f64() * 1e3,
+            text.text.chars().count()
+        );
+        return;
+    }
     let pdf = PdfDocument::open(&Source::open(&path).unwrap()).unwrap();
     let glyphs = pdf.glyphs(page).unwrap();
     for f in &glyphs.fonts {
-        let rec = f.data.as_ref().and_then(akkhor_pdf::reference::recover);
+        let rec = f
+            .data
+            .as_ref()
+            .and_then(|d| akkhor_pdf::reference::recover(d, f.name.as_deref()));
         println!(
             "font {:?} embedded={} recovered={:?}",
             f.name,
@@ -28,7 +57,11 @@ fn main() {
     }
     if let Ok(pat) = std::env::var("DUMP") {
         for f in &glyphs.fonts {
-            if let Some(r) = f.data.as_ref().and_then(akkhor_pdf::reference::recover) {
+            if let Some(r) = f
+                .data
+                .as_ref()
+                .and_then(|d| akkhor_pdf::reference::recover(d, f.name.as_deref()))
+            {
                 let mut v: Vec<_> = r
                     .map
                     .iter()
@@ -45,7 +78,11 @@ fn main() {
         let recs: Vec<_> = glyphs
             .fonts
             .iter()
-            .map(|f| f.data.as_ref().and_then(akkhor_pdf::reference::recover))
+            .map(|f| {
+                f.data
+                    .as_ref()
+                    .and_then(|d| akkhor_pdf::reference::recover(d, f.name.as_deref()))
+            })
             .collect();
         let mut seen = std::collections::BTreeMap::new();
         for g in &glyphs.glyphs {
@@ -62,7 +99,11 @@ fn main() {
         let recs: Vec<_> = glyphs
             .fonts
             .iter()
-            .map(|f| f.data.as_ref().and_then(akkhor_pdf::reference::recover))
+            .map(|f| {
+                f.data
+                    .as_ref()
+                    .and_then(|d| akkhor_pdf::reference::recover(d, f.name.as_deref()))
+            })
             .collect();
         for g in &glyphs.glyphs {
             let r = recs[g.font].as_ref().and_then(|r| r.map.get(&g.glyph_id));

@@ -47,6 +47,20 @@ struct ReferenceFont {
     deep: OnceLock<Option<Arc<Recovery>>>,
     /// Outline hash → glyph id.
     shapes: OnceLock<HashMap<u64, u32>>,
+    name: OnceLock<Option<String>>,
+}
+
+/// A font name without subset prefix, spaces, dashes or case:
+/// "ABCDEF+Noto Serif-Bengali" and "NotoSerifBengali" are the same.
+fn normalized_name(name: &str) -> String {
+    let name = match name.split_once('+') {
+        Some((tag, rest)) if tag.len() == 6 => rest,
+        _ => name,
+    };
+    name.chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect()
 }
 
 impl ReferenceFont {
@@ -60,6 +74,18 @@ impl ReferenceFont {
         self.deep
             .get_or_init(|| build(&self.data, true).map(Arc::new))
             .as_ref()
+    }
+
+    /// The PostScript name, normalized (see [`normalized_name`]).
+    fn name(&self) -> &Option<String> {
+        self.name.get_or_init(|| {
+            let font = FontRef::new((*self.data).as_ref()).ok()?;
+            let ps = font
+                .localized_strings(skrifa::string::StringId::POSTSCRIPT_NAME)
+                .english_or_first()?
+                .to_string();
+            Some(normalized_name(&ps))
+        })
     }
 
     fn shapes(&self) -> &HashMap<u64, u32> {
@@ -86,6 +112,7 @@ fn registry() -> &'static Mutex<Vec<Arc<ReferenceFont>>> {
                 recovery: OnceLock::new(),
                 deep: OnceLock::new(),
                 shapes: OnceLock::new(),
+                name: OnceLock::new(),
             }));
         }
         Mutex::new(fonts)
@@ -101,6 +128,7 @@ pub fn register_reference_font(data: Arc<dyn AsRef<[u8]> + Send + Sync>) {
         recovery: OnceLock::new(),
         deep: OnceLock::new(),
         shapes: OnceLock::new(),
+        name: OnceLock::new(),
     });
     registry()
         .lock()
@@ -120,7 +148,7 @@ fn has_shaping_rules(data: &[u8]) -> bool {
 /// The recovery table for an embedded font: its own (cmap and shaping
 /// rules) when it has shaping rules, otherwise borrowed glyph by glyph from
 /// the reference font whose outlines it matches best.
-pub fn recover(data: &Data) -> Option<Recovery> {
+pub fn recover(data: &Data, name: Option<&str>) -> Option<Recovery> {
     let own = build(data, false);
     let bytes = (**data).as_ref();
     if has_shaping_rules(bytes) {
@@ -133,8 +161,27 @@ pub fn recover(data: &Data) -> Option<Recovery> {
     if embedded.is_empty() {
         return own;
     }
+    // A reference with the same name is tried first: indexing the outlines
+    // of every registered font costs a few milliseconds each, once.
+    let all = references();
+    let wanted = name.map(normalized_name);
+    let named: Vec<Arc<ReferenceFont>> = all
+        .iter()
+        .filter(|r| wanted.is_some() && r.name().as_deref() == wanted.as_deref())
+        .cloned()
+        .collect();
     let mut best: Option<(usize, Arc<ReferenceFont>)> = None;
-    for r in references() {
+    let named_hit = named.iter().any(|r| {
+        let shapes = r.shapes();
+        embedded
+            .iter()
+            .filter(|(_, h)| shapes.contains_key(h))
+            .count()
+            * 2
+            >= embedded.len()
+    });
+    let candidates = if named_hit { named } else { all };
+    for r in candidates {
         let shapes = r.shapes();
         let hits = embedded
             .iter()

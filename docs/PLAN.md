@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 2 built; review next)
+Last updated: 2026-11-25 (Phase 2 done and reviewed)
 
 ---
 
@@ -136,7 +136,7 @@ Results (GitHub CI runner, release build):
 
 Known limits carried forward: adjacent-sibling and attribute CSS selectors are ignored; GIF and WebP images are sized but not drawn; Bijoy text is detected but not yet converted (done in Phase 2).
 
-### Phase 2: PDF Indic text layer 🔄 (the headline novelty)
+### Phase 2: PDF Indic text layer ✅ (the headline novelty, reviewed)
 
 Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point: a Chrome-printed Bangla/Hindi PDF reads back as `ক্ষম , ম  , কম` for `ক্ষমা, মন্ত্রী, কর্ম`.
 
@@ -147,6 +147,8 @@ Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point
 5. ✅ Legacy encodings: Bijoy (table from the MIT `poriborton` crate, inverted) for PDFs and `.txt`. Kruti Dev moved later: no open table or corpus to verify one against.
 6. ✅ Search, selection and copy on PDFs (CLI and Android).
 7. ✅ Accuracy corpus: 36 PDFs from two producers, two designs per script, Bijoy, with and without `ToUnicode`; character error rate checked in CI.
+
+Review: [reviews/phase-2.md](reviews/phase-2.md), 16 findings; the wrong-output ones fixed (Unicode "OMJ" fonts treated as Bijoy, learning from malformed candidates, Assamese spellings claiming Bangla glyphs). Carried forward: Chrome's synthetic bold (Type 3 fonts), fonts the engine does not know, no real-world PDFs in the corpus yet, UTF-16 positions for read-aloud.
 
 ### Phase 3: PDF speed and memory ⬜
 
@@ -161,6 +163,15 @@ Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point
 ### Phase 4: Indic PDF reflow ⬜
 
 Turn a PDF page's text layer (Phase 2) into a `Document` (reading order, paragraphs, headings by size) and lay it out with the flow pipeline. Images kept as blocks.
+
+Carried from the Phase 2 review:
+
+1. Column detection (the text layer reads in drawing order today).
+2. Type 3 fonts: match glyph procedure paths against reference outlines, for Chrome's synthetic bold.
+3. A real-world corpus: Bangla and Hindi PDFs from Word, InDesign, XeLaTeX and publishers, measured in CI.
+4. Reference fonts beyond Noto: a downloadable pack of freely licensed Bangla and Hindi fonts (SolaimanLipi, Kalpurush, Nikosh, ...), registered like the phone's own.
+5. UTF-16 positions in the Android API, for read-aloud highlighting.
+6. Kruti Dev / Chanakya, once a table can be verified against a corpus.
 
 ### Phase 5: More formats ⬜
 

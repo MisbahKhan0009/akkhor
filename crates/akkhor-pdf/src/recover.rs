@@ -235,6 +235,8 @@ pub fn build_with(
         }
     }
 
+    let rules = gsub_rules((**data).as_ref());
+
     // 2. Shape candidate syllables per script and learn new glyphs.
     let shaper = ShaperFont::new(&font);
     let mut buffer = Buffer::new();
@@ -274,6 +276,7 @@ pub fn build_with(
 
         // Shapes one candidate; returns whether it taught something new and
         // whether the font drew it as a single glyph.
+        let dotted_circle = font.charmap().map_unicode(0x25CCu32).map(|g| g.to_u32());
         let mut shape_one =
             |text: String, rec: &mut Recovery, budget: &mut usize| -> (bool, bool) {
                 if *budget == 0 {
@@ -288,6 +291,11 @@ pub fn build_with(
                     return (false, false);
                 }
                 let gids: Vec<u32> = buffer.glyph_infos().iter().map(|g| g.glyph_id).collect();
+                // A dotted circle means the shaper found the candidate
+                // malformed (a vowel sign with no consonant): nothing to learn.
+                if dotted_circle.is_some_and(|d| gids.contains(&d)) {
+                    return (false, false);
+                }
                 let learned = learn(&text, &gids, rec);
                 let single = gids.len() == 1;
                 if learned || !remember_sequence(&text, &gids, rec) {
@@ -346,9 +354,21 @@ pub fn build_with(
         let phala = |c: char| {
             matches!(c as u32 & 0x7F, 0x2F | 0x30 | 0x35 | 0x2E | 0x32 | 0x28) // য র ব ম ল ন
         };
+        // The substitution tables guess the rest; shaping verifies.
+        let mut guessed = rec.map.clone();
+        let mut script_hints: Vec<String> = apply_gsub_rules(&rules, &mut guessed)
+            .into_iter()
+            .filter_map(|g| guessed.remove(&g))
+            .map(|t| t.text)
+            .filter(|t| t.chars().count() >= 3)
+            .collect();
+        script_hints.extend(hints.iter().cloned());
+        // Assamese ৰ ৱ share their glyphs with Bangla র ব: a hint spelled
+        // with them would claim the Bangla glyphs.
+        script_hints.retain(|h| !h.contains(['\u{09F0}', '\u{09F1}']));
         // The hinted clusters, in shapes the shaper accepts.
         let is_virama = |c: char| c == v;
-        for hint in hints
+        for hint in script_hints
             .iter()
             .filter(|h| h.chars().any(|c| script_of(c) == *script))
         {
@@ -674,16 +694,30 @@ pub fn starts_with_letter(text: &str) -> bool {
 /// Fills in glyphs from the font's GSUB lookups, ignoring their context,
 /// until nothing new is learned.
 fn learn_from_gsub(data: &[u8], rec: &mut Recovery) {
+    let rules = gsub_rules(data);
+    for gid in apply_gsub_rules(&rules, &mut rec.map) {
+        rec.weak.insert(gid);
+    }
+}
+
+/// A substitution, context ignored: (output glyph, input glyphs, whether it
+/// forms a reph).
+type GsubRule = (u32, Vec<u32>, bool);
+
+/// Every single, alternate and ligature substitution in the font.
+fn gsub_rules(data: &[u8]) -> Vec<GsubRule> {
     use skrifa::raw::TableProvider;
     use skrifa::raw::tables::gsub::{
         AlternateSubst, LigatureSubst, SingleSubst, SubstitutionSubtables,
     };
     let Ok(font) = skrifa::FontRef::new(data) else {
-        return;
+        return Vec::new();
     };
-    let Ok(gsub) = font.gsub() else { return };
+    let Ok(gsub) = font.gsub() else {
+        return Vec::new();
+    };
     let Ok(lookups) = gsub.lookup_list() else {
-        return;
+        return Vec::new();
     };
 
     // Lookups that form rephs.
@@ -763,17 +797,20 @@ fn learn_from_gsub(data: &[u8], rec: &mut Recovery) {
         }
     }
 
+    rules
+}
+
+/// Names glyphs from the rules until nothing new is learned; returns the
+/// glyphs named.
+fn apply_gsub_rules(rules: &[GsubRule], map: &mut HashMap<u32, GlyphText>) -> Vec<u32> {
+    let mut named = Vec::new();
     for _ in 0..8 {
         let mut learned = false;
-        for (out, parts, reph) in &rules {
-            if *out == 0 || rec.map.contains_key(out) {
+        for (out, parts, reph) in rules {
+            if *out == 0 || map.contains_key(out) {
                 continue;
             }
-            let Some(texts) = parts
-                .iter()
-                .map(|g| rec.map.get(g))
-                .collect::<Option<Vec<_>>>()
-            else {
+            let Some(texts) = parts.iter().map(|g| map.get(g)).collect::<Option<Vec<_>>>() else {
                 continue;
             };
             let mut text = String::new();
@@ -803,14 +840,15 @@ fn learn_from_gsub(data: &[u8], rec: &mut Recovery) {
                     role => role,
                 }
             };
-            rec.map.insert(*out, GlyphText { text, role });
-            rec.weak.insert(*out);
+            map.insert(*out, GlyphText { text, role });
+            named.push(*out);
             learned = true;
         }
         if !learned {
             break;
         }
     }
+    named
 }
 
 /// Vowel signs with a canonical two-part decomposition.

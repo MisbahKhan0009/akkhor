@@ -63,6 +63,7 @@ pub fn register_test_fonts() {
         "../fonts/Mukta-Regular.ttf",
         "../../fonts/NotoSerifBengali-Regular.ttf",
         "../../fonts/NotoSerifDevanagari-Regular.ttf",
+        "../../fonts/NotoSerif-Regular.ttf",
     ] {
         let data = std::fs::read(corpus(f)).unwrap();
         akkhor_pdf::register_reference_font(Arc::new(data));

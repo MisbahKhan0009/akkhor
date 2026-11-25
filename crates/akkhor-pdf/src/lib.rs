@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub mod glyphs;
+mod read;
 pub mod recover;
 pub mod reference;
 pub mod text;
@@ -42,6 +43,10 @@ pub struct PdfDocument {
     /// Text of recently used pages, most recent last.
     texts: Mutex<Vec<(usize, Arc<PageText>)>>,
 }
+
+/// Fonts per page whose glyphs are recovered; a page with more (a hostile
+/// file) reads the rest from its text layer.
+const MAX_RECOVERED_FONTS: usize = 48;
 
 /// Pages whose text [`PdfDocument::page_text_cached`] keeps.
 const TEXT_CACHE_PAGES: usize = 4;
@@ -123,152 +128,23 @@ impl PdfDocument {
     /// after their syllable and two-part vowels.
     pub fn page_text(&self, index: usize) -> Result<PageText> {
         let glyphs = self.glyphs(index)?;
-        let tables: Vec<Option<Arc<recover::Recovery>>> =
-            glyphs.fonts.iter().map(|f| self.recovery(f)).collect();
-        // Whether each font's text layer can be trusted: it must mostly
-        // agree with the letters recovered from the glyphs. (Without a
-        // ToUnicode map, the interpreter guesses text from char codes,
-        // which for a renumbered subset are meaningless.)
-        let mut votes = vec![(0usize, 0usize); glyphs.fonts.len()];
-        for g in &glyphs.glyphs {
-            let rec = tables.get(g.font).and_then(|t| t.as_deref());
-            if let (Some(own), Some(r)) = (
-                g.unicode
-                    .as_deref()
-                    .filter(|u| text::usable(u) && !u.trim().is_empty()),
-                rec.and_then(|r| r.map.get(&g.glyph_id)),
-            ) && let Some(v) = votes.get_mut(g.font)
-            {
-                v.1 += 1;
-                v.0 += usize::from(recover::canonical(own) == r.text);
-            }
-        }
-        // When the two disagree, a complete font wins over the text layer,
-        // and the text layer wins over a subset's bare character map.
-        let mut tables = tables;
-        let mut trusted = vec![true; glyphs.fonts.len()];
-        for (font, (agree, n)) in votes.iter().enumerate() {
-            if *n > 0 && agree * 2 < *n {
-                if tables[font].as_ref().is_some_and(|t| t.complete) {
-                    trusted[font] = false;
-                } else {
-                    tables[font] = None;
-                }
-            }
-        }
-        let tables = tables;
-        let bijoy: Vec<bool> = glyphs
+        let tables = glyphs
             .fonts
             .iter()
-            .map(|f| f.name.as_deref().is_some_and(is_bijoy_font))
+            .enumerate()
+            .map(|(i, f)| {
+                if i < MAX_RECOVERED_FONTS {
+                    self.recovery(f)
+                } else {
+                    None
+                }
+            })
             .collect();
+        let fonts = read::readings(&glyphs, tables);
         contain(|| {
             text::assemble(
                 &glyphs,
-                |word| {
-                    let mut out = Vec::with_capacity(word.len());
-                    let mut i = 0;
-                    while i < word.len() {
-                        let g = word[i];
-                        let rec = tables.get(g.font).and_then(|t| t.as_deref());
-                        // Bijoy: Latin-1 letters drawn with a Bangla-looking
-                        // font. The whole run in that font is converted.
-                        if bijoy.get(g.font).copied().unwrap_or(false) {
-                            let n = word[i..].iter().take_while(|x| x.font == g.font).count();
-                            let run = &word[i..i + n];
-                            let ascii: String = run
-                                .iter()
-                                .map(|x| {
-                                    let trust = trusted.get(x.font).copied().unwrap_or(true);
-                                    let own =
-                                        x.unicode.as_deref().filter(|u| trust && text::usable(u));
-                                    let recovered = rec
-                                        .and_then(|r| r.map.get(&x.glyph_id))
-                                        .map(|t| t.text.as_str());
-                                    match (own, recovered) {
-                                        (Some(t), _) | (None, Some(t)) => t.to_string(),
-                                        // A blank glyph with width is a space.
-                                        (None, None) if x.advance > x.size * 0.15 => {
-                                            " ".to_string()
-                                        }
-                                        (None, None) => String::new(),
-                                    }
-                                })
-                                .collect();
-                            // ‚ (ূ-kar) and the comma share one outline in
-                            // many fonts; inside a word it is never a comma.
-                            let mut ascii: Vec<char> = ascii.chars().collect();
-                            for k in 0..ascii.len().saturating_sub(1) {
-                                if ascii[k] == ',' && ascii[k + 1].is_alphanumeric() {
-                                    ascii[k] = '\u{201A}';
-                                }
-                            }
-                            let ascii: String = ascii.into_iter().collect();
-                            let mut p = text::GlyphPiece::new(
-                                g,
-                                akkhor_flow::bijoy::bijoy_to_unicode(&ascii),
-                                recover::Role::Base,
-                            );
-                            for x in &run[1..] {
-                                p.rect = p.rect.union(x.rect);
-                            }
-                            out.push(p);
-                            i += n;
-                            continue;
-                        }
-                        // A run of glyphs that means more than its parts.
-                        if let Some(r) = rec.filter(|r| r.max_sequence >= 2) {
-                            let longest = r.max_sequence.min(word.len() - i);
-                            let hit = (2..=longest).rev().find_map(|n| {
-                                let run = &word[i..i + n];
-                                if run.iter().any(|x| x.font != g.font) {
-                                    return None;
-                                }
-                                let key: Vec<u32> = run.iter().map(|x| x.glyph_id).collect();
-                                r.sequences.get(&key).map(|t| (n, t))
-                            });
-                            if let Some((n, t)) = hit {
-                                let mut p =
-                                    text::GlyphPiece::new(g, t.clone(), recover::Role::Base);
-                                for x in &word[i + 1..i + n] {
-                                    p.rect = p.rect.union(x.rect);
-                                }
-                                out.push(p);
-                                i += n;
-                                continue;
-                            }
-                        }
-                        // An invisible, zero-width glyph in a recovered font
-                        // is a shaping leftover, whatever the text layer says.
-                        if g.advance == 0.0
-                            && rec.is_some_and(|r| r.indic && r.blank.contains(&g.glyph_id))
-                        {
-                            i += 1;
-                            continue;
-                        }
-                        let recovered = rec.and_then(|r| r.map.get(&g.glyph_id));
-                        let trust = trusted.get(g.font).copied().unwrap_or(true);
-                        let own = g.unicode.as_deref().filter(|u| trust && text::usable(u));
-                        let (t, role) = match (recovered, own) {
-                            (Some(r), _) if rec.is_some_and(|r| r.indic) => {
-                                (r.text.clone(), r.role)
-                            }
-                            (_, Some(t)) => (recover::canonical(t), recover::role_of(t)),
-                            (Some(r), None) => (r.text.clone(), r.role),
-                            // A blank glyph with width is a space.
-                            (None, None)
-                                if rec.is_some_and(|r| r.blank.contains(&g.glyph_id))
-                                    && g.advance > g.size * 0.15 =>
-                            {
-                                (" ".to_string(), recover::Role::Base)
-                            }
-                            (None, None) => (String::new(), recover::Role::Base),
-                        };
-                        out.push(text::GlyphPiece::new(g, t, role));
-                        i += 1;
-                    }
-                    out
-                },
+                |word| read::word_pieces(word, &fonts),
                 text::reorder,
             )
         })
@@ -328,7 +204,7 @@ impl PdfDocument {
         cache
             .entry(font.key)
             .or_insert_with(|| {
-                contain(|| reference::recover(data))
+                contain(|| reference::recover(data, font.name.as_deref()))
                     .ok()
                     .flatten()
                     .map(Arc::new)
@@ -468,8 +344,9 @@ fn to_affine<T: hayro::hayro_interpret::util::TransformExt>(t: T) -> Affine {
 }
 
 /// Whether a font name is one of the Bijoy ("MJ") fonts, whose text is
-/// Latin-1 that only looks like Bangla: SutonnyMJ, SutonnyOMJ,
-/// SolaimanLipiMJ, "Sutonny MJ Bold", ...
+/// Latin-1 that only looks like Bangla: SutonnyMJ, SolaimanLipiMJ,
+/// "Sutonny MJ Bold", ... The "OMJ" fonts (SutonnyOMJ) are their Unicode
+/// versions and are not Bijoy.
 pub fn is_bijoy_font(name: &str) -> bool {
     let base: String = name
         .split([',', '-', '+'])
@@ -479,7 +356,7 @@ pub fn is_bijoy_font(name: &str) -> bool {
         .filter(|c| !c.is_whitespace())
         .collect::<String>()
         .to_ascii_uppercase();
-    base.ends_with("MJ") || base.contains("BIJOY") || base.starts_with("SUTONNY")
+    (base.ends_with("MJ") && !base.ends_with("OMJ")) || base.contains("BIJOY")
 }
 
 #[cfg(test)]
@@ -539,7 +416,6 @@ mod tests {
     fn recognizes_bijoy_fonts() {
         for name in [
             "SutonnyMJ",
-            "SutonnyOMJ-Bold",
             "SolaimanLipiMJ,Italic",
             "Sutonny MJ",
             "BijoyBaijayanta",
@@ -551,6 +427,8 @@ mod tests {
             "Kalpurush",
             "TimesNewRomanPSMT",
             "MJollnir",
+            "SutonnyOMJ",
+            "SutonnyOMJ-Bold",
         ] {
             assert!(!is_bijoy_font(name), "{name}");
         }

@@ -824,14 +824,19 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfSelectionRects(
 ) -> jni_sys::jfloatArray {
     guard(std::ptr::null_mut(), || {
         let ((page, a), (end_page, b)) = (pdf_unpos(start), pdf_unpos(end));
-        let rects = with_pdf_text(h, page, |t| {
-            let b = if end_page > page {
-                t.text.len()
-            } else {
-                b.min(t.text.len())
-            };
-            Ok(t.rects(a.min(b)..b))
-        })?;
+        // An end before the start selects nothing.
+        let rects = if end_page < page {
+            Vec::new()
+        } else {
+            with_pdf_text(h, page, |t| {
+                let b = if end_page > page {
+                    t.text.len()
+                } else {
+                    b.min(t.text.len())
+                };
+                Ok(t.rects(a.min(b)..b))
+            })?
+        };
         let flat: Vec<jfloat> = rects
             .iter()
             .flat_map(|r| {
