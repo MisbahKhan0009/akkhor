@@ -49,8 +49,8 @@ struct ReferenceFont {
     /// Outline hash → glyph id.
     shapes: OnceLock<HashMap<u64, u32>>,
     /// Coarse pictures of every glyph, for Type 3 matching: (glyph id,
-    /// advance in 1000-unit ems, shape, shape grown by a cell).
-    pictures: OnceLock<Vec<(u32, f32, Shape, Shape)>>,
+    /// advance in 1000-unit ems, shape), 264 bytes a glyph.
+    pictures: OnceLock<Vec<(u32, f32, Shape)>>,
     name: OnceLock<Option<String>>,
 }
 
@@ -104,7 +104,7 @@ impl ReferenceFont {
 }
 
 impl ReferenceFont {
-    fn pictures(&self) -> &[(u32, f32, Shape, Shape)] {
+    fn pictures(&self) -> &[(u32, f32, Shape)] {
         self.pictures.get_or_init(|| {
             let mut out = Vec::new();
             let Ok(font) = FontRef::new((*self.data).as_ref()) else {
@@ -133,7 +133,7 @@ impl ReferenceFont {
                     continue;
                 }
                 let advance = metrics.advance_width(id).unwrap_or(0.0) * scale as f32;
-                out.push((gid, advance, shape, shape.dilated()));
+                out.push((gid, advance, shape));
             }
             out
         })
@@ -178,6 +178,54 @@ impl OutlinePen for PathPen {
 /// best match is taken when it is near certain and clearly ahead of the
 /// next glyph. Shapes are `(shape, advance)` in 1000-unit ems.
 pub fn recognise(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
+    // A book draws the same bold glyphs on page after page: answers are
+    // kept (up to a few thousand shapes) so each is matched once.
+    type Seen = HashMap<(Shape, u32), Option<GlyphText>>;
+    static SEEN: OnceLock<Mutex<Seen>> = OnceLock::new();
+    let seen = SEEN.get_or_init(|| Mutex::new(HashMap::new()));
+    let key = |(s, a): &(Shape, f32)| (*s, a.round() as u32);
+    let known: Vec<Option<Option<GlyphText>>> = {
+        let seen = seen.lock().unwrap_or_else(|e| e.into_inner());
+        shapes.iter().map(|k| seen.get(&key(k)).cloned()).collect()
+    };
+    let todo: Vec<(Shape, f32)> = shapes
+        .iter()
+        .zip(&known)
+        .map(|(s, k)| {
+            if k.is_some() {
+                (Shape::default(), s.1)
+            } else {
+                *s
+            }
+        })
+        .collect();
+    let fresh = match_shapes(&todo);
+    let mut seen = seen.lock().unwrap_or_else(|e| e.into_inner());
+    if seen.len() > 4096 {
+        seen.clear();
+    }
+    shapes
+        .iter()
+        .zip(known)
+        .zip(fresh)
+        .map(|((s, k), f)| match k {
+            Some(k) => k,
+            None => {
+                if !s.0.is_empty() {
+                    seen.insert(key(s), f.clone());
+                }
+                f
+            }
+        })
+        .collect()
+}
+
+/// Reference fonts pictured for shape matching: the first ones registered
+/// (the app registers its script fonts first). Picturing a font costs a few
+/// tens of milliseconds, once.
+const MAX_PICTURED: usize = 24;
+
+fn match_shapes(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
     const MIN: f32 = 0.9;
     const MARGIN: f32 = 0.03;
     // Per shape: (score, text) of the best glyph, and the best score of a
@@ -185,7 +233,7 @@ pub fn recognise(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
     // same letters, which must not count against each other).
     let mut best: Vec<Option<(f32, GlyphText)>> = vec![None; shapes.len()];
     let mut other: Vec<f32> = vec![0.0; shapes.len()];
-    for font in references() {
+    for font in references().into_iter().take(MAX_PICTURED) {
         let pictures = font.pictures();
         if pictures.is_empty() {
             continue;
@@ -199,14 +247,14 @@ pub fn recognise(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
             if shape.is_empty() {
                 continue;
             }
-            for (gid, adv, pic, grown) in pictures {
+            for (gid, adv, pic) in pictures {
                 if (adv - advance).abs() > advance.max(100.0) * 0.12 {
                     continue;
                 }
                 let Some(text) = table.map.get(gid) else {
                     continue;
                 };
-                let s = pic.bold_match(shape, grown);
+                let s = pic.bold_match(shape, &pic.dilated());
                 match &best[i] {
                     Some((f, t)) if s <= *f => {
                         if t.text != text.text {

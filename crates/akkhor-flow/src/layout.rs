@@ -301,6 +301,15 @@ impl<'a> Paginator<'a> {
             self.y += top.max(self.prev_margin_bottom) * opts.font_size;
         }
         self.prev_margin_bottom = style.margin_bottom.unwrap_or(0.0);
+        // A heading is not left alone at the foot of a page: it needs room
+        // for itself and two lines of what follows.
+        if matches!(block.kind, BlockKind::Heading(_))
+            && !self.current.is_empty()
+            && self.y + lh + 2.0 * opts.font_size * opts.line_height > bottom
+        {
+            self.new_page();
+            self.y = opts.margin_top;
+        }
 
         // Forced line breaks split the block into segments laid out separately.
         let mut seg_start = 0;
@@ -816,6 +825,34 @@ mod tests {
                 assert!(t.is_char_boundary(l.range.start) && t.is_char_boundary(l.range.end));
                 assert!(l.glyphs.iter().all(|g| g.x >= 0.0 && g.x < 1080.0));
             }
+        }
+    }
+
+    #[test]
+    fn headings_are_not_left_at_the_foot_of_a_page() {
+        let fonts = FontSet::bundled();
+        let mut doc = Document::default();
+        for i in 0..40 {
+            let mut h = crate::model::Block::paragraph(format!("Heading {i}"));
+            h.kind = BlockKind::Heading(2);
+            doc.blocks.push(h);
+            doc.blocks.push(crate::model::Block::paragraph(
+                "Some words of a paragraph. ".repeat(6 + i % 5),
+            ));
+        }
+        let opts = LayoutOptions {
+            width: 600.0,
+            height: 900.0,
+            ..Default::default()
+        };
+        let pages = paginate(&doc, &opts, &fonts);
+        assert!(pages.len() > 3);
+        for p in &pages {
+            let last = p.lines.last().unwrap();
+            assert!(
+                !matches!(doc.blocks[last.block].kind, BlockKind::Heading(_)),
+                "a page ends with a heading"
+            );
         }
     }
 }

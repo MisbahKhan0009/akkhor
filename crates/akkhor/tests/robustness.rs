@@ -65,6 +65,27 @@ fn exercise(bytes: Vec<u8>, name: &str, fonts: &FontSet) {
             let _ = pdf.search("কর", 0).take(3).count();
             let _ = pdf.outline();
             let _ = pdf.thumbnail(0, 64, &Theme::NIGHT);
+            // Reflow of the first chapter, laid out, and its positions.
+            if let Some(range) = pdf.reflow_chapters().first().cloned()
+                && let Ok(r) = pdf.reflow(range)
+            {
+                let images = pdf.reflow_images();
+                let opts = akkhor::flow::LayoutOptions {
+                    width: 320.0,
+                    height: 480.0,
+                    ..Default::default()
+                };
+                let pages =
+                    akkhor::flow::paginate_with_images(&r.document, &opts, fonts, Some(&images));
+                assert!(!pages.is_empty());
+                for (b, block) in r.document.blocks.iter().enumerate().take(20) {
+                    for off in [0, block.text.len() / 2, block.text.len()] {
+                        if let Some((page, at)) = r.to_page(b, off) {
+                            let _ = r.from_page(page, at);
+                        }
+                    }
+                }
+            }
         }
         Book::Epub(epub) => {
             let _ = epub.toc.len();
@@ -154,6 +175,20 @@ fn damaged_files_never_panic() {
     ))
     .unwrap();
     run("hi.libreoffice.pdf", &lo, &mut rng, 40, &fonts);
+    // Book layouts (columns, Typst's tagged artifacts and ActualText spans,
+    // Type 3 bold) through page structure and reflow.
+    for book in [
+        "bn.typst.two.pdf",
+        "bn.chrome.two.pdf",
+        "hi.xelatex.two.pdf",
+    ] {
+        let data = std::fs::read(format!(
+            "{}/../../tests/corpus/books/pdf/{book}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        run(book, &data, &mut rng, 30, &fonts);
+    }
     run(
         "bijoy.txt",
         &fixture("bijoy-sample.txt"),

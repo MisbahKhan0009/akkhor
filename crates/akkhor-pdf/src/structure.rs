@@ -131,29 +131,37 @@ fn reading_order(p: &PageInput<'_>, body: f32) -> Vec<(usize, Item)> {
     items.extend((0..p.images.len()).map(Item::Image));
     let mut out = Vec::with_capacity(items.len());
     let mut region = 0;
-    cut(p, items, body, &mut region, &mut out);
+    cut(p, items, body, 0, &mut region, &mut out);
     out
 }
+
+/// Columns nested deeper than this are read as one region: real pages have
+/// a few, and a hostile page with thousands would otherwise overflow the
+/// stack (an abort that no panic guard catches).
+const MAX_CUT_DEPTH: usize = 24;
 
 fn cut(
     p: &PageInput<'_>,
     mut items: Vec<Item>,
     body: f32,
+    depth: usize,
     region: &mut usize,
     out: &mut Vec<(usize, Item)>,
 ) {
     if items.is_empty() {
         return;
     }
+    let depth = depth + 1;
     // Columns: the widest vertical gap crossing every item of the region.
     if items.len() > 1
+        && depth < MAX_CUT_DEPTH
         && let Some(x) = vertical_gap(p, &items, f64::from(body) * 0.6)
     {
         let (left, right): (Vec<Item>, Vec<Item>) = items
             .into_iter()
             .partition(|&it| rect_of(p, it).center().x < x);
-        cut(p, left, body, region, out);
-        cut(p, right, body, region, out);
+        cut(p, left, body, depth, region, out);
+        cut(p, right, body, depth, region, out);
         return;
     }
     // Bands, top to bottom: items overlapping vertically share a band. A
@@ -198,10 +206,10 @@ fn cut(
             }
             let all: Vec<Item> = columns.iter().flatten().copied().collect();
             if columns.len() > 1 && vertical_gap(p, &all, f64::from(body) * 0.6).is_some() {
-                cut(p, all, body, region, out);
+                cut(p, all, body, depth, region, out);
             } else {
                 for band in columns.iter() {
-                    cut(p, band.clone(), body, region, out);
+                    cut(p, band.clone(), body, depth, region, out);
                 }
             }
             columns.clear();
@@ -230,7 +238,7 @@ fn cut(
     let owns: Vec<Option<(f64, f64)>> = bands
         .iter()
         .map(|(_, b)| {
-            if b.len() > 1 {
+            if b.len() > 1 && depth < MAX_CUT_DEPTH {
                 gap_interval(p, b, min)
             } else {
                 None
@@ -764,6 +772,33 @@ mod tests {
         }];
         let l = &analyse(&pages)[0];
         assert_eq!(l.blocks.last().unwrap().kind, BlockKind::Footnote);
+    }
+
+    #[test]
+    fn thousands_of_columns_do_not_overflow_the_stack() {
+        // 20,000 one-glyph "lines" on one baseline, each 2 pt apart from the
+        // next by more than the column gap: a hostile or broken page.
+        let lines: Vec<(f64, f32, f64, f32, bool, &str)> = (0..20_000)
+            .map(|i| {
+                (
+                    f64::from(i) * 20.0,
+                    100.0,
+                    f64::from(i) * 20.0 + 5.0,
+                    10.0,
+                    false,
+                    "x",
+                )
+            })
+            .collect();
+        let t = page(&lines);
+        let pages = [PageInput {
+            text: &t,
+            images: &[],
+            page: Rect::new(0.0, 0.0, 400_000.0, 595.0),
+        }];
+        let l = &analyse(&pages)[0];
+        let n: usize = l.blocks.iter().map(|b| b.lines.len()).sum();
+        assert_eq!(n, 20_000);
     }
 
     #[test]
