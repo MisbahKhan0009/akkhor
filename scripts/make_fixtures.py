@@ -35,12 +35,19 @@ ENGLISH = [
 ]
 
 
+CSS = """/* sample book styles */
+h1 { text-align: center; margin: 1em 0 1.5em; }
+p { text-indent: 1.5em; margin: 0; text-align: justify; }
+h1 + p, p.first { text-indent: 0; }
+"""
+
+
 def xhtml(title, blocks, lang):
     body = "\n".join(f"<{t}>{x}</{t}>" for t, x in blocks)
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}" xml:lang="{lang}">
-<head><title>{title}</title><style>p {{ text-indent: 1em; }}</style></head>
+<head><title>{title}</title><link rel="stylesheet" type="text/css" href="../Styles/book.css"/></head>
 <body>
 {body}
 </body>
@@ -71,6 +78,7 @@ def make_epub(path):
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="css" href="Styles/book.css" media-type="text/css"/>
 {manifest}
   </manifest>
   <spine toc="ncx">
@@ -103,6 +111,7 @@ def make_epub(path):
         z.writestr("OEBPS/content.opf", opf, compress_type=zipfile.ZIP_DEFLATED)
         z.writestr("OEBPS/nav.xhtml", nav, compress_type=zipfile.ZIP_DEFLATED)
         z.writestr("OEBPS/toc.ncx", ncx, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr("OEBPS/Styles/book.css", CSS, compress_type=zipfile.ZIP_DEFLATED)
         for name, lang, blocks in chapters:
             z.writestr(f"OEBPS/Text/{name}", xhtml(blocks[0][1], blocks, lang), compress_type=zipfile.ZIP_DEFLATED)
 

@@ -8,6 +8,7 @@
 
 use std::ops::Range;
 
+use crate::css::Align;
 use crate::fonts::{FontId, FontSet, FontStyle, Synthetic};
 use crate::hyphen::hyphenate;
 use crate::model::StyleSpan;
@@ -127,22 +128,46 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
     let avail = (opts.width - 2.0 * opts.margin_x).max(1.0);
     let mut y = opts.margin_top;
 
+    let mut prev_margin_bottom = 0.0f32;
     for (block_idx, block) in doc.blocks.iter().enumerate() {
-        let size = opts.font_size * heading_scale(block.kind);
+        if block.kind == BlockKind::Image {
+            continue; // images are laid out from Phase 1.6
+        }
+        let style = &block.style;
+        let size = opts.font_size
+            * style
+                .font_scale
+                .unwrap_or_else(|| heading_scale(block.kind));
         let lh = size * opts.line_height;
         let indent = match block.kind {
             BlockKind::Quote | BlockKind::ListItem => size * 1.5,
             _ => 0.0,
         };
-        let justify = opts.justify && matches!(block.kind, BlockKind::Paragraph | BlockKind::Quote);
+        let align = match style.align {
+            Some(a) => a,
+            None if opts.justify
+                && matches!(block.kind, BlockKind::Paragraph | BlockKind::Quote) =>
+            {
+                Align::Justify
+            }
+            None => Align::Start,
+        };
+        let first_indent = style.indent.unwrap_or(0.0) * opts.font_size;
 
-        if !pages.last().is_some_and(|p| p.lines.is_empty()) {
-            y += opts.font_size * opts.paragraph_gap;
+        let page_empty = pages.last().is_some_and(|p| p.lines.is_empty());
+        if style.page_break_before && !page_empty {
+            pages.push(Page::default());
+            y = opts.margin_top;
+        } else if !page_empty {
+            // Vertical margins collapse: the larger of the two wins.
+            let top = style.margin_top.unwrap_or(opts.paragraph_gap);
+            y += top.max(prev_margin_bottom) * opts.font_size;
         }
+        prev_margin_bottom = style.margin_bottom.unwrap_or(0.0);
 
         // Forced line breaks split the block into segments laid out separately.
         let mut seg_start = 0;
-        for segment in block.text.split('\n') {
+        for (seg_idx, segment) in block.text.split('\n').enumerate() {
             let seg_range = seg_start..seg_start + segment.len();
             seg_start = seg_range.end + 1;
             // Style spans of this segment, made relative to it.
@@ -156,12 +181,7 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
                     style: sp.style,
                 })
                 .collect();
-            let base = if matches!(block.kind, BlockKind::Heading(_)) {
-                FontStyle::BOLD
-            } else {
-                FontStyle::REGULAR
-            };
-            let glyphs = shape_styled(segment, &spans, base, size, fonts);
+            let glyphs = shape_styled(segment, &spans, FontStyle::REGULAR, size, fonts);
             // Only English words are hyphenated; don't load a Latin font for
             // a segment without any.
             let hyphen = if segment.bytes().any(|b| b.is_ascii_alphabetic()) {
@@ -169,14 +189,13 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
             } else {
                 None
             };
-            for (range, placed) in break_lines(
-                segment,
-                &glyphs,
-                avail - indent,
-                justify,
-                opts.margin_x + indent,
-                hyphen,
-            ) {
+            let shape = LineShape {
+                avail: avail - indent,
+                left: opts.margin_x + indent,
+                first_indent: if seg_idx == 0 { first_indent } else { 0.0 },
+                align,
+            };
+            for (range, placed) in break_lines(segment, &glyphs, &shape, hyphen) {
                 if y + lh > bottom && !pages.last().is_some_and(|p| p.lines.is_empty()) {
                     pages.push(Page::default());
                     y = opts.margin_top;
@@ -246,12 +265,20 @@ fn no_line_end(c: char) -> bool {
 /// Breaks one shaped segment into lines. Returns each line's byte range and
 /// its glyphs with `x` set and `y` relative to the baseline. `hyphen` is the
 /// shaped hyphen glyph used when an English word is hyphenated.
+/// The horizontal shape of the lines of one segment.
+struct LineShape {
+    /// Width available to text, and its left edge.
+    avail: f32,
+    left: f32,
+    /// Extra indent of the first line (negative for a hanging indent).
+    first_indent: f32,
+    align: Align,
+}
+
 fn break_lines(
     text: &str,
     glyphs: &[ShapedGlyph],
-    avail: f32,
-    justify: bool,
-    left: f32,
+    shape: &LineShape,
     hyphen: Option<ShapedGlyph>,
 ) -> Vec<(Range<usize>, Vec<PlacedGlyph>)> {
     if text.trim().is_empty() {
@@ -291,10 +318,19 @@ fn break_lines(
         glyphs[gi(a)..gi(end)].iter().map(|g| g.advance).sum()
     };
     let size = glyphs.first().map_or(16.0, |g| g.size);
+    // The first line is shorter (or longer) by the first-line indent.
+    let avail_for = |start: usize| {
+        if start == 0 {
+            (shape.avail - shape.first_indent).max(size)
+        } else {
+            shape.avail
+        }
+    };
 
     // Where the English word starting at `from` may be hyphenated so that the
     // line from `start` still fits (with the hyphen). Picks the latest point.
     let hyphen_point = |start: usize, from: usize| -> Option<usize> {
+        let avail = avail_for(start);
         let hy = hyphen?;
         let word_end = text[from..]
             .find(|c: char| !c.is_ascii_alphabetic())
@@ -309,6 +345,8 @@ fn break_lines(
     let mut lines = Vec::new();
     let mut start = 0;
     while start < text.len() {
+        let avail = avail_for(start);
+        let left = shape.left + if start == 0 { shape.first_indent } else { 0.0 };
         // Furthest break that fits.
         let mut end = None;
         for &b in breaks.iter().filter(|&&b| b > start) {
@@ -360,6 +398,11 @@ fn break_lines(
             }
         };
         let is_last = end >= text.len();
+        // The last line of a justified paragraph is set ragged.
+        let align = match shape.align {
+            Align::Justify if is_last => Align::Start,
+            a => a,
+        };
         let mut placed = place(
             text,
             glyphs,
@@ -371,7 +414,7 @@ fn break_lines(
                 } else {
                     0.0
                 },
-            justify && !is_last,
+            align,
             left,
         );
         if hyphenated && let Some(h) = hyphen {
@@ -413,7 +456,7 @@ fn place(
     from: usize,
     to: usize,
     avail: f32,
-    justify: bool,
+    align: Align,
     left: f32,
 ) -> Vec<PlacedGlyph> {
     let line = &glyphs[from..to];
@@ -427,7 +470,7 @@ fn place(
     let natural: f32 = line.iter().map(|g| g.advance).sum();
     let spaces = line.iter().filter(|g| is_space(g)).count();
     let mut extra = 0.0;
-    if justify && spaces > 0 {
+    if align == Align::Justify && spaces > 0 {
         let per = (avail - natural) / spaces as f32;
         // Very loose lines look worse justified than ragged.
         let size = line.first().map_or(16.0, |g| g.size);
@@ -435,7 +478,13 @@ fn place(
             extra = per;
         }
     }
-    let mut pen = left;
+    let free = (avail - natural).max(0.0);
+    let mut pen = left
+        + match align {
+            Align::Center => free / 2.0,
+            Align::End => free,
+            _ => 0.0,
+        };
     line.iter()
         .map(|g| {
             let advance = g.advance + if is_space(g) { extra } else { 0.0 };
@@ -521,6 +570,33 @@ mod tests {
         for w in lines.windows(2) {
             assert_eq!(w[0].range.end, w[1].range.start);
         }
+    }
+
+    #[test]
+    fn css_alignment_indent_and_page_breaks() {
+        let fonts = FontSet::bundled();
+        let doc = Document::from_html(
+            r#"<style>.c{text-align:center; text-indent:0} .r{text-align:right; text-indent:0} p{text-indent:2em}
+               .brk{page-break-before:always}</style>
+               <p class="c">মাঝখানে</p><p class="r">ডানে</p>
+               <p>প্রথম লাইনে ইন্ডেন্ট থাকবে।</p><p class="brk">নতুন পাতা</p>"#,
+        );
+        let opts = LayoutOptions::default();
+        let pages = paginate(&doc, &opts, &fonts);
+        assert_eq!(pages.len(), 2, "page break starts a new page");
+        let l = &pages[0].lines;
+        let mid = opts.width / 2.0;
+        let center = (l[0].left + l[0].right) / 2.0;
+        assert!((center - mid).abs() < 2.0, "centred: {center} vs {mid}");
+        assert!(
+            (l[1].right - (opts.width - opts.margin_x)).abs() < 2.0,
+            "right-aligned"
+        );
+        assert!(
+            (l[2].left - (opts.margin_x + 2.0 * opts.font_size)).abs() < 1.0,
+            "first-line indent"
+        );
+        assert_eq!(pages[1].lines[0].block, 3);
     }
 
     #[test]

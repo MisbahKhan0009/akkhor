@@ -9,6 +9,7 @@ pub mod zip;
 use akkhor_core::{Error, Result, Source};
 use akkhor_flow::Document;
 use akkhor_flow::markup::{Token, Tokenizer};
+use akkhor_flow::model::linked_stylesheets;
 use akkhor_flow::search::{Match, find_all};
 
 use crate::zip::ZipArchive;
@@ -153,7 +154,17 @@ impl EpubBook {
     pub fn chapter(&self, index: usize) -> Result<Document> {
         let path = self.spine.get(index).ok_or(Error::OutOfRange)?;
         let html = self.zip.read_string(path)?;
-        let mut doc = Document::from_html(&html);
+        let dir = parent_dir(path);
+        let css: Vec<String> = linked_stylesheets(&html)
+            .iter()
+            .filter_map(|href| {
+                self.zip
+                    .read_string(&join_path(&dir, &percent_decode(href)))
+                    .ok()
+            })
+            .collect();
+        let css_refs: Vec<&str> = css.iter().map(String::as_str).collect();
+        let mut doc = Document::from_html_with_css(&html, &css_refs);
         if doc.lang.is_none() {
             doc.lang = self.metadata.language.clone();
         }
@@ -347,6 +358,9 @@ mod tests {
         assert!(!book.toc.is_empty());
         let ch = book.chapter(0).unwrap();
         assert!(ch.blocks.iter().any(|b| b.text.contains("ক্ষ")));
+        // The linked stylesheet centres headings and indents paragraphs.
+        assert_eq!(ch.blocks[0].style.align, Some(akkhor_flow::Align::Center));
+        assert_eq!(ch.blocks[1].style.indent, Some(1.5));
         // ক্ষ is in the Bangla chapter (several times) and in the English one.
         let hits: Vec<_> = book.search("ক্ষ").collect();
         assert!(hits.iter().any(|(c, _)| *c == 0));

@@ -13,6 +13,7 @@
 //! 4. [`layout`]: line breaking and pagination.
 //! 5. [`paint`]: drawing a page into a pixel buffer.
 
+pub mod css;
 pub mod fonts;
 pub mod hyphen;
 pub mod layout;
@@ -24,9 +25,10 @@ pub mod search;
 pub mod select;
 pub mod shape;
 
+pub use css::Align;
 pub use fonts::{FontId, FontSet, FontStyle, Synthetic};
 pub use layout::{LayoutOptions, Line, Page, PlacedGlyph, paginate};
-pub use model::{Block, BlockKind, Document, Position, Style, StyleSpan};
+pub use model::{Block, BlockKind, BlockStyle, Document, Position, Style, StyleSpan};
 pub use paint::{GlyphCache, render_page};
 pub use script::Script;
 pub use search::{Match, find_all, snippet};
