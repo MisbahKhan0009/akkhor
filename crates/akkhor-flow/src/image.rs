@@ -101,9 +101,10 @@ pub fn decode(_b: &[u8]) -> Option<DecodedImage> {
     None
 }
 
-/// Refuse to decode absurd images (decompression bombs).
+/// Refuse to decode images over 16 megapixels (64 MB while decoding):
+/// book pictures are far smaller, and it stops decompression bombs.
 #[cfg(feature = "images")]
-const MAX_PIXELS: u64 = 40_000_000;
+const MAX_PIXELS: u64 = 16_000_000;
 
 #[cfg(feature = "images")]
 fn decode_png(b: &[u8]) -> Option<DecodedImage> {

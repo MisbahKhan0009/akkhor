@@ -113,11 +113,22 @@ impl Document {
         b.finish()
     }
 
-    /// Builds a document from plain text: blank lines separate paragraphs.
+    /// Builds a document from plain text. Files that separate paragraphs
+    /// with blank lines (and may hard-wrap lines inside them) are read that
+    /// way; files with one paragraph per line, common for Bangla text, keep
+    /// every line as its own paragraph.
     pub fn from_plain_text(text: &str) -> Self {
         let mut doc = Document::default();
-        let text = text.replace("\r\n", "\n");
-        for para in text.split("\n\n").map(str::trim).filter(|p| !p.is_empty()) {
+        let text = text.replace("\r\n", "\n").replace('\r', "\n");
+        let lines = text.lines().filter(|l| !l.trim().is_empty()).count();
+        let blank_separated = text.matches("\n\n").count();
+        let one_per_line = lines >= 8 && blank_separated * 8 < lines;
+        let paragraphs: Box<dyn Iterator<Item = &str>> = if one_per_line {
+            Box::new(text.lines())
+        } else {
+            Box::new(text.split("\n\n"))
+        };
+        for para in paragraphs.map(str::trim).filter(|p| !p.is_empty()) {
             doc.blocks.push(Block::paragraph(collapse_ws(para)));
         }
         doc
@@ -162,16 +173,21 @@ struct Computed {
 }
 
 struct Frame {
-    info: ElementInfo,
     computed: Computed,
     opens_block: bool,
 }
+
+/// Deeper nesting than this is treated as flat: real books never get close,
+/// and it bounds the work hostile files can cause.
+const MAX_DEPTH: usize = 256;
 
 #[derive(Default)]
 struct Builder {
     doc: Document,
     sheet: Stylesheet,
     stack: Vec<Frame>,
+    /// Selector facts of the open elements, parallel to `stack`.
+    infos: Vec<ElementInfo>,
     kind: Option<BlockKind>,
     block_style: Option<BlockStyle>,
     text: String,
@@ -233,8 +249,7 @@ impl Builder {
                 .unwrap_or_default(),
             name,
         };
-        let ancestors: Vec<ElementInfo> = self.stack.iter().map(|f| f.info.clone()).collect();
-        let mut decls = self.sheet.matching(&info, &ancestors);
+        let mut decls = self.sheet.matching(&info, &self.infos);
         if let Some(inline) = get("style") {
             decls.extend(parse_declarations(&inline));
         }
@@ -300,33 +315,37 @@ impl Builder {
             block.align = c.align;
             block.indent = c.indent;
             block.font_scale = c.font_scale;
+            // A page break carried from an empty element before this one.
+            let carried = self.block_style.take().is_some_and(|b| b.page_break_before);
+            block.page_break_before |= carried;
             self.block_style = Some(block);
+        }
+        if self_closing || VOID.contains(&name) || self.stack.len() >= MAX_DEPTH {
+            return;
         }
         if name == "style" {
             self.css = Some(String::new());
         }
-        if self_closing || VOID.contains(&name) {
-            return;
-        }
         self.close_span();
         self.stack.push(Frame {
-            info,
             computed: c,
             opens_block,
         });
+        self.infos.push(info);
         self.span_start = self.text.len();
     }
 
     fn close(&mut self, name: &str) {
-        let Some(at) = self.stack.iter().rposition(|f| f.info.name == name) else {
+        let Some(at) = self.infos.iter().rposition(|i| i.name == name) else {
             return; // stray end tag
         };
         self.close_span();
         let mut block_closed = false;
         while self.stack.len() > at {
             let f = self.stack.pop().expect("non-empty");
+            let info = self.infos.pop().expect("parallel to stack");
             block_closed |= f.opens_block && !f.computed.hidden;
-            if f.info.name == "style"
+            if info.name == "style"
                 && let Some(css) = self.css.take()
             {
                 self.sheet.add(&css);
@@ -558,5 +577,32 @@ mod tests {
         let html = r#"<html><head><link rel="stylesheet" href="../Styles/a.css"/>
             <link rel="icon" href="x.png"/><link href="b.css" rel="Stylesheet"></head><body/></html>"#;
         assert_eq!(linked_stylesheets(html), vec!["../Styles/a.css", "b.css"]);
+    }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+
+    #[test]
+    fn self_closing_style_does_not_swallow_text() {
+        let doc = Document::from_html("<head><style/></head><body><p>দেখা যায়</p></body>");
+        assert_eq!(doc.blocks.len(), 1, "{doc:?}");
+    }
+
+    #[test]
+    fn plain_text_paragraph_styles() {
+        let blank = "এক লাইন\nআরও এক\n\nদ্বিতীয় অনুচ্ছেদ\n";
+        assert_eq!(Document::from_plain_text(blank).blocks.len(), 2);
+        let per_line = (0..20).map(|i| format!("অনুচ্ছেদ {i}\n")).collect::<String>();
+        assert_eq!(Document::from_plain_text(&per_line).blocks.len(), 20);
+    }
+
+    #[test]
+    fn empty_page_break_element_carries_to_next_block() {
+        let doc = Document::from_html(
+            r#"<p>এক</p><div style="page-break-before:always"></div><p>দুই</p>"#,
+        );
+        assert!(doc.blocks[1].style.page_break_before, "{:?}", doc.blocks[1]);
     }
 }

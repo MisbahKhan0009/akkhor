@@ -37,6 +37,12 @@ pub struct Source(Arc<Bytes>);
 
 impl Source {
     /// Memory-maps the file at `path`.
+    ///
+    /// The file must not be truncated while it is open: reading a mapped
+    /// page past the new end raises SIGBUS and ends the process. That is the
+    /// price of zero-copy access, paid by every mmap-based reader. Apps
+    /// should open files they control (their own library folder, or a copy
+    /// of a shared file) rather than files another app may rewrite.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = File::open(path)?;
         Self::from_file(&file)

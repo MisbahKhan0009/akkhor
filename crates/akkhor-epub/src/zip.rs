@@ -42,6 +42,14 @@ fn bad() -> Error {
     Error::malformed("damaged zip archive")
 }
 
+/// `data[at..at + len]`, with every addition checked: sizes and offsets come
+/// from the file and may be hostile.
+fn slice(data: &[u8], at: u64, len: u64) -> Option<&[u8]> {
+    let start = usize::try_from(at).ok()?;
+    let end = start.checked_add(usize::try_from(len).ok()?)?;
+    data.get(start..end)
+}
+
 impl ZipArchive {
     pub fn open(source: Source) -> Result<Self> {
         let data = source.bytes();
@@ -67,9 +75,9 @@ impl ZipArchive {
         }
 
         let mut entries = Vec::with_capacity(count.min(100_000) as usize);
-        let mut pos = cd_offset as usize;
+        let mut pos = usize::try_from(cd_offset).map_err(|_| bad())?;
         for _ in 0..count {
-            if data.get(pos..pos + 4) != Some(b"PK\x01\x02") {
+            if slice(data, pos as u64, 46).is_none_or(|h| !h.starts_with(b"PK\x01\x02")) {
                 return Err(bad());
             }
             let method = u16le(data, pos + 10).ok_or_else(bad)?;
@@ -79,13 +87,11 @@ impl ZipArchive {
             let extra_len = u16le(data, pos + 30).ok_or_else(bad)? as usize;
             let comment_len = u16le(data, pos + 32).ok_or_else(bad)? as usize;
             let mut local_header = u32le(data, pos + 42).ok_or_else(bad)? as u64;
-            let name_bytes = data.get(pos + 46..pos + 46 + name_len).ok_or_else(bad)?;
+            let name_bytes = slice(data, pos as u64 + 46, name_len as u64).ok_or_else(bad)?;
             let name = String::from_utf8_lossy(name_bytes).into_owned();
 
             // Zip64 extra field carries the real sizes and offset.
-            let extra = data
-                .get(pos + 46 + name_len..pos + 46 + name_len + extra_len)
-                .unwrap_or(&[]);
+            let extra = slice(data, (pos + 46 + name_len) as u64, extra_len as u64).unwrap_or(&[]);
             let mut e = 0;
             while e + 4 <= extra.len() {
                 let id = u16le(extra, e).unwrap_or(0);
@@ -142,21 +148,21 @@ impl ZipArchive {
         let idx = *self.by_name.get(name).ok_or(Error::OutOfRange)?;
         let e = &self.entries[idx];
         let data = self.source.bytes();
-        let lh = e.local_header as usize;
-        if data.get(lh..lh + 4) != Some(b"PK\x03\x04") {
+        let header = slice(data, e.local_header, 30).ok_or_else(bad)?;
+        if !header.starts_with(b"PK\x03\x04") {
             return Err(bad());
         }
+        let lh = e.local_header as usize;
         let flags = u16le(data, lh + 6).ok_or_else(bad)?;
         if flags & 1 != 0 {
             return Err(Error::Protected);
         }
         let name_len = u16le(data, lh + 26).ok_or_else(bad)? as usize;
         let extra_len = u16le(data, lh + 28).ok_or_else(bad)? as usize;
-        let start = lh + 30 + name_len + extra_len;
-        let raw = data
-            .get(start..start + e.compressed_size as usize)
-            .ok_or_else(bad)?;
+        let start = (lh + 30 + name_len + extra_len) as u64;
+        let raw = slice(data, start, e.compressed_size).ok_or_else(bad)?;
         match e.method {
+            0 if raw.len() > MAX_ENTRY => Err(Error::malformed("zip entry too large")),
             0 => Ok(raw.to_vec()),
             8 => decompress_to_vec_with_limit(raw, (e.size as usize).min(MAX_ENTRY))
                 .map_err(|_| bad()),

@@ -243,7 +243,7 @@ impl<'a> Paginator<'a> {
             };
             // Book pixels are CSS pixels: 16 of them to the body em.
             let scale = opts.font_size / 16.0;
-            let max_h = bottom - opts.margin_top;
+            let max_h = (bottom - opts.margin_top).max(1.0);
             let fit = (avail / (iw as f32 * scale))
                 .min(max_h / (ih as f32 * scale))
                 .min(1.0);
@@ -461,13 +461,19 @@ fn break_lines(
 
     // Glyph index of the first glyph whose cluster is >= byte offset.
     let gi = |offset: usize| glyphs.partition_point(|g| g.cluster < offset);
+    // Running sum of advances, so any width is one subtraction.
+    let mut prefix = Vec::with_capacity(glyphs.len() + 1);
+    prefix.push(0.0f32);
+    for g in glyphs {
+        prefix.push(prefix.last().copied().unwrap_or(0.0) + g.advance);
+    }
     let width = |a: usize, b: usize| -> f32 {
         // Trailing spaces do not count towards the line width.
         let mut end = b;
         while end > a && bytes[end - 1] == b' ' {
             end -= 1;
         }
-        glyphs[gi(a)..gi(end)].iter().map(|g| g.advance).sum()
+        prefix[gi(end)] - prefix[gi(a)]
     };
     let size = glyphs.first().map_or(16.0, |g| g.size);
     // The first line is shorter (or longer) by the first-line indent.
@@ -499,9 +505,11 @@ fn break_lines(
     while start < text.len() {
         let avail = avail_for(start);
         let left = shape.left + if start == 0 { shape.first_indent } else { 0.0 };
-        // Furthest break that fits.
+        // Furthest break that fits. Breaks are sorted, so start the scan at
+        // the first one after `start`.
+        let first = breaks.partition_point(|&b| b <= start);
         let mut end = None;
-        for &b in breaks.iter().filter(|&&b| b > start) {
+        for &b in &breaks[first..] {
             if width(start, b) <= avail {
                 end = Some(b);
             } else {

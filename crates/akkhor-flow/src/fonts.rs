@@ -6,10 +6,10 @@
 //! touches the Bangla or Devanagari font at all.
 
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use akkhor_core::Source;
+use harfrust::ShapePlan;
 use harfrust::font::{Blob, Font};
 
 use crate::script::Script;
@@ -29,6 +29,8 @@ pub struct LoadedFont {
     pub units_per_em: f32,
     pub ascender: f32,
     pub descender: f32,
+    /// Shaping plans by script, built once and reused for every run.
+    plans: Mutex<Vec<(Option<harfrust::Script>, Arc<ShapePlan>)>>,
 }
 
 impl LoadedFont {
@@ -58,7 +60,25 @@ impl LoadedFont {
             units_per_em,
             ascender,
             descender,
+            plans: Mutex::new(Vec::new()),
         })
+    }
+
+    /// The left-to-right shaping plan for `script`, built on first use.
+    pub fn plan(&self, script: Option<harfrust::Script>) -> Arc<ShapePlan> {
+        let mut plans = self.plans.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((_, p)) = plans.iter().find(|(s, _)| *s == script) {
+            return p.clone();
+        }
+        let plan = Arc::new(ShapePlan::new(
+            &self.font,
+            harfrust::Direction::LeftToRight,
+            script,
+            None,
+            &[],
+        ));
+        plans.push((script, plan.clone()));
+        plan
     }
 
     pub fn has_char(&self, c: char) -> bool {

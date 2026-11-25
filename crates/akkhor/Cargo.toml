@@ -31,3 +31,6 @@ akkhor-core.workspace = true
 akkhor-pdf = { workspace = true, optional = true }
 akkhor-epub = { workspace = true, optional = true }
 akkhor-flow = { workspace = true, optional = true }
+
+[dev-dependencies]
+akkhor-flow = { workspace = true, features = ["bundled-fonts"] }

@@ -36,10 +36,11 @@
 #![allow(non_snake_case, clippy::missing_safety_doc)]
 
 use std::cell::RefCell;
-use std::ffi::{CStr, CString, c_char};
+use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use akkhor::{Book, Format, Source, Theme};
 use jni_sys::{JNIEnv, jclass, jfloat, jint, jlong, jobject, jstring};
@@ -50,12 +51,11 @@ use akkhor::flow::{FontSet, GlyphCache, LayoutOptions, Page, Script, fonts::Font
 static FONTS: Mutex<Vec<(String, PathBuf)>> = Mutex::new(Vec::new());
 
 thread_local! {
-    static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
+    static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 fn set_error(msg: impl ToString) {
-    let c = CString::new(msg.to_string().replace('\0', " ")).ok();
-    LAST_ERROR.with(|e| *e.borrow_mut() = c);
+    LAST_ERROR.with(|e| *e.borrow_mut() = Some(msg.to_string()));
 }
 
 struct Handle {
@@ -135,36 +135,77 @@ fn guard<T>(fallback: T, f: impl FnOnce() -> Result<T, String>) -> T {
     }
 }
 
+/// Reads a Java string as UTF-16 (JNI's "modified UTF-8" would mangle
+/// characters outside the Basic Multilingual Plane).
 unsafe fn jstr(env: *mut JNIEnv, s: jstring) -> Option<String> {
     if s.is_null() {
         return None;
     }
     unsafe {
-        let get = (**env).GetStringUTFChars?;
-        let release = (**env).ReleaseStringUTFChars?;
-        let chars = get(env, s, std::ptr::null_mut());
-        if chars.is_null() {
-            return None;
-        }
-        let out = CStr::from_ptr(chars).to_string_lossy().into_owned();
-        release(env, s, chars);
-        Some(out)
+        let len = (**env).GetStringLength?(env, s);
+        let mut units = vec![0u16; len.max(0) as usize];
+        (**env).GetStringRegion?(env, s, 0, len, units.as_mut_ptr());
+        Some(String::from_utf16_lossy(&units))
     }
 }
 
-unsafe fn handle<'a>(h: jlong) -> Result<&'a mut Handle, String> {
-    if h == 0 {
-        return Err("closed or invalid handle".into());
+/// Makes a Java string from UTF-16, which is valid for every character.
+unsafe fn new_jstring(env: *mut JNIEnv, s: &str) -> Result<jstring, String> {
+    let units: Vec<u16> = s.encode_utf16().collect();
+    unsafe {
+        let new = (**env).NewString.ok_or("JNI")?;
+        let out = new(env, units.as_ptr(), units.len() as jint);
+        if out.is_null() {
+            return Err("out of memory".into());
+        }
+        Ok(out)
     }
-    Ok(unsafe { &mut *(h as *mut Handle) })
+}
+
+type Shared = Arc<Mutex<Handle>>;
+
+/// Open books by id. Ids are never reused, so a stale or doubled `close`
+/// and a call after `close` are harmless errors, and each book has its own
+/// lock, so a render thread and the UI thread can call in at the same time.
+static HANDLES: Mutex<BTreeMap<jlong, Shared>> = Mutex::new(BTreeMap::new());
+static NEXT_ID: AtomicI64 = AtomicI64::new(1);
+
+fn registry() -> MutexGuard<'static, BTreeMap<jlong, Shared>> {
+    HANDLES.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Runs `f` on the open book `h`, holding that book's lock.
+fn with_handle<T>(h: jlong, f: impl FnOnce(&mut Handle) -> Result<T, String>) -> Result<T, String> {
+    let shared = registry()
+        .get(&h)
+        .cloned()
+        .ok_or("closed or invalid handle")?;
+    // A panic in an earlier call poisons the lock; the data is still
+    // consistent (every call writes whole values), so carry on.
+    let mut lock = shared.lock().unwrap_or_else(|e| e.into_inner());
+    f(&mut lock)
+}
+
+/// Runs `f` on the laid-out chapter of `h`.
+#[cfg(feature = "flow")]
+fn with_flow<T>(
+    h: jlong,
+    f: impl FnOnce(&mut FlowState) -> Result<T, String>,
+) -> Result<T, String> {
+    with_handle(h, |h| {
+        f(h.flow.as_mut().ok_or("call layoutChapter first")?)
+    })
 }
 
 fn into_handle(book: Book) -> jlong {
-    Box::into_raw(Box::new(Handle {
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let handle = Handle {
         book,
         #[cfg(feature = "flow")]
         flow: None,
-    })) as jlong
+    };
+    registry().insert(id, Arc::new(Mutex::new(handle)));
+    id
 }
 
 #[unsafe(no_mangle)]
@@ -232,9 +273,10 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_openFd(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_dev_akkhor_Native_close(_: *mut JNIEnv, _: jclass, h: jlong) {
-    if h != 0 {
-        let _ = catch_unwind(|| drop(unsafe { Box::from_raw(h as *mut Handle) }));
-    }
+    // Remove it from the registry, then drop it outside the registry lock.
+    // A call still running on another thread keeps it alive until it ends.
+    let removed = registry().remove(&h);
+    let _ = catch_unwind(AssertUnwindSafe(|| drop(removed)));
 }
 
 #[unsafe(no_mangle)]
@@ -244,12 +286,13 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_format(
     h: jlong,
 ) -> jint {
     guard(-1, || {
-        let h = unsafe { handle(h) }?;
-        Ok(match h.book.format() {
-            Format::Pdf => 0,
-            Format::Epub => 1,
-            Format::Txt => 2,
-            _ => 9,
+        with_handle(h, |h| {
+            Ok(match h.book.format() {
+                Format::Pdf => 0,
+                Format::Epub => 1,
+                Format::Txt => 2,
+                _ => 9,
+            })
         })
     })
 }
@@ -261,26 +304,26 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_count(
     h: jlong,
 ) -> jint {
     guard(-1, || {
-        let h = unsafe { handle(h) }?;
-        Ok(match &h.book {
-            #[cfg(feature = "pdf")]
-            Book::Pdf(p) => p.page_count() as jint,
-            #[cfg(feature = "epub")]
-            Book::Epub(e) => e.chapter_count() as jint,
-            #[cfg(feature = "txt")]
-            Book::Text(_) => 1,
+        with_handle(h, |h| {
+            Ok(match &h.book {
+                #[cfg(feature = "pdf")]
+                Book::Pdf(p) => p.page_count() as jint,
+                #[cfg(feature = "epub")]
+                Book::Epub(e) => e.chapter_count() as jint,
+                #[cfg(feature = "txt")]
+                Book::Text(_) => 1,
+            })
         })
     })
 }
 
 #[cfg(feature = "pdf")]
 fn pdf_size(h: jlong, page: jint) -> Result<(f32, f32), String> {
-    let h = unsafe { handle(h) }?;
-    match &h.book {
+    with_handle(h, |h| match &h.book {
         Book::Pdf(p) => p.page_size(page as usize).map_err(|e| e.to_string()),
         #[allow(unreachable_patterns)]
         _ => Err("not a PDF".into()),
-    }
+    })
 }
 
 #[cfg(feature = "pdf")]
@@ -418,17 +461,18 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTile(
     theme_code: jint,
 ) -> jint {
     guard(-1, || {
-        let h = unsafe { handle(h) }?;
-        #[allow(irrefutable_let_patterns)]
-        let Book::Pdf(pdf) = &h.book else {
-            return Err("not a PDF".into());
-        };
-        let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
-        let tile = akkhor::Tile::new(x.max(0) as u32, y.max(0) as u32, bmp.width, bmp.height);
-        let out = bmp.pixels()?;
-        pdf.render_tile(page as usize, scale, tile, &theme(theme_code), out)
-            .map_err(|e| e.to_string())?;
-        Ok(0)
+        with_handle(h, |h| {
+            #[allow(irrefutable_let_patterns)]
+            let Book::Pdf(pdf) = &h.book else {
+                return Err("not a PDF".into());
+            };
+            let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
+            let tile = akkhor::Tile::new(x.max(0) as u32, y.max(0) as u32, bmp.width, bmp.height);
+            let out = bmp.pixels()?;
+            pdf.render_tile(page as usize, scale, tile, &theme(theme_code), out)
+                .map_err(|e| e.to_string())?;
+            Ok(0)
+        })
     })
 }
 
@@ -446,45 +490,46 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
     font_size: jfloat,
 ) -> jint {
     guard(-1, || {
-        let _ = chapter; // unused in TXT-only builds
-        let h = unsafe { handle(h) }?;
-        let doc = match &h.book {
-            #[cfg(feature = "epub")]
-            Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
-            #[cfg(feature = "txt")]
-            Book::Text(t) => t.document.clone(),
-            #[allow(unreachable_patterns)]
-            _ => return Err("not a reflowable book".into()),
-        };
-        let flow = h.flow.get_or_insert_with(|| FlowState {
-            fonts: font_set(),
-            glyphs: GlyphCache::default(),
-            pages: Vec::new(),
-            width: 0,
-            height: 0,
-            chapter: 0,
-            doc: Default::default(),
-        });
-        let opts = LayoutOptions {
-            width: width as f32,
-            height: height as f32,
-            font_size,
-            margin_x: width as f32 * 0.067,
-            ..Default::default()
-        };
-        let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
-            #[cfg(feature = "epub")]
-            Book::Epub(e) => Some(Box::new(e.chapter_images(chapter as usize))),
-            #[allow(unreachable_patterns)]
-            _ => None,
-        };
-        flow.pages =
-            akkhor::flow::paginate_with_images(&doc, &opts, &flow.fonts, images.as_deref());
-        flow.chapter = chapter.max(0) as usize;
-        flow.doc = doc;
-        flow.width = width.max(0) as u32;
-        flow.height = height.max(0) as u32;
-        Ok(flow.pages.len() as jint)
+        with_handle(h, |h| {
+            let _ = chapter; // unused in TXT-only builds
+            let doc = match &h.book {
+                #[cfg(feature = "epub")]
+                Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
+                #[cfg(feature = "txt")]
+                Book::Text(t) => t.document.clone(),
+                #[allow(unreachable_patterns)]
+                _ => return Err("not a reflowable book".into()),
+            };
+            let flow = h.flow.get_or_insert_with(|| FlowState {
+                fonts: font_set(),
+                glyphs: GlyphCache::default(),
+                pages: Vec::new(),
+                width: 0,
+                height: 0,
+                chapter: 0,
+                doc: Default::default(),
+            });
+            let opts = LayoutOptions {
+                width: width as f32,
+                height: height as f32,
+                font_size,
+                margin_x: width as f32 * 0.067,
+                ..Default::default()
+            };
+            let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
+                #[cfg(feature = "epub")]
+                Book::Epub(e) => Some(Box::new(e.chapter_images(chapter as usize))),
+                #[allow(unreachable_patterns)]
+                _ => None,
+            };
+            flow.pages =
+                akkhor::flow::paginate_with_images(&doc, &opts, &flow.fonts, images.as_deref());
+            flow.chapter = chapter.max(0) as usize;
+            flow.doc = doc;
+            flow.width = width.max(0) as u32;
+            flow.height = height.max(0) as u32;
+            Ok(flow.pages.len() as jint)
+        })
     })
 }
 
@@ -499,33 +544,34 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderFlowPage(
     theme_code: jint,
 ) -> jint {
     guard(-1, || {
-        let h = unsafe { handle(h) }?;
-        let flow = h.flow.as_mut().ok_or("call layoutChapter first")?;
-        let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
-            #[cfg(feature = "epub")]
-            Book::Epub(e) => Some(Box::new(e.chapter_images(flow.chapter))),
-            #[allow(unreachable_patterns)]
-            _ => None,
-        };
-        let p = flow.pages.get(page as usize).ok_or("page out of range")?;
-        let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
-        if bmp.width != flow.width || bmp.height != flow.height {
-            return Err("bitmap size differs from the laid-out page size".into());
-        }
-        let (w, hgt) = (bmp.width, bmp.height);
-        let out = bmp.pixels()?;
-        akkhor::flow::render_page(
-            p,
-            &flow.fonts,
-            images.as_deref(),
-            &mut flow.glyphs,
-            &theme(theme_code),
-            w,
-            hgt,
-            out,
-        )
-        .map_err(|e| e.to_string())?;
-        Ok(0)
+        with_handle(h, |h| {
+            let flow = h.flow.as_mut().ok_or("call layoutChapter first")?;
+            let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
+                #[cfg(feature = "epub")]
+                Book::Epub(e) => Some(Box::new(e.chapter_images(flow.chapter))),
+                #[allow(unreachable_patterns)]
+                _ => None,
+            };
+            let p = flow.pages.get(page as usize).ok_or("page out of range")?;
+            let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
+            if bmp.width != flow.width || bmp.height != flow.height {
+                return Err("bitmap size differs from the laid-out page size".into());
+            }
+            let (w, hgt) = (bmp.width, bmp.height);
+            let out = bmp.pixels()?;
+            akkhor::flow::render_page(
+                p,
+                &flow.fonts,
+                images.as_deref(),
+                &mut flow.glyphs,
+                &theme(theme_code),
+                w,
+                hgt,
+                out,
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(0)
+        })
     })
 }
 
@@ -555,14 +601,6 @@ unsafe fn long_array(env: *mut JNIEnv, values: &[jlong]) -> Result<jni_sys::jlon
     }
 }
 
-#[cfg(feature = "flow")]
-fn flow_state<'a>(h: jlong) -> Result<&'a mut FlowState, String> {
-    let h = unsafe { handle(h) }?;
-    h.flow
-        .as_mut()
-        .ok_or_else(|| "call layoutChapter first".into())
-}
-
 /// The position under (x, y) on a laid-out page, snapped to a syllable
 /// boundary; -1 if the page is empty.
 #[cfg(feature = "flow")]
@@ -576,9 +614,10 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_hitTest(
     y: jfloat,
 ) -> jlong {
     guard(-1, || {
-        let flow = flow_state(h)?;
-        let p = flow.pages.get(page as usize).ok_or("page out of range")?;
-        Ok(akkhor::flow::hit_test(&flow.doc, p, x, y).map_or(-1, pack))
+        with_flow(h, |flow| {
+            let p = flow.pages.get(page as usize).ok_or("page out of range")?;
+            Ok(akkhor::flow::hit_test(&flow.doc, p, x, y).map_or(-1, pack))
+        })
     })
 }
 
@@ -592,8 +631,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_wordAt(
     pos: jlong,
 ) -> jni_sys::jlongArray {
     guard(std::ptr::null_mut(), || {
-        let flow = flow_state(h)?;
-        let (s, e) = akkhor::flow::word_at(&flow.doc, unpack(pos));
+        let (s, e) = with_flow(h, |flow| Ok(akkhor::flow::word_at(&flow.doc, unpack(pos))))?;
         unsafe { long_array(env, &[pack(s), pack(e)]) }
     })
 }
@@ -610,9 +648,10 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_selectionRects(
     end: jlong,
 ) -> jni_sys::jfloatArray {
     guard(std::ptr::null_mut(), || {
-        let flow = flow_state(h)?;
-        let p = flow.pages.get(page as usize).ok_or("page out of range")?;
-        let rects = akkhor::flow::selection_rects(p, unpack(start), unpack(end));
+        let rects = with_flow(h, |flow| {
+            let p = flow.pages.get(page as usize).ok_or("page out of range")?;
+            Ok(akkhor::flow::selection_rects(p, unpack(start), unpack(end)))
+        })?;
         let flat: Vec<jfloat> = rects
             .iter()
             .flat_map(|r| [r.x, r.y, r.width, r.height])
@@ -641,13 +680,14 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_textBetween(
     end: jlong,
 ) -> jstring {
     guard(std::ptr::null_mut(), || {
-        let flow = flow_state(h)?;
-        let text = akkhor::flow::text_between(&flow.doc, unpack(start), unpack(end));
-        let c = CString::new(text.replace('\0', " ")).map_err(|e| e.to_string())?;
-        unsafe {
-            let new = (**env).NewStringUTF.ok_or("JNI")?;
-            Ok(new(env, c.as_ptr()))
-        }
+        let text = with_flow(h, |flow| {
+            Ok(akkhor::flow::text_between(
+                &flow.doc,
+                unpack(start),
+                unpack(end),
+            ))
+        })?;
+        unsafe { new_jstring(env, &text) }
     })
 }
 
@@ -664,15 +704,14 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_search(
     guard(std::ptr::null_mut(), || {
         let _ = chapter; // unused in TXT-only builds
         let query = unsafe { jstr(env, query) }.ok_or("query is null")?;
-        let hd = unsafe { handle(h) }?;
-        let doc = match &hd.book {
+        let doc = with_handle(h, |hd| match &hd.book {
             #[cfg(feature = "epub")]
-            Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
+            Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string()),
             #[cfg(feature = "txt")]
-            Book::Text(t) => t.document.clone(),
+            Book::Text(t) => Ok(t.document.clone()),
             #[allow(unreachable_patterns)]
-            _ => return Err("not a reflowable book".into()),
-        };
+            _ => Err("not a reflowable book".into()),
+        })?;
         let hits: Vec<jlong> = akkhor::flow::find_all(&doc, &query)
             .iter()
             .flat_map(|m| [pack(m.start), pack(m.end)])
@@ -686,13 +725,54 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_lastError(
     env: *mut JNIEnv,
     _: jclass,
 ) -> jstring {
-    LAST_ERROR.with(|e| match e.borrow().as_ref() {
-        Some(msg) => unsafe {
-            match (**env).NewStringUTF {
-                Some(new) => new(env, msg.as_ptr() as *const c_char),
-                None => std::ptr::null_mut(),
-            }
-        },
+    match LAST_ERROR.with(|e| e.borrow().clone()) {
+        Some(m) => unsafe { new_jstring(env, &m) }.unwrap_or(std::ptr::null_mut()),
         None => std::ptr::null_mut(),
-    })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture(name: &str) -> String {
+        format!("{}/../../tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    #[test]
+    fn handles_are_safe_across_threads_and_after_close() {
+        let id = into_handle(akkhor::open(fixture("small.pdf")).unwrap());
+        // Many threads using the same book at once.
+        let threads: Vec<_> = (0..8)
+            .map(|_| {
+                std::thread::spawn(move || {
+                    for _ in 0..50 {
+                        let n = with_handle(id, |h| Ok(h.book.format())).unwrap();
+                        assert_eq!(n, Format::Pdf);
+                    }
+                })
+            })
+            .collect();
+        for t in threads {
+            t.join().unwrap();
+        }
+        unsafe { Java_dev_akkhor_Native_close(std::ptr::null_mut(), std::ptr::null_mut(), id) };
+        assert!(
+            with_handle(id, |_| Ok(())).is_err(),
+            "use after close is an error"
+        );
+        // A second close and a made-up id are harmless.
+        unsafe { Java_dev_akkhor_Native_close(std::ptr::null_mut(), std::ptr::null_mut(), id) };
+        assert!(with_handle(123_456_789, |_| Ok(())).is_err());
+    }
+
+    #[test]
+    fn positions_pack_in_reading_order() {
+        use akkhor::flow::Position;
+        let a = pack(Position::new(3, 10));
+        let b = pack(Position::new(3, 11));
+        let c = pack(Position::new(4, 0));
+        assert!(a < b && b < c);
+        assert_eq!(unpack(c), Position::new(4, 0));
+    }
 }

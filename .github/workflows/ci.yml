@@ -23,6 +23,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --features akkhor-flow/bundled-fonts
       - run: cargo test --workspace --features akkhor-flow/bundled-fonts
+      - name: Robustness (damaged and hostile files, release build)
+        run: cargo test --release -p akkhor --test robustness
 
   switches:
     name: Format switch ${{ matrix.features }}

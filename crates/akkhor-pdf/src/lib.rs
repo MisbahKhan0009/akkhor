@@ -33,7 +33,7 @@ impl PdfDocument {
     pub fn open(source: &Source) -> Result<Self> {
         source.advise_random();
         let data: Arc<akkhor_core::Bytes> = source.shared();
-        let pdf = Pdf::new(data).map_err(|e| match e {
+        let pdf = contain(|| Pdf::new(data))?.map_err(|e| match e {
             LoadPdfError::Decryption(_) => Error::Protected,
             LoadPdfError::Invalid => Error::malformed("unreadable PDF structure"),
         })?;
@@ -83,6 +83,22 @@ impl PdfDocument {
             return Ok(());
         }
         let (w, h) = (to_u16(tile.width)?, to_u16(tile.height)?);
+        // The PDF interpreter is young; a panic on a malformed page becomes an
+        // error instead of unwinding into the caller.
+        contain(|| self.draw_tile(index, scale, tile, theme, w, h, &mut out[..needed]))?
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_tile(
+        &self,
+        index: usize,
+        scale: f32,
+        tile: Tile,
+        theme: &Theme,
+        w: u16,
+        h: u16,
+        out: &mut [u8],
+    ) -> Result<()> {
         let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
 
         // Move the page so the tile's corner lands at the origin, then scale.
@@ -102,8 +118,8 @@ impl PdfDocument {
         );
         ctx.flush();
 
-        let target = PixmapMut::new(w, h, &mut out[..needed])
-            .ok_or_else(|| Error::malformed("bad target size"))?;
+        let target =
+            PixmapMut::new(w, h, out).ok_or_else(|| Error::malformed("bad target size"))?;
         let bg = theme.background;
         ctx.render_with(
             target,
@@ -152,6 +168,12 @@ impl RenderedPage {
         }
         px
     }
+}
+
+/// Runs `f`, turning a panic into an error.
+fn contain<T>(f: impl FnOnce() -> T) -> Result<T> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
+        .map_err(|_| Error::malformed("the PDF interpreter failed on this file"))
 }
 
 fn to_u16(v: u32) -> Result<u16> {

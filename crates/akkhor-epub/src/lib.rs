@@ -42,14 +42,7 @@ impl EpubBook {
     pub fn open(source: Source) -> Result<Self> {
         source.advise_random();
         let zip = ZipArchive::open(source)?;
-        if zip
-            .entries()
-            .iter()
-            .any(|e| e.name == "META-INF/encryption.xml")
-            && zip
-                .read_string("META-INF/encryption.xml")
-                .is_ok_and(|s| s.contains("EncryptedData") && !s.contains("fonts"))
-        {
+        if is_drm_protected(&zip) {
             return Err(Error::Protected);
         }
 
@@ -222,6 +215,45 @@ impl ImageProvider for ChapterImages<'_> {
     }
 }
 
+/// Font obfuscation (IDPF and Adobe) "encrypts" embedded fonts only; the
+/// text is readable. Anything else in `encryption.xml`, or an Adobe
+/// `rights.xml`, means real DRM.
+fn is_drm_protected(zip: &ZipArchive) -> bool {
+    const FONT_OBFUSCATION: [&str; 2] = [
+        "http://www.idpf.org/2008/embedding",
+        "http://ns.adobe.com/pdf/enc#RC",
+    ];
+    if zip.contains("META-INF/rights.xml") {
+        return true;
+    }
+    let Ok(xml) = zip.read_string("META-INF/encryption.xml") else {
+        return false;
+    };
+    let mut algorithm: Option<String> = None;
+    for tok in Tokenizer::new(&xml) {
+        match tok {
+            Token::Start { name, .. } if name == "encrypteddata" => algorithm = None,
+            Token::Start { name, attrs, .. } if name == "encryptionmethod" => {
+                algorithm = attr(&attrs, "algorithm")
+            }
+            Token::Start { name, attrs, .. } if name == "cipherreference" => {
+                let uri = attr(&attrs, "uri").unwrap_or_default().to_ascii_lowercase();
+                let is_font = [".ttf", ".otf", ".woff", ".woff2"]
+                    .iter()
+                    .any(|e| uri.ends_with(e));
+                let obfuscation = algorithm
+                    .as_deref()
+                    .is_some_and(|a| FONT_OBFUSCATION.contains(&a));
+                if !(obfuscation && is_font) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
 fn attr(attrs: &[(String, String)], key: &str) -> Option<String> {
     attrs.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone())
 }
@@ -376,6 +408,69 @@ mod tests {
             "OEBPS/Images/a.png"
         );
         assert_eq!(percent_decode("a%20b.xhtml"), "a b.xhtml");
+    }
+
+    fn zip_with(files: &[(&str, &str)]) -> ZipArchive {
+        // A stored (uncompressed) zip, written by hand.
+        let mut out = Vec::new();
+        let mut central = Vec::new();
+        for (name, body) in files {
+            let off = out.len() as u32;
+            let len = (body.len() as u32).to_le_bytes();
+            out.extend_from_slice(b"PK\x03\x04\x14\0\0\0\0\0\0\0\0\0\0\0\0\0");
+            out.extend_from_slice(&len);
+            out.extend_from_slice(&len);
+            out.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            out.extend_from_slice(&[0, 0]);
+            out.extend_from_slice(name.as_bytes());
+            out.extend_from_slice(body.as_bytes());
+            central.extend_from_slice(b"PK\x01\x02\x14\0\x14\0\0\0\0\0\0\0\0\0\0\0\0\0");
+            central.extend_from_slice(&len);
+            central.extend_from_slice(&len);
+            central.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            central.extend_from_slice(&[0; 12]);
+            central.extend_from_slice(&off.to_le_bytes());
+            central.extend_from_slice(name.as_bytes());
+        }
+        let cd = out.len() as u32;
+        out.extend_from_slice(&central);
+        out.extend_from_slice(b"PK\x05\x06\0\0\0\0");
+        out.extend_from_slice(&(files.len() as u16).to_le_bytes());
+        out.extend_from_slice(&(files.len() as u16).to_le_bytes());
+        out.extend_from_slice(&(central.len() as u32).to_le_bytes());
+        out.extend_from_slice(&cd.to_le_bytes());
+        out.extend_from_slice(&[0, 0]);
+        ZipArchive::open(Source::from_vec(out)).unwrap()
+    }
+
+    #[test]
+    fn font_obfuscation_is_not_drm() {
+        let enc = |alg: &str, uri: &str| {
+            format!(
+                r#"<encryption><EncryptedData><EncryptionMethod Algorithm="{alg}"/>
+                <CipherData><CipherReference URI="{uri}"/></CipherData></EncryptedData></encryption>"#
+            )
+        };
+        let idpf = enc("http://www.idpf.org/2008/embedding", "OEBPS/Misc/Font.otf");
+        let z = zip_with(&[("META-INF/encryption.xml", &idpf)]);
+        assert!(z.read_string("META-INF/encryption.xml").is_ok());
+        assert!(!is_drm_protected(&z));
+        let adept = enc(
+            "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+            "OEBPS/Text/ch1.xhtml",
+        );
+        assert!(is_drm_protected(&zip_with(&[(
+            "META-INF/encryption.xml",
+            &adept
+        )])));
+        assert!(is_drm_protected(&zip_with(&[(
+            "META-INF/rights.xml",
+            "<rights/>"
+        )])));
+        assert!(!is_drm_protected(&zip_with(&[(
+            "mimetype",
+            "application/epub+zip"
+        )])));
     }
 
     #[test]

@@ -150,11 +150,12 @@ pub fn shape_styled(
         let scale = size / font.units_per_em;
         buffer.clear();
         buffer.push_str(&text[run.range.clone()]);
+        let script = hr_script(run.script);
         buffer.set_direction(Direction::LeftToRight);
-        buffer.set_script(hr_script(run.script));
-        buffer.guess_segment_properties();
+        buffer.set_script(script);
+        let plan = font.plan(script);
         let shaper = ShaperFont::new(&font.font);
-        if shape(&shaper, &mut buffer, ShapeOptions::new()).is_err() {
+        if shape(&shaper, &mut buffer, ShapeOptions::new().plan(Some(&plan))).is_err() {
             continue;
         }
         // Synthetic bold makes strokes thicker; give letters a little room.

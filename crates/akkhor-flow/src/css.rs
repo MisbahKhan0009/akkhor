@@ -123,6 +123,9 @@ impl Stylesheet {
     /// The declarations that apply to `element` (with `ancestors`, outermost
     /// first), in cascade order: later entries override earlier ones.
     pub fn matching(&self, element: &ElementInfo, ancestors: &[ElementInfo]) -> Vec<Decl> {
+        if self.rules.is_empty() {
+            return Vec::new();
+        }
         let mut hits: Vec<&Rule> = self
             .rules
             .iter()
