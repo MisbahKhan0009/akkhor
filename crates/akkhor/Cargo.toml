@@ -15,8 +15,12 @@ categories = ["text-processing", "rendering"]
 # adds nothing to the binary. A format that is on costs no RAM until a file of
 # that format is opened.
 [features]
-default = ["pdf", "epub", "txt"]
-pdf = ["dep:akkhor-pdf"]
+default = ["pdf", "pdf-scans", "epub", "txt"]
+# PDFs, with JPEG images and the 14 standard PDF fonts.
+pdf = ["dep:akkhor-pdf", "akkhor-pdf/jpeg", "akkhor-pdf/standard-fonts"]
+# Decoders for scanned pages: JBIG2 and CCITT (black and white) and
+# JPEG 2000. Common in scanned books; about 0.4 MB of code.
+pdf-scans = ["pdf", "akkhor-pdf/jbig2", "akkhor-pdf/ccitt", "akkhor-pdf/jpx"]
 # Embedded CJK character maps for Chinese/Japanese/Korean PDFs.
 pdf-cjk = ["pdf", "akkhor-pdf/cjk"]
 epub = ["dep:akkhor-epub", "flow"]

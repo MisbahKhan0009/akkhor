@@ -32,12 +32,13 @@ default = [
     "std",
     "images",
 ]
-images = [
-    "dep:zune-jpeg",
-    "dep:hayro-ccitt",
-    "dep:hayro-jbig2",
-    "dep:hayro-jpeg2000",
-]
+# Akkhor change: "images" (asked for by hayro-interpret) no longer pulls in
+# the decoders; each is its own feature, chosen by akkhor-pdf.
+images = []
+jpeg = ["dep:zune-jpeg"]
+ccitt = ["dep:hayro-ccitt"]
+jbig2 = ["dep:hayro-jbig2"]
+jpx = ["dep:hayro-jpeg2000"]
 std = [
     "hayro-jbig2?/std",
     "hayro-jpeg2000?/std",

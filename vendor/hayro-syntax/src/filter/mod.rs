@@ -2,13 +2,13 @@
 
 mod ascii_85;
 pub(crate) mod ascii_hex;
-#[cfg(feature = "images")]
+#[cfg(feature = "ccitt")]
 mod ccitt;
-#[cfg(feature = "images")]
+#[cfg(feature = "jpeg")]
 mod dct;
-#[cfg(feature = "images")]
+#[cfg(feature = "jbig2")]
 mod jbig2;
-#[cfg(feature = "images")]
+#[cfg(feature = "jpx")]
 mod jpx;
 mod lzw_flate;
 mod png;
@@ -66,7 +66,11 @@ impl Filter {
         &self,
         data: &[u8],
         params: &Dict<'_>,
-        #[cfg_attr(not(feature = "images"), allow(unused))] image_params: &ImageDecodeParams,
+        #[cfg_attr(
+            not(any(feature = "jpeg", feature = "ccitt", feature = "jbig2", feature = "jpx")),
+            allow(unused)
+        )]
+        image_params: &ImageDecodeParams,
     ) -> Result<FilterResult<'static>, DecodeFailure> {
         match self {
             Self::AsciiHexDecode => ascii_hex::decode(data)
@@ -84,24 +88,30 @@ impl Filter {
             Self::FlateDecode => lzw_flate::flate::decode(data, params)
                 .map(FilterResult::from_data)
                 .ok_or(DecodeFailure::StreamDecode),
-            #[cfg(feature = "images")]
+            #[cfg(feature = "jpeg")]
             Self::DctDecode => {
                 dct::decode(data, params, image_params).ok_or(DecodeFailure::ImageDecode)
             }
-            #[cfg(feature = "images")]
+            #[cfg(feature = "ccitt")]
             Self::CcittFaxDecode => {
                 ccitt::decode(data, params, image_params).ok_or(DecodeFailure::ImageDecode)
             }
-            #[cfg(feature = "images")]
+            #[cfg(feature = "jbig2")]
             Self::Jbig2Decode => {
                 jbig2::decode(data, params, image_params).ok_or(DecodeFailure::ImageDecode)
             }
-            #[cfg(feature = "images")]
+            #[cfg(feature = "jpx")]
             Self::JpxDecode => jpx::decode(data, image_params).ok_or(DecodeFailure::ImageDecode),
-            #[cfg(not(feature = "images"))]
-            Self::DctDecode | Self::CcittFaxDecode | Self::Jbig2Decode | Self::JpxDecode => {
-                Err(DecodeFailure::ImageDecode)
-            }
+            // Akkhor change: each codec is its own feature; a missing one
+            // fails like a damaged image.
+            #[cfg(not(feature = "jpeg"))]
+            Self::DctDecode => Err(DecodeFailure::ImageDecode),
+            #[cfg(not(feature = "ccitt"))]
+            Self::CcittFaxDecode => Err(DecodeFailure::ImageDecode),
+            #[cfg(not(feature = "jbig2"))]
+            Self::Jbig2Decode => Err(DecodeFailure::ImageDecode),
+            #[cfg(not(feature = "jpx"))]
+            Self::JpxDecode => Err(DecodeFailure::ImageDecode),
             _ => Err(DecodeFailure::StreamDecode),
         }
     }

@@ -13,7 +13,7 @@ authors = ["Md. Misbah Khan"]
 
 [workspace.dependencies]
 akkhor-core = { path = "crates/akkhor-core", version = "0.1.0" }
-akkhor-pdf = { path = "crates/akkhor-pdf", version = "0.1.0" }
+akkhor-pdf = { path = "crates/akkhor-pdf", version = "0.1.0", default-features = false }
 akkhor-flow = { path = "crates/akkhor-flow", version = "0.1.0" }
 akkhor-epub = { path = "crates/akkhor-epub", version = "0.1.0" }
 akkhor = { path = "crates/akkhor", version = "0.1.0", default-features = false }
@@ -38,6 +38,31 @@ lto = "fat"
 codegen-units = 1
 strip = true
 panic = "unwind"
+
+# Code that runs rarely or once per file is optimised for size, the
+# rasterizer, interpreter and shaper for speed. Measured: 0.2 MB smaller,
+# no change in render time (whole-library opt-level "s" or "z" came out
+# larger, because of how it changes inlining under LTO).
+[profile.release.package.hayro-jbig2]
+opt-level = "s"
+[profile.release.package.hayro-jpeg2000]
+opt-level = "s"
+[profile.release.package.hayro-ccitt]
+opt-level = "s"
+[profile.release.package.moxcms]
+opt-level = "s"
+[profile.release.package.hayro-font]
+opt-level = "s"
+[profile.release.package.hayro-cmap]
+opt-level = "s"
+[profile.release.package.hayro-postscript]
+opt-level = "s"
+[profile.release.package.pxfm]
+opt-level = "s"
+[profile.release.package.zune-jpeg]
+opt-level = "s"
+[profile.release.package.akkhor-epub]
+opt-level = "s"
 
 # Smallest binary, for size comparisons: cargo build --profile release-small
 [profile.release-small]

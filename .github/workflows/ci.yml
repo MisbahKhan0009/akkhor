@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features: [pdf, epub, txt, "pdf,pdf-cjk", "pdf,epub,txt"]
+        features: [pdf, "pdf,pdf-scans", epub, txt, "pdf,pdf-cjk", "pdf,epub,txt"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -84,12 +84,15 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY"
           ls -la jniLibs/*
-      - name: PDF-only and EPUB-only sizes (arm64)
+      - name: Sizes per feature set (arm64)
         run: |
           export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
-          for f in pdf epub; do
-            cargo ndk -t arm64-v8a -P 24 -o "only-$f" build --release -p akkhor-android --no-default-features --features "$f"
-            echo "| arm64-v8a, $f only | $(du -h only-$f/arm64-v8a/libakkhor.so | cut -f1) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| arm64-v8a build | bytes |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for f in "pdf,epub,txt" "pdf,pdf-scans" "pdf" "epub,txt"; do
+            out="only-${f//,/-}"
+            cargo ndk -t arm64-v8a -P 24 -o "$out" build --release -p akkhor-android --no-default-features --features "$f"
+            echo "| $f | $(stat -c %s $out/arm64-v8a/libakkhor.so) |" >> "$GITHUB_STEP_SUMMARY"
           done
       - uses: actions/upload-artifact@v4
         with:

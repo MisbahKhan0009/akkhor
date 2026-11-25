@@ -16,8 +16,10 @@ crate-type = ["cdylib"]
 # Format switches pass straight through to the engine, so an app can build a
 # PDF-only or EPUB-only library.
 [features]
-default = ["pdf", "epub", "txt"]
+default = ["pdf", "pdf-scans", "epub", "txt"]
 pdf = ["akkhor/pdf"]
+# JBIG2, CCITT and JPEG 2000 decoders for scanned pages.
+pdf-scans = ["pdf", "akkhor/pdf-scans"]
 pdf-cjk = ["akkhor/pdf-cjk"]
 epub = ["akkhor/epub", "flow"]
 txt = ["akkhor/txt", "flow"]

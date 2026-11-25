@@ -9,7 +9,14 @@ repository.workspace = true
 authors.workspace = true
 
 [features]
-default = ["standard-fonts"]
+default = ["standard-fonts", "jpeg", "jbig2", "jpx", "ccitt"]
+# Image decoders. JPEG is in nearly every PDF with photos; JBIG2 and CCITT
+# hold scanned black-and-white pages; JPEG 2000 appears in scans and
+# archives. Without one, such images are left blank.
+jpeg = ["hayro-syntax/jpeg"]
+jbig2 = ["hayro-syntax/jbig2"]
+jpx = ["hayro-syntax/jpx"]
+ccitt = ["hayro-syntax/ccitt"]
 # Embeds the 14 standard PDF fonts (~a few hundred KB) for PDFs that use
 # them without embedding. Most books embed their fonts.
 standard-fonts = ["hayro/embed-fonts"]
@@ -22,6 +29,8 @@ bundled-fonts = ["akkhor-flow/bundled-fonts"]
 akkhor-core.workspace = true
 akkhor-flow.workspace = true
 hayro.workspace = true
+# The vendored parser (see vendor/README.md), named to choose its decoders.
+hayro-syntax = { version = "0.9", default-features = false, features = ["std"] }
 harfrust.workspace = true
 skrifa.workspace = true
 
