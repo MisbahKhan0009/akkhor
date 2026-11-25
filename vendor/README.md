@@ -25,7 +25,16 @@ touched in memory.
 - `CachedPages::get` shortens the lifetime by hand (documented `unsafe`),
   because `Pages` became invariant once it held lazily filled cells.
 
-To update: copy the new upstream version here, re-apply the diff, run the
+**Second change** (`src/object/array.rs` only; diff in
+`hayro-syntax.lenient-array.diff`, Phase 4b): an array element that cannot
+be parsed (a flipped byte inside a number, `84\xC5.88`) is skipped up to
+the next delimiter instead of failing the whole array. Before, one bad
+number in a page's `/MediaBox` made the page dictionary unreadable and the
+page was lost; MuPDF skips the token the same way. Content streams are
+unchanged. Test: `a_damaged_number_does_not_lose_the_page`; renders of every
+fixture and corpus PDF identical.
+
+To update: copy the new upstream version here, re-apply the diffs, run the
 workspace tests and `scripts/compare_renders.sh` (identical page counts and
 renders on every corpus and fixture PDF). The change is meant to be
 offered upstream.

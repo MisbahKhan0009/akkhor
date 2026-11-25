@@ -201,9 +201,8 @@ pub fn check_books(pick: impl Fn(&str) -> bool, target: impl Fn(&str) -> f64) {
             intact * 100.0,
             &missing[..missing.len().min(4)]
         );
-        // Mukta's nukta and candrabindu glyphs are known to read wrong in
-        // XeLaTeX output (see docs/reviews/phase-4.md); everything else must
-        // be whole.
+        // The target is per file: Mukta's one ambiguous nukta conjunct
+        // (see books.rs); everything else must be whole.
         if intact < target(name) {
             failed.push(format!("{name}: {:.1}%", intact * 100.0));
         }

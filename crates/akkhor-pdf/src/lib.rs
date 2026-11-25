@@ -261,20 +261,41 @@ impl PdfDocument {
     /// Reflows the pages of `pages` (see [`reflow`]): paragraphs and
     /// headings in reading order, without running headers or page numbers,
     /// for the flow layout to set on any screen.
+    ///
+    /// The page before and the page after the range are read too, as
+    /// context: running headers are found by repeating on nearby pages,
+    /// which a one-page chapter cannot show on its own.
     pub fn reflow(&self, pages: Range<usize>) -> Result<reflow::Reflow> {
-        let end = pages.end.min(self.page_count());
+        let n = self.page_count();
+        let end = pages.end.min(n);
         let pages = pages.start.min(end)..end;
-        let mut texts = Vec::with_capacity(pages.len());
-        let mut pictures = Vec::with_capacity(pages.len());
-        let mut sizes = Vec::with_capacity(pages.len());
-        for i in pages.clone() {
+        if pages.is_empty() {
+            return Ok(reflow::Reflow::default());
+        }
+        let around = pages.start.saturating_sub(1)..(end + 1).min(n);
+        let mut texts = Vec::with_capacity(around.len());
+        let mut shapes = Vec::with_capacity(around.len());
+        let mut sizes = Vec::with_capacity(around.len());
+        for i in around.clone() {
             texts.push(self.page_text_cached(i)?);
             let page = self.pdf.pages().get(i).ok_or(Error::OutOfRange)?;
-            pictures.push(contain(|| theme::picture_boxes(page))?);
+            shapes.push(reflow::PageShapes {
+                pictures: contain(|| theme::picture_boxes(page))?,
+            });
             sizes.push(self.page_size(i)?);
         }
-        let refs: Vec<&PageText> = texts.iter().map(|t| &**t).collect();
-        contain(|| reflow::reflow(pages.start, &refs, &pictures, &sizes))
+        let input: Vec<reflow::ReflowPage<'_>> = texts
+            .iter()
+            .zip(&shapes)
+            .zip(sizes)
+            .map(|((t, s), size)| reflow::ReflowPage {
+                text: t,
+                shapes: s,
+                size,
+            })
+            .collect();
+        let own = pages.start - around.start..end - around.start;
+        contain(|| reflow::reflow(around.start, &input, own))
     }
 
     /// The pictures of a reflow ([`reflow::image_source`] names), drawn

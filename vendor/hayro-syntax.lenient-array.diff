@@ -1,0 +1,32 @@
+--- a/src/object/array.rs
++++ b/src/object/array.rs
+@@ -100,8 +100,27 @@
+                 return Some(());
+             } else if is_content_stream {
+                 r.skip_with_depth::<Object<'_>>(true, depth + 1)?;
+-            } else {
+-                r.skip_with_depth::<MaybeRef<Object<'_>>>(false, depth + 1)?;
++            } else if r
++                .skip_with_depth::<MaybeRef<Object<'_>>>(false, depth + 1)
++                .is_none()
++            {
++                // Akkhor: a damaged element (a flipped byte inside a number)
++                // is skipped up to the next delimiter, as MuPDF does, so one
++                // bad number does not lose the whole dictionary around it
++                // (a page's /MediaBox, and with it the page). Readers of the
++                // array then see it end early or skip the element.
++                let start = r.offset();
++                r.forward_while(crate::trivia::is_regular_character);
++                if r.offset() == start {
++                    // A stray delimiter: step over it, unless it ends the array
++                    // or the data.
++                    match r.peek_byte()? {
++                        b']' => {}
++                        _ => {
++                            r.read_byte()?;
++                        }
++                    }
++                }
+             }
+         }
+     }

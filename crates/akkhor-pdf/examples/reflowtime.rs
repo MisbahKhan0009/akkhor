@@ -27,11 +27,18 @@ fn main() {
     let mut worst: f64 = 0.0;
     let mut total = 0.0;
     for range in doc.reflow_chapters() {
+        let shapes = akkhor_pdf::reflow::PageShapes::default();
+        let pages: Vec<_> = range
+            .clone()
+            .map(|i| akkhor_pdf::reflow::ReflowPage {
+                text: &texts[i],
+                shapes: &shapes,
+                size: doc.page_size(i).unwrap(),
+            })
+            .collect();
         let refs: Vec<_> = texts[range.clone()].iter().collect();
-        let sizes: Vec<_> = range.clone().map(|i| doc.page_size(i).unwrap()).collect();
-        let pics = vec![Vec::new(); refs.len()];
         let t = Instant::now();
-        let r = akkhor_pdf::reflow::reflow(range.start, &refs, &pics, &sizes);
+        let r = akkhor_pdf::reflow::reflow(range.start, &pages, 0..pages.len());
         let ms = t.elapsed().as_secs_f64() * 1e3;
         worst = worst.max(ms);
         total += ms;

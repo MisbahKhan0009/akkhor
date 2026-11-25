@@ -204,48 +204,64 @@ impl Building {
     }
 }
 
-/// Reflows a chapter: `pages[i]` is page `first + i`.
-pub fn reflow(
-    first: usize,
-    texts: &[&PageText],
-    pictures: &[Vec<Rect>],
-    sizes: &[(f32, f32)],
-) -> Reflow {
+/// The vector shapes of a page that structure looks at, in points from the
+/// top left.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PageShapes {
+    /// Raster pictures.
+    pub pictures: Vec<Rect>,
+}
+
+/// One page given to [`reflow`].
+pub struct ReflowPage<'a> {
+    pub text: &'a PageText,
+    pub shapes: &'a PageShapes,
+    /// Width and height in points.
+    pub size: (f32, f32),
+}
+
+/// Reflows a chapter. `pages[i]` is PDF page `first + i`; only the pages in
+/// `own` (indices into `pages`) are reflowed. The others are neighbours
+/// given for context: a running header is told by repeating on nearby
+/// pages, also when the chapter is a single page.
+pub fn reflow(first: usize, pages: &[ReflowPage<'_>], own: Range<usize>) -> Reflow {
+    let own = own.start.min(pages.len())..own.end.min(pages.len());
     // Pictures worth a block: not icons, not a background behind the text.
-    let pictures: Vec<Vec<Rect>> = pictures
+    let pictures: Vec<Vec<Rect>> = pages
         .iter()
-        .zip(sizes)
-        .zip(texts)
-        .map(|((pics, (w, h)), t)| {
-            let area = f64::from(*w) * f64::from(*h);
-            pics.iter()
+        .map(|p| {
+            let (w, h) = p.size;
+            let area = f64::from(w) * f64::from(h);
+            p.shapes
+                .pictures
+                .iter()
                 .filter(|r| {
                     let a = r.width() * r.height();
-                    a > area * 0.015 && !(a > area * 0.85 && !t.text.trim().is_empty())
+                    a > area * 0.015 && !(a > area * 0.85 && !p.text.text.trim().is_empty())
                 })
                 .copied()
                 .collect()
         })
         .collect();
-    let inputs: Vec<PageInput<'_>> = texts
+    let inputs: Vec<PageInput<'_>> = pages
         .iter()
         .zip(&pictures)
-        .zip(sizes)
-        .map(|((t, pics), (w, h))| PageInput {
-            text: t,
+        .map(|(p, pics)| PageInput {
+            text: p.text,
             images: pics,
-            page: Rect::new(0.0, 0.0, f64::from(*w), f64::from(*h)),
+            page: Rect::new(0.0, 0.0, f64::from(p.size.0), f64::from(p.size.1)),
         })
         .collect();
     let layouts = structure::analyse(&inputs);
-    let body = structure::body_size(&inputs);
-    let compounds = compounds(texts);
+    let texts: Vec<&PageText> = pages.iter().map(|p| p.text).collect();
+    let compounds = compounds(&texts[own.clone()]);
     let mut out = Building {
         blocks: Vec::new(),
         segments: Vec::new(),
         open: None,
     };
-    for (i, (layout, text)) in layouts.iter().zip(texts).enumerate() {
+    for i in own.clone() {
+        let (layout, text) = (&layouts[i], texts[i]);
         let page = first + i;
         let mut notes: Vec<&structure::Block> = Vec::new();
         for b in &layout.blocks {
@@ -296,7 +312,6 @@ pub fn reflow(
             }
         }
     }
-    let _ = body;
     // Paragraphs that kept nothing (only whitespace) are dropped.
     let mut document = Document::default();
     let mut segments = Vec::new();
@@ -308,7 +323,7 @@ pub fn reflow(
     }
     Reflow {
         document,
-        pages: first..first + texts.len(),
+        pages: first + own.start..first + own.end,
         segments,
     }
 }
@@ -353,6 +368,18 @@ mod tests {
         t
     }
 
+    static NO_SHAPES: PageShapes = PageShapes {
+        pictures: Vec::new(),
+    };
+
+    fn plain(t: &PageText) -> ReflowPage<'_> {
+        ReflowPage {
+            text: t,
+            shapes: &NO_SHAPES,
+            size: (420.0, 595.0),
+        }
+    }
+
     #[test]
     fn hyphens_are_joined_but_compounds_kept() {
         let t = page(&[
@@ -361,7 +388,7 @@ mod tests {
             (40.0, 124.0, 380.0, "ইঞ্জিন দেখে। আবার পাঠ-ইঞ্জিন। ধীরে-"),
             (40.0, 136.0, 380.0, "ধীরে চলে।"),
         ]);
-        let r = reflow(0, &[&t], &[vec![]], &[(420.0, 595.0)]);
+        let r = reflow(0, &[plain(&t)], 0..1);
         assert_eq!(r.document.blocks.len(), 1);
         assert_eq!(
             r.document.blocks[0].text,
@@ -379,7 +406,7 @@ mod tests {
             (40.0, 100.0, 380.0, "and ends here."),
             (55.0, 112.0, 380.0, "New one."),
         ]);
-        let r = reflow(3, &[&a, &b], &[vec![], vec![]], &[(420.0, 595.0); 2]);
+        let r = reflow(3, &[plain(&a), plain(&b)], 0..2);
         let texts: Vec<&str> = r.document.blocks.iter().map(|b| b.text.as_str()).collect();
         assert_eq!(
             texts,

@@ -47,3 +47,23 @@ fn synthetic_bold_type3_headings_are_recognised() {
     assert!(text.contains("অক্ষর পরীক্ষা"), "{text}");
     assert!(text.contains("अक्षर परीक्षण"), "{text}");
 }
+
+/// A flipped byte inside a page's /MediaBox numbers used to make the whole
+/// page dictionary unreadable, so the page (here, the document) was lost.
+/// MuPDF skips the bad token; so does Akkhor now.
+#[test]
+fn a_damaged_number_does_not_lose_the_page() {
+    // A LibreOffice PDF: the page dictionary holds its own /MediaBox.
+    let mut data = std::fs::read(corpus("pdf/hi.libreoffice.pdf")).unwrap();
+    let at = data
+        .windows(16)
+        .position(|w| w == b"/MediaBox[0 0 59")
+        .unwrap();
+    data[at + 17] = 0xC5; // 595.3 -> 595\xC5.3
+    let doc = PdfDocument::open(&Source::from_vec(data)).unwrap();
+    assert!(doc.page_count() >= 1);
+    let page = doc
+        .render_page(0, 0.5, &akkhor_core::Theme::ORIGINAL)
+        .unwrap();
+    assert!(page.width > 0 && page.height > 0);
+}

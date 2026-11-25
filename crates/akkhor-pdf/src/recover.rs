@@ -319,6 +319,12 @@ pub fn build_with(
         // Vowel signs, nukta and their combinations with candrabindu and
         // anusvara (ें, ैं, ों are single glyphs in many fonts).
         for &c in &consonants {
+            // A consonant with candrabindu or anusvara alone first: a font
+            // that draws ँ above a letter with its own glyph would otherwise
+            // learn it from ॅं (candra E and anusvara), which looks the same.
+            for &b in &signs {
+                shape_one(format!("{c}{b}"), &mut rec, &mut budget);
+            }
             for &m in &matras {
                 shape_one(format!("{c}{m}"), &mut rec, &mut budget);
                 for &b in &signs {
@@ -401,6 +407,22 @@ pub fn build_with(
             for variant in variants {
                 let mut free = 1;
                 shape_one(variant, &mut rec, &mut free);
+            }
+        }
+        // Conjuncts with a nukta letter on either side (ब्ज़, ज़्य): the
+        // letters with nukta forms are few, so all pairs are cheap.
+        if let Some(n) = nukta {
+            let nukta_letter = |c: char| {
+                matches!(
+                    c as u32 & 0x7F,
+                    0x15 | 0x16 | 0x17 | 0x1C | 0x21 | 0x22 | 0x2B | 0x2F
+                )
+            };
+            for &k in consonants.iter().filter(|c| nukta_letter(**c)) {
+                for &c in &consonants {
+                    shape_one(format!("{c}{v}{k}{n}"), &mut rec, &mut budget);
+                    shape_one(format!("{k}{n}{v}{c}"), &mut rec, &mut budget);
+                }
             }
         }
         let mut seen: HashSet<String> = HashSet::new();

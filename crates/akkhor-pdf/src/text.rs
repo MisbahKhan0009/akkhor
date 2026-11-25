@@ -151,13 +151,73 @@ impl PageText {
 
     /// Every occurrence of `query` on the page (Indic-aware folding, whole
     /// syllables only), as byte ranges.
+    ///
+    /// A word split by a line-end hyphen (শি-⏎ক্ষার্থী) is found too: the
+    /// text is also searched with such hyphens joined, and the match covers
+    /// both halves.
     pub fn find(&self, query: &str) -> Vec<Range<usize>> {
         let q = akkhor_flow::search::fold(query);
-        akkhor_flow::search::find_in_text(&self.text, &q)
+        let mut out: Vec<Range<usize>> = akkhor_flow::search::find_in_text(&self.text, &q)
             .into_iter()
             .map(|(s, e)| s..e)
-            .collect()
+            .collect();
+        // Joined both ways: শি-⏎ক্ষা is শিক্ষা, and ধীরে-⏎ধীরে is ধীরে-ধীরে.
+        for keep in [false, true] {
+            let (joined, origin) = joined_hyphens(&self.text, keep);
+            if joined.len() == self.text.len() {
+                break;
+            }
+            for (s, e) in akkhor_flow::search::find_in_text(&joined, &q) {
+                let range = origin[s]..origin[e];
+                // Only matches that run across a joined line end are new.
+                if self.text[range.clone()].contains('\n')
+                    && !out
+                        .iter()
+                        .any(|r| r.start < range.end && range.start < r.end)
+                {
+                    out.push(range);
+                }
+            }
+        }
+        out.sort_by_key(|r| r.start);
+        out
     }
+}
+
+fn is_line_hyphen(c: char) -> bool {
+    matches!(c, '-' | '\u{2010}' | '\u{AD}')
+}
+
+/// The text with every `hyphen ⏎ letter` line end joined (the hyphen kept
+/// or dropped), and for each byte of it (and its end) the offset in the
+/// original text.
+fn joined_hyphens(text: &str, keep_hyphen: bool) -> (String, Vec<usize>) {
+    let mut out = String::with_capacity(text.len());
+    let mut origin = Vec::with_capacity(text.len() + 1);
+    let mut chars = text.char_indices().peekable();
+    while let Some((at, c)) = chars.next() {
+        if is_line_hyphen(c) {
+            let mut look = chars.clone();
+            if let Some((_, '\n')) = look.next()
+                && let Some(&(_, next)) = look.peek()
+                && (next.is_alphabetic() || akkhor_flow::script::indic_cat(next).is_some())
+                && out.chars().next_back().is_some_and(|p| {
+                    p.is_alphabetic() || akkhor_flow::script::indic_cat(p).is_some()
+                })
+            {
+                chars.next(); // the line break
+                if keep_hyphen {
+                    out.push(c);
+                    origin.extend(std::iter::repeat_n(at, c.len_utf8()));
+                }
+                continue;
+            }
+        }
+        out.push(c);
+        origin.extend(std::iter::repeat_n(at, c.len_utf8()));
+    }
+    origin.push(text.len());
+    (out, origin)
 }
 
 /// What one glyph contributes to the text, decided by the caller.
@@ -631,4 +691,30 @@ pub(crate) fn reorder(pieces: Vec<GlyphPiece<'_>>) -> Vec<GlyphPiece<'_>> {
         merged.push(p);
     }
     merged
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_finds_words_split_by_a_line_end_hyphen() {
+        let t = PageText {
+            text: "স্কুলে শি-\nক্ষার্থীরা আসে। পাঠ-ইঞ্জিন".into(),
+            ..PageText::default()
+        };
+        let hits = t.find("শিক্ষার্থীরা");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(&t.text[hits[0].clone()], "শি-\nক্ষার্থীরা");
+        // A compound inside a line is found as written, once.
+        assert_eq!(t.find("পাঠ-ইঞ্জিন").len(), 1);
+        let t2 = PageText {
+            text: "धीरे-\nधीरे चलो".into(),
+            ..PageText::default()
+        };
+        assert_eq!(t2.find("धीरे-धीरे").len(), 1);
+        assert_eq!(t2.find("धीरेधीरे").len(), 1);
+        // Text with no hyphenated line end is searched once.
+        assert_eq!(t.find("আসে").len(), 1);
+    }
 }

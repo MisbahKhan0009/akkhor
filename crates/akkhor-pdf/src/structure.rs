@@ -486,7 +486,8 @@ fn mark_furniture(pages: &[PageInput<'_>], out: &mut [PageLayout], body: f32) {
         .collect();
     for (pi, (layout, p)) in out.iter_mut().zip(pages).enumerate() {
         let page_box = layout.page;
-        for b in &mut layout.blocks {
+        let rects: Vec<Rect> = layout.blocks.iter().map(|b| b.rect).collect();
+        for (bi, b) in layout.blocks.iter_mut().enumerate() {
             if b.kind == BlockKind::Image {
                 continue;
             }
@@ -506,13 +507,22 @@ fn mark_furniture(pages: &[PageInput<'_>], out: &mut [PageLayout], body: f32) {
             // A page number is small or body-sized, alone on its line.
             let number =
                 in_band && is_page_number(&text) && b.rect.height() < f64::from(body) * 2.5;
-            // On a page with no neighbours to compare with, a small line at
-            // the very top or bottom is a running header or footer.
+            // On a page with no neighbours to compare with, a short small
+            // line at the very top or bottom, set apart from the text by more
+            // than a line gap, is a running header or footer.
             let alone = pages.len() == 1 && in_band && {
                 let h = page_box.height().max(1.0);
                 let edge =
                     (b.rect.y1 - page_box.y0) / h < 0.08 || (b.rect.y0 - page_box.y0) / h > 0.92;
+                let gap = rects
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i != bi)
+                    .map(|(_, r)| (r.y0 - b.rect.y1).max(b.rect.y0 - r.y1))
+                    .fold(f64::INFINITY, f64::min);
                 edge && block_size(p.text, b) < body * 0.9
+                    && text.chars().count() <= 80
+                    && gap >= f64::from(body)
             };
             if tagged || repeated || number || alone {
                 b.kind = BlockKind::Furniture;
@@ -799,6 +809,31 @@ mod tests {
         let l = &analyse(&pages)[0];
         let n: usize = l.blocks.iter().map(|b| b.lines.len()).sum();
         assert_eq!(n, 20_000);
+    }
+
+    #[test]
+    fn one_page_furniture_needs_a_gap() {
+        // A small line close above the text is a caption or a note, not a
+        // running header; the same line far above it is one.
+        let near = page(&[
+            (40.0, 40.0, 200.0, 8.0, false, "a small note"),
+            (40.0, 52.0, 380.0, 10.0, false, "body text"),
+            (40.0, 64.0, 380.0, 10.0, false, "body text"),
+        ]);
+        let far = page(&[
+            (40.0, 30.0, 200.0, 8.0, false, "a running header"),
+            (40.0, 80.0, 380.0, 10.0, false, "body text"),
+            (40.0, 92.0, 380.0, 10.0, false, "body text"),
+        ]);
+        for (t, furniture) in [(&near, false), (&far, true)] {
+            let pages = [PageInput {
+                text: t,
+                images: &[],
+                page: A5,
+            }];
+            let l = &analyse(&pages)[0];
+            assert_eq!(l.blocks[0].kind == BlockKind::Furniture, furniture);
+        }
     }
 
     #[test]

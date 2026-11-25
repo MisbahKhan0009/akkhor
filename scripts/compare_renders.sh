@@ -4,7 +4,7 @@
 # vendored PDF parser:  scripts/compare_renders.sh OLD_BINARY NEW_BINARY
 set -u
 old=$1 new=$2 diffs=0
-for f in tests/fixtures/*.pdf tests/corpus/pdf/*.pdf; do
+for f in tests/fixtures/*.pdf tests/corpus/pdf/*.pdf tests/corpus/books/pdf/*.pdf; do
   for p in 0 1; do
     a=$("$old" "$f" --page $p --scale 0.5 --out /tmp/cmp-a.png 2>&1 | grep -E "^pages|^error")
     b=$("$new" "$f" --page $p --scale 0.5 --out /tmp/cmp-b.png 2>&1 | grep -E "^pages|^error")

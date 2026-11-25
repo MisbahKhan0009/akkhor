@@ -143,8 +143,7 @@ fn books_reflow_like_the_source() {
             recall * 100.0,
             if headings_ok { "ok" } else { "WRONG" }
         );
-        // Mukta's two known glyph misses (see books.rs) cost a few letters.
-        let cer_limit = if name.contains("mukta") { 0.01 } else { 0.005 };
+        let cer_limit = 0.005;
         if e > cer_limit
             || precision < 0.95
             || recall < 0.95
