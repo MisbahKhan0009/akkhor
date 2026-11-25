@@ -51,10 +51,17 @@ impl Default for LayoutOptions {
 pub struct PlacedGlyph {
     pub font: FontId,
     pub glyph: u32,
-    /// Pen position in page pixels; `y` is the baseline.
+    /// Where the glyph is drawn, in page pixels; `y` is on the baseline
+    /// (plus any mark offset).
     pub x: f32,
     pub y: f32,
     pub size: f32,
+    /// Byte offset in the block text of the cluster this glyph belongs to.
+    pub cluster: usize,
+    /// Pen position before this glyph and its advance (including any
+    /// justification space), for hit-testing and selection.
+    pub pen: f32,
+    pub advance: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -64,6 +71,27 @@ pub struct Line {
     /// Byte range of the block's text shown on this line.
     pub range: Range<usize>,
     pub glyphs: Vec<PlacedGlyph>,
+    /// Vertical extent of the line box and its baseline, in page pixels.
+    pub top: f32,
+    pub bottom: f32,
+    pub baseline: f32,
+    /// Horizontal extent of the visible text.
+    pub left: f32,
+    pub right: f32,
+}
+
+impl Line {
+    /// The x position where the text at byte `offset` starts on this line.
+    /// Offsets at or past the end of the line map to its right edge.
+    pub fn x_of(&self, offset: usize) -> f32 {
+        if offset <= self.range.start {
+            return self.left;
+        }
+        self.glyphs
+            .iter()
+            .find(|g| g.cluster >= offset)
+            .map_or(self.right, |g| g.pen)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -126,6 +154,16 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
                     y = opts.margin_top;
                 }
                 let baseline = y + lh * 0.72;
+                let glyphs: Vec<PlacedGlyph> = placed
+                    .into_iter()
+                    .map(|mut g| {
+                        g.y += baseline;
+                        g.cluster += seg_range.start;
+                        g
+                    })
+                    .collect();
+                let left = glyphs.first().map_or(opts.margin_x + indent, |g| g.pen);
+                let right = glyphs.last().map_or(left, |g| g.pen + g.advance);
                 pages
                     .last_mut()
                     .expect("at least one page")
@@ -133,13 +171,12 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
                     .push(Line {
                         block: block_idx,
                         range: seg_range.start + range.start..seg_range.start + range.end,
-                        glyphs: placed
-                            .into_iter()
-                            .map(|mut g| {
-                                g.y += baseline;
-                                g
-                            })
-                            .collect(),
+                        glyphs,
+                        top: y,
+                        bottom: y + lh,
+                        baseline,
+                        left,
+                        right,
                     });
                 y += lh;
             }
@@ -289,14 +326,18 @@ fn place(
     let mut pen = left;
     line.iter()
         .map(|g| {
+            let advance = g.advance + if is_space(g) { extra } else { 0.0 };
             let placed = PlacedGlyph {
                 font: g.font,
                 glyph: g.glyph,
                 x: pen + g.x_offset,
                 y: -g.y_offset,
                 size: g.size,
+                cluster: g.cluster,
+                pen,
+                advance,
             };
-            pen += g.advance + if is_space(g) { extra } else { 0.0 };
+            pen += advance;
             placed
         })
         .collect()

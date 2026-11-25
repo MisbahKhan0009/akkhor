@@ -7,6 +7,20 @@
 
 use crate::markup::{Token, Tokenizer};
 
+/// A place in a document: a block and a byte offset into its text.
+/// Positions order the way the text reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Position {
+    pub block: usize,
+    pub offset: usize,
+}
+
+impl Position {
+    pub fn new(block: usize, offset: usize) -> Self {
+        Self { block, offset }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Style {
     pub bold: bool,
