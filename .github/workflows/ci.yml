@@ -38,6 +38,12 @@ jobs:
           exit $status
       - name: Bijoy round trip
         run: cargo test --release -q -p akkhor-flow --test bijoy_roundtrip -- --nocapture
+      - name: Android interface (Native.kt against the engine, every call from a JVM)
+        run: |
+          cargo build -p akkhor-android
+          python3 scripts/check_native.py --java /tmp/jni
+          javac -encoding UTF-8 -d /tmp/jni /tmp/jni/dev/akkhor/Native.java android/test/NativeTest.java
+          java -Djava.library.path=target/debug -cp /tmp/jni NativeTest .
 
   switches:
     name: Format switch ${{ matrix.features }}

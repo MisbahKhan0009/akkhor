@@ -1,65 +1,9 @@
 //! JNI bridge for Android.
 //!
-//! Kotlin side (in the app, `package dev.akkhor`):
-//!
-//! ```kotlin
-//! object Native {
-//!     init { System.loadLibrary("akkhor") }
-//!     external fun registerFont(script: String, path: String)        // "Latn", "Beng", "Deva", ...
-//!     // The 14 standard PDF fonts, for PDFs that use them without embedding:
-//!     // "Helvetica" -> Roboto, "Times-Roman" -> Noto Serif, "Courier" -> a
-//!     // monospace; any face of a family stands in for the others.
-//!     external fun registerStandardFont(name: String, path: String)
-//!     external fun openFd(fd: Int, name: String?): Long              // 0 on failure
-//!     external fun openPath(path: String): Long
-//!     external fun close(handle: Long)
-//!     external fun format(handle: Long): Int                         // 0 PDF, 1 EPUB, 2 TXT
-//!     external fun count(handle: Long): Int                          // PDF pages, EPUB chapters
-//!     external fun pageWidth(handle: Long, page: Int): Float         // PDF points
-//!     external fun pageHeight(handle: Long, page: Int): Float
-//!     external fun renderPdfTile(handle: Long, page: Int, scale: Float,
-//!                                x: Int, y: Int, bitmap: Bitmap, theme: Int): Int
-//!     // Several tiles of one page, sharing its fonts and images; returns how
-//!     // many were drawn. cancelRendering stops a batch before its next tile.
-//!     external fun renderPdfTiles(handle: Long, page: Int, scale: Float,
-//!                                 bitmaps: Array<Bitmap>, xs: IntArray, ys: IntArray,
-//!                                 theme: Int): Int
-//!     external fun cancelRendering(handle: Long)
-//!     external fun trimMemory(handle: Long): Int                    // from onTrimMemory
-//!     external fun outlineTitles(handle: Long): Array<String>?      // table of contents
-//!     external fun outlineLevelsAndPages(handle: Long): IntArray?   // [level, page, ...]
-//!     // Thumbnails: renderPdfTile at scale = side / max(pageWidth, pageHeight).
-//!     // Reflow: EPUB chapters, the text file, or a PDF's reflow chapters
-//!     // (reflowChapterCount of them; headings, paragraphs, pictures, without
-//!     // running headers or page numbers).
-//!     external fun layoutChapter(handle: Long, chapter: Int, width: Int, height: Int,
-//!                                fontSize: Float): Int               // page count, < 0 on error
-//!     external fun renderFlowPage(handle: Long, page: Int, bitmap: Bitmap, theme: Int): Int
-//!     // Positions are Longs: (block shl 32) or byteOffset. All snap to syllables.
-//!     external fun hitTest(handle: Long, page: Int, x: Float, y: Float): Long   // -1 if none
-//!     external fun wordAt(handle: Long, pos: Long): LongArray               // [start, end]
-//!     external fun selectionRects(handle: Long, page: Int, start: Long, end: Long): FloatArray
-//!     external fun textBetween(handle: Long, start: Long, end: Long): String
-//!     external fun search(handle: Long, chapter: Int, query: String): LongArray // [start, end, ...]
-//!     // PDF text (copy, search, selection, read-aloud). Positions are Longs:
-//!     // (page shl 32) or byteOffset, snapped to syllables; boxes in PDF points.
-//!     external fun pdfPageText(handle: Long, page: Int): String?
-//!     external fun pdfHitTest(handle: Long, page: Int, x: Float, y: Float): Long // -1 if none
-//!     external fun pdfWordAt(handle: Long, pos: Long): LongArray               // [start, end]
-//!     external fun pdfSelectionRects(handle: Long, start: Long, end: Long): FloatArray
-//!     external fun pdfTextBetween(handle: Long, start: Long, end: Long): String?
-//!     external fun pdfSearch(handle: Long, page: Int, query: String): LongArray // one page
-//!     // PDF reflow: chapters, and the same place in the other view.
-//!     external fun reflowChapterCount(handle: Long): Int
-//!     external fun reflowChapterOfPage(handle: Long, page: Int): Int
-//!     external fun pdfToReflow(handle: Long, chapter: Int, pdfPos: Long): Long  // -1 if none
-//!     external fun reflowToPdf(handle: Long, chapter: Int, pos: Long): Long     // -1 if none
-//!     // Engine offsets are UTF-8 bytes; Kotlin strings count UTF-16 units.
-//!     external fun utf16Offset(text: String, utf8: Int): Int
-//!     external fun utf8Offset(text: String, utf16: Int): Int
-//!     external fun lastError(): String?
-//! }
-//! ```
+//! The Kotlin side is [`android/Native.kt`](../../../android/Native.kt),
+//! which the app copies; `docs/api/android.md` explains the calls. CI checks
+//! that every declaration there matches a function here
+//! (`scripts/check_native.py`) and calls them all from a JVM.
 //!
 //! Rendering writes straight into the `Bitmap`'s memory (ARGB_8888), with no
 //! intermediate copy. Every entry point catches panics so a bad file can
@@ -95,7 +39,13 @@ struct Handle {
     book: Book,
     #[cfg(feature = "flow")]
     flow: Option<FlowState>,
+    /// Chapters, progress and locators (Phase 5), made on first use.
+    #[cfg(feature = "flow")]
+    reading: Option<akkhor::Reading>,
 }
+
+#[cfg(feature = "flow")]
+mod app;
 
 #[cfg(feature = "flow")]
 struct FlowState {
@@ -147,8 +97,13 @@ fn font_set() -> FontSet {
     set
 }
 
-/// 0 paper, 1 sepia, 2 dusk, 3 night, 4 original (PDF colours untouched).
+/// 0 paper, 1 sepia, 2 dusk, 3 night, 4 original (PDF colours untouched),
+/// 16 to 63 the app's own (setThemeColors).
 fn theme(code: jint) -> Theme {
+    #[cfg(feature = "flow")]
+    if let Some(t) = app::custom_theme(code) {
+        return t;
+    }
     match code {
         1 => Theme::SEPIA,
         2 => Theme::DUSK,
@@ -255,6 +210,8 @@ fn into_handle(book: Book) -> jlong {
         book,
         #[cfg(feature = "flow")]
         flow: None,
+        #[cfg(feature = "flow")]
+        reading: None,
     };
     registry().insert(id, Arc::new(Mutex::new(handle)));
     GENERATIONS
@@ -356,6 +313,8 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_close(_: *mut JNIEnv, _: jc
     // Remove it from the registry, then drop it outside the registry lock.
     // A call still running on another thread keeps it alive until it ends.
     let removed = registry().remove(&h);
+    #[cfg(feature = "flow")]
+    app::forget_searches(h);
     if let Some(g) = GENERATIONS
         .lock()
         .unwrap_or_else(|e| e.into_inner())
