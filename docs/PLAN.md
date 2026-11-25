@@ -100,10 +100,14 @@ Results (Linux x86-64, release build):
 | total resident memory, peak (cold) | 30 MB |
 | Bangla EPUB chapter: open + parse + layout + render | under 8 ms total, ~15 MB peak |
 | fonts loaded for a Bangla-only chapter | 1 of 3 |
+| same 308 MB PDF on a GitHub CI runner (slow disk), cold open | 331 ms, 6.6 MB heap, 30 MB peak |
+| `libakkhor.so`, all formats (CI, stripped) | arm64-v8a 5.5 MB, armeabi-v7a 4.1 MB, x86_64 6.7 MB |
 
 Bangla (ক্ষ, ন্ত্র, র্ম, ব্যাঁ, ৎ, ZWNJ) and Devanagari (क्ष, त्र, ज्ञ, श्र, द्ध, ष्ट्र) render correctly.
-Findings to act on: cold PDF open is dominated by walking the whole page tree (fix in Phase 3);
-justification needs hyphenation to avoid loose Latin lines (Phase 1).
+Findings to act on:
+- Cold PDF open is dominated by walking the whole page tree, which touches every page object on disk (fix in Phase 3).
+- The Android library is over the 3 MB target. Main suspects: the 14 standard PDF fonts embedded by default, colour management and image codecs compiled in for every build. Size work is added to Phase 3.
+- Justification needs hyphenation to avoid loose Latin lines (Phase 1).
 
 ### Phase 1: Indic text core ⏳
 
@@ -139,6 +143,7 @@ Done when: copy/search works on the corpus with under 2% character errors.
 4. Progressive rendering: low-resolution preview first, then sharp.
 5. Smart night mode: draw text and lines in theme colours while images keep their real colours (our own drawing device, not whole-page inversion).
 6. Thumbnails and table of contents (outlines).
+7. Library size: measure what each dependency adds (`cargo bloat`), load the standard PDF fonts from disk instead of embedding them, put rarely used codecs (JPEG 2000, JBIG2, CCITT) behind switches, try `opt-level = "s"` for cold code. Target: under 3 MB for arm64-v8a with all formats.
 
 ### Phase 4: Indic PDF reflow ⬜
 
@@ -162,9 +167,9 @@ After Phase 7 (or earlier, once Phases 1 to 3 land): the reader app, in its own 
 
 | Metric | Target | Spike |
 |---|---|---|
-| Engine `.so` size per CPU architecture, all formats | under 3 MB | measured in CI |
+| Engine `.so` size per CPU architecture, all formats | under 3 MB | 5.5 MB arm64 (work planned in Phase 3) |
 | RAM while reading a 1 GB PDF | under 60 MB | 30 MB peak (308 MB file) |
-| First page, any file size | under 300 ms | 89 ms cold, 5 to 13 ms warm |
+| First page, any file size | under 300 ms | 89 ms cold (laptop), 331 ms cold (CI disk), 5 to 13 ms warm |
 | Reopen | under 100 ms | yes |
 
 ## 6. Testing and CI
