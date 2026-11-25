@@ -123,10 +123,14 @@ fn decode_png(b: &[u8]) -> Option<DecodedImage> {
     match info.color_type {
         ColorType::Rgba => rgba.extend_from_slice(px),
         ColorType::Rgb => px
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .for_each(|p| rgba.extend_from_slice(&[p[0], p[1], p[2], 255])),
         ColorType::GrayscaleAlpha => px
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .for_each(|p| rgba.extend_from_slice(&[p[0], p[0], p[0], p[1]])),
         ColorType::Grayscale => px
             .iter()

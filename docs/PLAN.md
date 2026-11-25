@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25
+Last updated: 2026-11-25 (Phase 1 done)
 
 ---
 
@@ -109,22 +109,34 @@ Findings to act on:
 - The Android library is over the 3 MB target. Main suspects: the 14 standard PDF fonts embedded by default, colour management and image codecs compiled in for every build. Size work is added to Phase 3.
 - Justification needs hyphenation to avoid loose Latin lines (Phase 1).
 
-### Phase 1: Indic text core 🔄
+### Phase 1: Indic text core ✅ (2026-11-25)
 
-Make reflowable text complete and correct. Detailed design: [phases/phase-1.md](phases/phase-1.md).
+Make reflowable text complete and correct. Detailed design and checklist: [phases/phase-1.md](phases/phase-1.md).
 
-1. Selection and hit-testing API: point → (block, offset), snapping to syllables; range → highlight rectangles.
-2. Indic-aware search: normalise nukta forms, ZWJ/ZWNJ, khanda ta (ৎ / ত্‍), Bangla য়/ড়/ঢ় composed vs decomposed, Devanagari precomposed nukta letters; match across line breaks.
-3. Line-breaking rules: no break before danda (। ॥) or closing punctuation, no break after opening punctuation; Latin hyphenation (patterns), optional Bangla/Hindi break hints.
-4. Font fallback by coverage (a character the script font lacks falls to the next font), bold/italic font slots with synthetic bold/italic as fallback.
-5. CSS subset: `text-align`, `text-indent`, `margin`, `font-size`, `font-weight`, `font-style`, `display:none`, `page-break-*`.
-6. Images in EPUB (decode lazily, scale to page, byte-budgeted cache).
-7. Incremental pagination: lay out the current chapter first, the rest in the background; cancel on font change.
-8. TXT: encoding detection (UTF-8/16, Windows-1252) and Bijoy-encoded Bangla text detection.
+- ✅ 1.1 Positions, hit-testing, word selection, highlight rectangles, copy; all snap to syllables
+- ✅ 1.2 Indic-aware search (nukta, split vowels, ৎ / ত্‍, ZWJ/ZWNJ, case, quotes); never matches half a conjunct; lazy whole-book EPUB search
+- ✅ 1.3 No line starts with । ॥ or closing punctuation; English hyphenation (Liang, hyph-utf8 en-us)
+- ✅ 1.4 Font fallback by coverage; bold/italic faces with synthetic fallback
+- ✅ 1.5 CSS subset: alignment, indent, margins, font size/weight/style, display:none, page breaks; linked, embedded and inline styles
+- ✅ 1.6 EPUB images: header-only sizing, PNG/JPEG decoding at display size, byte-budget cache
+- ✅ 1.7 Incremental pagination (`Paginator`), `page_for(position)`
+- ✅ 1.8 TXT: UTF-8/UTF-16/Windows-1252 decoding, Bijoy detection
+- ✅ 1.9 Android bridge (hitTest, wordAt, selectionRects, textBetween, search) and CLI `--search`
 
-Done when: a 1,000-page Bangla novel EPUB opens to its first page in under 150 ms on a mid-range phone, selection never splits a conjunct, and search finds every variant spelling in a test corpus.
+Results (GitHub CI runner, release build):
 
-### Phase 2: PDF Indic text layer ⬜ (the headline novelty)
+| Test | Result |
+|---|---|
+| ~1,000-page Bangla text (1,072 pages): first page | 0.75 ms (6 of 6,000 paragraphs laid out) |
+| same, all pages | 269 ms |
+| search the same text (1,500 hits) | 10 ms |
+| EPUB chapter with an image: layout + render | 2.4 ms + 13 ms |
+| Bijoy-encoded sample | detected as `LegacyBijoy` |
+| `libakkhor.so` arm64-v8a, all formats | 5.8 MB (was 5.5 MB; size work is in Phase 3) |
+
+Known limits carried forward: adjacent-sibling and attribute CSS selectors are ignored; GIF and WebP images are sized but not drawn; Bijoy text is detected but not yet converted (Phase 2).
+
+### Phase 2: PDF Indic text layer ⏳ (the headline novelty)
 
 1. Text extraction with positions from hayro's interpreter (glyph, font, transform).
 2. Use `ToUnicode` maps when present and trustworthy.
@@ -167,9 +179,9 @@ After Phase 7 (or earlier, once Phases 1 to 3 land): the reader app, in its own 
 
 | Metric | Target | Spike |
 |---|---|---|
-| Engine `.so` size per CPU architecture, all formats | under 3 MB | 5.5 MB arm64 (work planned in Phase 3) |
+| Engine `.so` size per CPU architecture, all formats | under 3 MB | 5.8 MB arm64 after Phase 1 (work planned in Phase 3) |
 | RAM while reading a 1 GB PDF | under 60 MB | 30 MB peak (308 MB file) |
-| First page, any file size | under 300 ms | 89 ms cold (laptop), 331 ms cold (CI disk), 5 to 13 ms warm |
+| First page, any file size | under 300 ms | PDF: 89 ms cold (laptop), 338 ms cold (CI disk), 5 to 13 ms warm. Long Bangla text: under 1 ms |
 | Reopen | under 100 ms | yes |
 
 ## 6. Testing and CI

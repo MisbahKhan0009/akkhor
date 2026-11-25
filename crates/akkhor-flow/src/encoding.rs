@@ -44,7 +44,7 @@ fn decode_cp1252(b: &[u8]) -> String {
 }
 
 fn decode_utf16(b: &[u8], little_endian: bool) -> String {
-    let units = b.chunks_exact(2).map(|p| {
+    let units = b.as_chunks::<2>().0.iter().map(|p| {
         if little_endian {
             u16::from_le_bytes([p[0], p[1]])
         } else {

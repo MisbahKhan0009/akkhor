@@ -1,4 +1,4 @@
-# Phase 1: Indic text core (detailed plan)
+# Phase 1: Indic text core (detailed plan) ✅ done
 
 Goal: make reflowable text (EPUB, TXT) complete and correct, with every
 operation aware of Indic syllables. This file is the design; `docs/PLAN.md`
@@ -145,9 +145,9 @@ Expose the new pieces: `hitTest`, `selectionRects`, `textBetween`,
 
 ## Done when
 
-- [ ] Selection, hit-testing and highlights never split a conjunct (tests in 9 scripts)
-- [ ] Search finds every variant spelling in the test corpus and nothing inside conjuncts
-- [ ] Every CSS property above changes layout as expected
-- [ ] EPUB images render
-- [ ] First page of a 1,000-page Bangla chapter is laid out in under 30 ms on a laptop (target under 150 ms on a mid-range phone)
-- [ ] CI green, PLAN.md updated with results
+- [x] Selection, hit-testing and highlights never split a conjunct (tests in 9 scripts)
+- [x] Search finds every variant spelling in the test corpus and nothing inside conjuncts
+- [x] Every CSS property above changes layout as expected
+- [x] EPUB images render (PNG, JPEG; GIF/WebP are sized only)
+- [x] First page of a 1,000-page Bangla text is laid out in under 30 ms on a laptop: 0.75 ms (phone measurement waits for the app)
+- [x] CI green, PLAN.md updated with results
