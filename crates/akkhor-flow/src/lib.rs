@@ -24,7 +24,7 @@ pub mod search;
 pub mod select;
 pub mod shape;
 
-pub use fonts::{FontId, FontSet};
+pub use fonts::{FontId, FontSet, FontStyle, Synthetic};
 pub use layout::{LayoutOptions, Line, Page, PlacedGlyph, paginate};
 pub use model::{Block, BlockKind, Document, Position, Style, StyleSpan};
 pub use paint::{GlyphCache, render_page};

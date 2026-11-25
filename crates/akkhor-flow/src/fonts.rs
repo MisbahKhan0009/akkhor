@@ -66,8 +66,43 @@ impl LoadedFont {
     }
 }
 
+/// Weight and slant a font file provides.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct FontStyle {
+    pub bold: bool,
+    pub italic: bool,
+}
+
+impl FontStyle {
+    pub const REGULAR: FontStyle = FontStyle {
+        bold: false,
+        italic: false,
+    };
+    pub const BOLD: FontStyle = FontStyle {
+        bold: true,
+        italic: false,
+    };
+    pub const ITALIC: FontStyle = FontStyle {
+        bold: false,
+        italic: true,
+    };
+    pub const BOLD_ITALIC: FontStyle = FontStyle {
+        bold: true,
+        italic: true,
+    };
+}
+
+/// Emboldening and slanting the painter applies when a font file for the
+/// requested style is missing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Synthetic {
+    pub bold: bool,
+    pub italic: bool,
+}
+
 struct Entry {
     scripts: Vec<Script>,
+    style: FontStyle,
     data: FontData,
     loaded: OnceLock<Option<LoadedFont>>,
 }
@@ -87,12 +122,70 @@ impl FontSet {
     /// `Script::Latin` also serves as the fallback for everything else.
     /// Nothing is read until the font is first needed.
     pub fn add(&mut self, scripts: &[Script], data: FontData) -> FontId {
+        self.add_styled(scripts, FontStyle::REGULAR, data)
+    }
+
+    /// Registers a bold, italic or bold-italic face. Without one, bold and
+    /// italic text is drawn by emboldening and slanting the regular face.
+    pub fn add_styled(&mut self, scripts: &[Script], style: FontStyle, data: FontData) -> FontId {
         self.entries.push(Entry {
             scripts: scripts.to_vec(),
+            style,
             data,
             loaded: OnceLock::new(),
         });
         self.entries.len() - 1
+    }
+
+    /// The font to draw `c` with, in `script` and `style`: the script's own
+    /// font when it has the character, otherwise the first other font that
+    /// does (Latin first). Prefers a real styled face; otherwise returns the
+    /// regular face plus the synthetic styling to apply.
+    pub fn resolve(
+        &self,
+        script: Script,
+        style: FontStyle,
+        c: char,
+    ) -> Option<(FontId, Synthetic)> {
+        let order = [script, Script::Latin];
+        let mut candidates: Vec<FontId> = Vec::new();
+        for s in order {
+            for want_exact in [true, false] {
+                for (id, e) in self.entries.iter().enumerate() {
+                    let style_ok = if want_exact {
+                        e.style == style
+                    } else {
+                        e.style == FontStyle::REGULAR
+                    };
+                    if e.scripts.contains(&s) && style_ok && !candidates.contains(&id) {
+                        candidates.push(id);
+                    }
+                }
+            }
+        }
+        for (id, e) in self.entries.iter().enumerate() {
+            if e.style == FontStyle::REGULAR && !candidates.contains(&id) {
+                candidates.push(id);
+            }
+        }
+        let synth = |id: FontId| {
+            let have = self.entries[id].style;
+            Synthetic {
+                bold: style.bold && !have.bold,
+                italic: style.italic && !have.italic,
+            }
+        };
+        candidates
+            .iter()
+            .copied()
+            .find(|&id| self.get(id).is_some_and(|f| f.has_char(c)))
+            .or_else(|| {
+                candidates
+                    .iter()
+                    .copied()
+                    .find(|&id| self.get(id).is_some())
+            })
+            .map(|id| (id, synth(id)))
     }
 
     /// Noto Serif, Noto Serif Bengali and Noto Serif Devanagari, compiled in.

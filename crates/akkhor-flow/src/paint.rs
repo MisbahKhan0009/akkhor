@@ -9,7 +9,7 @@ use std::sync::Arc;
 use akkhor_core::{Error, LruCache, Result, Theme};
 use harfrust::GlyphId;
 use harfrust::font::glyph::outline::{DrawMemory, DrawOptions, PathSink};
-use kurbo::{Affine, BezPath};
+use kurbo::{Affine, BezPath, Stroke};
 use vello_cpu::color::{AlphaColor, Srgb};
 use vello_cpu::{PixmapMut, RasterizerSettings, RenderContext, Resources, TargetInit};
 
@@ -119,11 +119,20 @@ pub fn render_page(
                 continue;
             };
             let s = (g.size / font.units_per_em) as f64;
-            // Font units are y-up; pixels are y-down.
-            ctx.set_transform(
-                Affine::translate((g.x as f64, g.y as f64)) * Affine::scale_non_uniform(s, -s),
-            );
+            // Font units are y-up; pixels are y-down. Synthetic italic slants
+            // by 12 degrees (tan 12° ≈ 0.21).
+            let mut t =
+                Affine::translate((g.x as f64, g.y as f64)) * Affine::scale_non_uniform(s, -s);
+            if g.synthetic.italic {
+                t *= Affine::new([1.0, 0.0, 0.21, 1.0, 0.0, 0.0]);
+            }
+            ctx.set_transform(t);
             ctx.fill_path(&path);
+            if g.synthetic.bold {
+                // Thicken every stroke by about 3% of the em.
+                ctx.set_stroke(Stroke::new(font.units_per_em as f64 * 0.03));
+                ctx.stroke_path(&path);
+            }
         }
     }
     ctx.flush();

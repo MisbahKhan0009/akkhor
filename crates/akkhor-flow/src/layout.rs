@@ -8,11 +8,12 @@
 
 use std::ops::Range;
 
-use crate::fonts::{FontId, FontSet};
+use crate::fonts::{FontId, FontSet, FontStyle, Synthetic};
 use crate::hyphen::hyphenate;
+use crate::model::StyleSpan;
 use crate::model::{BlockKind, Document};
 use crate::script::syllable_starts;
-use crate::shape::{ShapedGlyph, shape_paragraph};
+use crate::shape::{ShapedGlyph, shape_paragraph, shape_styled};
 
 #[derive(Clone, Debug)]
 pub struct LayoutOptions {
@@ -63,6 +64,8 @@ pub struct PlacedGlyph {
     /// justification space), for hit-testing and selection.
     pub pen: f32,
     pub advance: f32,
+    /// Emboldening/slant to apply because no real bold/italic face exists.
+    pub synthetic: Synthetic,
 }
 
 #[derive(Clone, Debug)]
@@ -142,8 +145,30 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
         for segment in block.text.split('\n') {
             let seg_range = seg_start..seg_start + segment.len();
             seg_start = seg_range.end + 1;
-            let glyphs = shape_paragraph(segment, size, fonts);
-            let hyphen = shape_paragraph("-", size, fonts).first().copied();
+            // Style spans of this segment, made relative to it.
+            let spans: Vec<StyleSpan> = block
+                .spans
+                .iter()
+                .filter(|sp| sp.end > seg_range.start && sp.start < seg_range.end)
+                .map(|sp| StyleSpan {
+                    start: sp.start.max(seg_range.start) - seg_range.start,
+                    end: sp.end.min(seg_range.end) - seg_range.start,
+                    style: sp.style,
+                })
+                .collect();
+            let base = if matches!(block.kind, BlockKind::Heading(_)) {
+                FontStyle::BOLD
+            } else {
+                FontStyle::REGULAR
+            };
+            let glyphs = shape_styled(segment, &spans, base, size, fonts);
+            // Only English words are hyphenated; don't load a Latin font for
+            // a segment without any.
+            let hyphen = if segment.bytes().any(|b| b.is_ascii_alphabetic()) {
+                shape_paragraph("-", size, fonts).first().copied()
+            } else {
+                None
+            };
             for (range, placed) in break_lines(
                 segment,
                 &glyphs,
@@ -360,6 +385,7 @@ fn break_lines(
                 cluster: end,
                 pen,
                 advance: h.advance,
+                synthetic: placed.last().map_or(h.synthetic, |g| g.synthetic),
             });
         }
         lines.push((start..end, placed));
@@ -422,6 +448,7 @@ fn place(
                 cluster: g.cluster,
                 pen,
                 advance,
+                synthetic: g.synthetic,
             };
             pen += advance;
             placed
