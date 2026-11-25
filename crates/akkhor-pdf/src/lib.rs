@@ -142,7 +142,7 @@ impl RenderedPage {
     /// Straight-alpha RGBA, e.g. for PNG encoding.
     pub fn into_unpremultiplied(self) -> Vec<u8> {
         let mut px = self.pixels;
-        for p in px.chunks_exact_mut(4) {
+        for p in px.as_chunks_mut::<4>().0 {
             let a = p[3] as u32;
             if a != 0 && a != 255 {
                 for c in &mut p[..3] {

@@ -112,7 +112,7 @@ fn ms(t: Instant) -> f64 {
 
 fn write_png(path: &str, w: u32, h: u32, premul: Vec<u8>) -> Result<(), String> {
     let mut px = premul;
-    for p in px.chunks_exact_mut(4) {
+    for p in px.as_chunks_mut::<4>().0 {
         let a = p[3] as u32;
         if a != 0 && a != 255 {
             for c in &mut p[..3] {
