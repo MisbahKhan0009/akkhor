@@ -26,6 +26,7 @@ cliffs, fragile behaviour, missed targets) · 🟡 improve or document.
 | Page search | 9 corpus files missed a word split by a line-end hyphen; none now |
 | Damaged files | 145 of 200 show page 1 (was 143); renders of every corpus PDF identical to the previous build |
 | Cost | page text of the 2,000-page PDF 4.06 s against 4.13 to 4.38 s for the previous build, same session; structure and reflow 0.75 ms worst chapter; the pictures, rules and boxes pass 0.4 ms a page |
+| `libakkhor.so` arm64, all formats (CI) | 5.73 → 5.89 MB (PDF only 5.02 → 5.18); the size target was set aside before this phase |
 | Hostile pages | 10,000 rules and 20,000 aligned lines on one page: before the fix 3.6 s in `tables::find` (finding 3), now under 0.1 s |
 
 ## Findings

@@ -54,3 +54,4 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-26,Phase 4b,table rows reflowed with cells in order (table corpus),100,%,tests/corpus/tables,scripts/bench/score_tables.py (MuPDF 65%; PDFium 76%; Poppler 48% in their text)
 2026-11-26,Phase 4b,damaged PDFs whose page 1 is shown,145,of 200,compare_engines.py robustness,lenient array parsing in vendored hayro-syntax (MuPDF 130)
 2026-11-26,Phase 4b,headings in the real Bangla book's reflow,356,blocks,local only,was 1221 in Phase 4 (numbers and labels taken for headings)
+2026-11-26,Phase 4b,arm64 Android library size,5.89,MB,GitHub Actions cargo-ndk,CI run on 4135a9f (tables, boxes, Type 3 bold probes; was 5.73)
