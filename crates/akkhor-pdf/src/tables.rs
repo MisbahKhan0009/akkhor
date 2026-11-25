@@ -776,6 +776,8 @@ mod tests {
         }
         let fills = [
             Rect::new(50.0, 185.0, 320.0, 215.0),
+            // A coloured square behind a row number is not a box.
+            Rect::new(38.0, 290.0, 52.0, 304.0),
             // A highlight hugging its line is not a box.
             Rect::new(39.0, 291.0, 381.0, 303.0),
         ];

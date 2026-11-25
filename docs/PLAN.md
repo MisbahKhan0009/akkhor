@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 4b planned)
+Last updated: 2026-11-26 (Phase 4b done)
 
 ---
 
@@ -186,7 +186,7 @@ Results: reflow on 22 book PDFs from four producers with 0.0% wrong characters, 
 
 Review: [reviews/phase-4.md](reviews/phase-4.md), 21 findings; the four wrong-output or crash ones fixed (stack overflow on hostile pages, doubled letters from fake bold and from Typst, Type 3 advances). Two of the Phase 3 comparison's claims were corrected (damaged files, memory). Carried: library size (0.23 MB over), tables and cards in reflow, Mukta's two glyphs, hyphen-aware page search, a downloadable font pack for the app.
 
-### Phase 4b: tables, cards and open items 🔄
+### Phase 4b: tables, cards and open items ✅
 
 Detailed design: [phases/phase-4b.md](phases/phase-4b.md). From the Phase 4 review: tables are read column by column, cards and boxes are not seen, bold lead-ins become headings, Mukta's two glyphs, page search misses hyphenated words, 2 damaged files, one-page furniture.
 
@@ -199,6 +199,10 @@ Detailed design: [phases/phase-4b.md](phases/phase-4b.md). From the Phase 4 revi
 7. Hyphen-aware page search.
 8. Damaged files, one-page furniture.
 9. Scoring, case study and review.
+
+Results: on 8 table and card PDFs from four producers every block reflows as the truth says: small tables row by row with cells in order, wide ones as a picture with alt text, cards whole; MuPDF, PDFium and Poppler keep 65%, 76% and 48% of table rows in order in their text. The real Bangla book's tables now read across (585 rows on 53 pages) and its reflow has 356 headings instead of 1,221. Page search finds hyphenated words; 145 of 200 damaged files show a page; the book corpus did not move.
+
+Review: [reviews/phase-4b.md](reviews/phase-4b.md), 18 findings; the six wrong-output ones fixed (cell gaps, line spacing, a cut-off table row, numbering columns, labels taken for cards and headings, Typst reph). Carried: a permitted real PDF with tables, header labels in coloured boxes, headings followed by a table, one text-layer reorder seen on the real book.
 
 ### Phase 5: More formats ⬜
 

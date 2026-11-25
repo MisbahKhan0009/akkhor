@@ -1212,6 +1212,93 @@ mod tests {
     }
 
     #[test]
+    fn a_run_of_labels_is_not_headings() {
+        // Larger text, three labels side by side with nothing between
+        // them (around a picture), then a real heading and body text.
+        let t = page(&[
+            (40.0, 100.0, 100.0, 13.0, false, "Chef"),
+            (160.0, 100.0, 220.0, 13.0, false, "Waiter"),
+            (280.0, 100.0, 340.0, 13.0, false, "Menu"),
+            (
+                40.0,
+                200.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (40.0, 212.0, 200.0, 10.0, false, "more body text."),
+            (40.0, 240.0, 200.0, 16.0, false, "A heading"),
+            (
+                40.0,
+                262.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (40.0, 274.0, 200.0, 10.0, false, "more body text."),
+        ]);
+        let pages = [PageInput {
+            text: &t,
+            images: &[],
+            rules: &[],
+            fills: &[],
+            page: A5,
+        }];
+        let k = kinds(&analyse(&pages)[0], &t);
+        let headings: Vec<&str> = k
+            .iter()
+            .filter(|(kind, _)| matches!(kind, BlockKind::Heading(_)))
+            .map(|(_, t)| t.as_str())
+            .collect();
+        assert_eq!(headings, ["A heading"]);
+    }
+
+    #[test]
+    fn text_over_a_picture_belongs_to_it() {
+        let t = page(&[
+            (
+                40.0,
+                100.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (100.0, 200.0, 140.0, 10.0, false, "label"),
+            (
+                40.0,
+                400.0,
+                380.0,
+                10.0,
+                false,
+                "body text after the picture.",
+            ),
+        ]);
+        let pictures = [Rect::new(40.0, 150.0, 380.0, 350.0)];
+        let pages = [PageInput {
+            text: &t,
+            images: &pictures,
+            rules: &[],
+            fills: &[],
+            page: A5,
+        }];
+        let l = &analyse(&pages)[0];
+        let image = l
+            .blocks
+            .iter()
+            .find(|b| b.kind == BlockKind::Image)
+            .unwrap();
+        assert_eq!(image.lines, [1]);
+        assert!(
+            !l.blocks
+                .iter()
+                .any(|b| b.kind == BlockKind::Paragraph && b.lines.contains(&1))
+        );
+    }
+
+    #[test]
     fn one_page_furniture_needs_a_gap() {
         // A small line close above the text is a caption or a note, not a
         // running header; the same line far above it is one.

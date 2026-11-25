@@ -1,6 +1,6 @@
 # Phase 4b: tables, cards and the small open items
 
-Status: in progress. Follows [phase-4.md](phase-4.md) and its review
+Status: done (2026-11-26). Follows [phase-4.md](phase-4.md) and its review
 ([reviews/phase-4.md](../reviews/phase-4.md)); the library size (finding 12)
 is accepted as it is.
 
@@ -116,14 +116,17 @@ words found. Case study, CSVs and figures updated; review in
 
 ## Done when
 
-- [ ] Table and card corpus, four producers, Bangla and Hindi, with truth
-- [ ] Rules and boxes collected; tables found (ruled, rules only, unruled)
-- [ ] Tables reflow as text (up to 3 columns) or a picture; positions map
-- [ ] Cards read box by box; centred lines and bold lead-ins handled
-- [ ] Book corpus unchanged (0.0% wrong characters, 100% block starts)
-- [ ] Mukta 100%; hyphen-aware page search; one-page furniture rule
-- [ ] Damaged files looked at, fixed or documented
-- [ ] Case study, CSVs, review; CI green
+- [x] Table and card corpus, four producers, Bangla and Hindi, with truth
+  (8 PDFs, `tests/corpus/tables`)
+- [x] Rules and boxes collected; tables found (ruled, rules only, unruled)
+- [x] Tables reflow as text (up to 3 columns, a serial-number column
+  folded in) or a picture with alt text; positions map
+- [x] Cards read box by box; centred lines and bold lead-ins handled
+- [x] Book corpus unchanged (0.0% wrong characters, 100% block starts)
+- [x] Mukta 99.8% (100% not possible: the font draws ब्ज़ and ब्ज alike);
+  hyphen-aware page search; one-page furniture rule
+- [x] Damaged files looked at and fixed (145 of 200)
+- [x] Case study, CSVs, review (`docs/reviews/phase-4b.md`); CI green
 
 ## Risks
 
