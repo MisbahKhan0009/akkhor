@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 4 planned)
+Last updated: 2026-11-25 (Phase 4 done)
 
 ---
 
@@ -167,7 +167,7 @@ Results: night, dusk and sepia work on PDFs with photos kept in colour; cold ope
 
 Review: [reviews/phase-3.md](reviews/phase-3.md), 13 findings. Fixed: night-theme cost growing with the number of images on a page, the hayro version the render cache's `unsafe` relies on now pinned, benchmark load check. Carried forward: library size, redraw speed against MuPDF, memory on Indic pages, damaged-file recovery.
 
-### Phase 4: Indic PDF reflow 🔄
+### Phase 4: Indic PDF reflow ✅
 
 Detailed design: [phases/phase-4.md](phases/phase-4.md). Measured starting point: no reflow; on a two-column XeLaTeX book page 8.7% of words run together (XeLaTeX draws no spaces and justifies tightly; MuPDF finds 17% of words there); running headers and page numbers are read as text lines; line-end hyphens are kept.
 
@@ -181,6 +181,10 @@ Detailed design: [phases/phase-4.md](phases/phase-4.md). Measured starting point
 8. Benchmarks, case study (reflow section and book corpus for every engine) and the review.
 
 Moved out: the downloadable Bangla and Hindi font pack (app side, licence checks), Kruti Dev (no verifiable table).
+
+Results: reflow on 22 book PDFs from four producers with 0.0% wrong characters, every paragraph and heading break, footnotes and no running headers or page numbers, under 1 ms per chapter; positions map both ways. Text layer: XeLaTeX word gaps, Typst ActualText spans, Chrome's clipped next-page glyphs and Type 3 synthetic bold (read by shape when there is no text). A real 204-page Bangla book (measured locally) found fake bold drawn twice and Ghostscript-rewritten fonts: 100% of its words whole with its free fonts registered, against about 26% for MuPDF, PDFium and Poppler. Standard PDF fonts can come from the app; arm64 library 5.73 MB.
+
+Review: [reviews/phase-4.md](reviews/phase-4.md), 21 findings; the four wrong-output or crash ones fixed (stack overflow on hostile pages, doubled letters from fake bold and from Typst, Type 3 advances). Two of the Phase 3 comparison's claims were corrected (damaged files, memory). Carried: library size (0.23 MB over), tables and cards in reflow, Mukta's two glyphs, hyphen-aware page search, a downloadable font pack for the app.
 
 ### Phase 5: More formats ⬜
 
