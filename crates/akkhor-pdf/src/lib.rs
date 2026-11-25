@@ -11,6 +11,10 @@
 
 use std::sync::Arc;
 
+pub mod glyphs;
+
+pub use glyphs::{PageGlyphs, PdfFont, PdfGlyph};
+
 use akkhor_core::{Error, Result, Source, Theme, Tile};
 use hayro::hayro_interpret::InterpreterSettings;
 use hayro::hayro_syntax::{LoadPdfError, Pdf};
@@ -51,6 +55,13 @@ impl PdfDocument {
     pub fn page_size(&self, index: usize) -> Result<(f32, f32)> {
         let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
         Ok(page.render_dimensions())
+    }
+
+    /// The glyphs drawn on a page, with fonts, positions (points, top-left
+    /// origin) and whatever the PDF's own text layer says they mean.
+    pub fn glyphs(&self, index: usize) -> Result<PageGlyphs> {
+        let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
+        contain(|| glyphs::collect(page))
     }
 
     /// Pixel size of a whole page at `scale` (pixels per point).
@@ -182,4 +193,35 @@ fn to_u16(v: u32) -> Result<u16> {
 
 fn to_affine<T: hayro::hayro_interpret::util::TransformExt>(t: T) -> Affine {
     t.to_kurbo()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn open(name: &str) -> PdfDocument {
+        let path = format!("{}/../../tests/{name}", env!("CARGO_MANIFEST_DIR"));
+        PdfDocument::open(&Source::open(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn collects_glyphs_with_positions_and_fonts() {
+        let pdf = open("corpus/pdf/bn.chrome.pdf");
+        let (w, h) = pdf.page_size(0).unwrap();
+        let page = pdf.glyphs(0).unwrap();
+        assert!(page.glyphs.len() > 300, "{} glyphs", page.glyphs.len());
+        assert!(
+            page.fonts
+                .iter()
+                .any(|f| f.name.as_deref() == Some("NotoSerifBengali-Regular"))
+        );
+        for g in &page.glyphs {
+            assert!(g.origin.0 >= 0.0 && g.origin.0 <= w && g.origin.1 >= 0.0 && g.origin.1 <= h);
+            assert!((10.0..30.0).contains(&g.size), "size {}", g.size);
+        }
+        // Text runs top to bottom.
+        let first = page.glyphs.first().unwrap().origin.1;
+        let last = page.glyphs.last().unwrap().origin.1;
+        assert!(first < last);
+    }
 }
