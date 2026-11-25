@@ -41,8 +41,7 @@ the font, the others 97 to 100%
 13.5 ms (MuPDF 219 ms, PDFium 185 ms)
 
 It isn't ahead everywhere. MuPDF still redraws a page faster (1.1 ms vs
-3.0 ms, down from 5.4), opens more damaged files, and uses less memory on
-Indic pages. And I missed my library size target: 5.8 MB, not 3.5. Those
+3.0 ms, down from 5.4) and uses less memory on Indic pages. And I missed my library size target: 5.8 MB, not 3.5. Those
 are next on the list.
 Every number, chart and script is in the repo, so anyone can rerun it.
 

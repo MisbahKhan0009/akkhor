@@ -242,11 +242,13 @@ fn run(args: &[String]) -> Result<String, String> {
         Some("survive") => {
             let outcome = (|| -> Result<(), String> {
                 let pdf = open(&arg(1)?)?;
-                if pdf.page_count() > 0 {
-                    pdf.render_page(0, 0.5, &Theme::ORIGINAL)
-                        .map_err(|e| e.to_string())?;
-                    pdf.page_text(0).map_err(|e| e.to_string())?;
+                // Opened means a page shown (the same rule for every engine).
+                if pdf.page_count() == 0 {
+                    return Err("no pages".into());
                 }
+                pdf.render_page(0, 0.5, &Theme::ORIGINAL)
+                    .map_err(|e| e.to_string())?;
+                pdf.page_text(0).map_err(|e| e.to_string())?;
                 Ok(())
             })();
             Ok(match outcome {

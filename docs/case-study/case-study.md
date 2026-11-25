@@ -178,8 +178,11 @@ colours. Scanned pages (greyscale images) follow the theme like text.
 ![200 damaged PDFs](figures/robustness.png)
 
 200 damaged PDFs, the same files for every engine: **no engine crashed or
-hung**. MuPDF manages to open the most damaged files (180); Akkhor opens
-143 and refuses the rest with an error.
+hung**. Akkhor shows page 1 of the most damaged files (143), then MuPDF
+(130), Poppler (117) and PDFium (109); the rest are refused with an error.
+"Opened" means a page was shown: my first run also counted files that
+MuPDF and PDFium opened with zero pages, which gave MuPDF 180. With the
+same rule for everyone, that lead was an artefact.
 
 ## Where Akkhor is behind (and what is next)
 
@@ -192,7 +195,6 @@ Being honest about this is part of the point:
 - **Memory on an Indic page at 2x:** 11.4 MB added against 7.7 to 9.1 MB
   for the others ([`figures/memory.png`](figures/memory.png)): fonts are
   parsed once for text recovery and again for drawing.
-- **Damaged files:** MuPDF recovers more of them.
 - **Unknown fonts with no text layer:** if neither the PDF nor the phone
   has the font, there is nothing to recover from.
 - **Library size:** 5.8 MB on Linux and on Android (arm64) with all
@@ -219,6 +221,10 @@ Being honest about this is part of the point:
 - I set a 3 MB, then 3.5 MB, size target before knowing what Indic text
   recovery would need. Measuring every build showed the floor; the target
   is now 5.5 MB and the reasons are in the Phase 3 review.
+- My first robustness run counted a damaged file "opened" when the
+  library opened it, even with zero pages. MuPDF opens many truncated
+  files that way, so it looked far ahead (180 to 143). Counting only files
+  that show a page, Akkhor leads (143 to 130).
 - The review of the night theme found a page that draws 100,000 small
   images made it 450 ms slower, because every pixel was checked against
   every image. A row-by-row sweep brought that to 40 ms.

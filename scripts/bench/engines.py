@@ -179,9 +179,12 @@ def library_cmd(engine, cmd, args):
     if cmd == "survive":
         try:
             doc = engine.open(args[0])
-            if engine.count(doc) > 0:
-                engine.render(doc, 0, 0.5)
-                engine.text(doc, 0)
+            # Opened means a page shown: a document with no pages shows
+            # nothing (same rule for every engine).
+            if engine.count(doc) == 0:
+                return {"ok": False, "error": "no pages"}
+            engine.render(doc, 0, 0.5)
+            engine.text(doc, 0)
             return {"ok": True}
         except Exception as e:  # a graceful error, not a crash
             return {"ok": False, "error": str(e)[:200]}

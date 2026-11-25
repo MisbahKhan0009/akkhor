@@ -46,3 +46,5 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-25,Phase 4 real world,Bangla book words intact Akkhor bundled fonts only,68.2,%,cloud VM,data/real_world_book.csv
 2026-11-25,Phase 4 real world,Bangla book words intact MuPDF,26.1,%,cloud VM,data/real_world_book.csv
 2026-11-25,Phase 4.5,arm64 Android library size,6.01,MB,GitHub Actions cargo-ndk,CI run 45612528228 (reflow and Type 3 recognition added; 5.81 before Phase 4)
+2026-11-25,Phase 4.7,damaged PDFs showing page 1 (of 200) Akkhor,143,files,cloud VM,data/robustness.csv (same rule for all engines)
+2026-11-25,Phase 4.7,damaged PDFs showing page 1 (of 200) MuPDF,130,files,cloud VM,data/robustness.csv (180 under the old rule that counted zero-page opens)
