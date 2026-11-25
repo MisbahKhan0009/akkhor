@@ -755,7 +755,13 @@ mod tests {
         }
         let start = std::time::Instant::now();
         let _ = find(&t, &all(&t), &rules, &[], 10.0);
-        assert!(start.elapsed().as_secs_f64() < 1.0);
+        // Generous: CI runs unoptimised tests on shared machines. The
+        // quadratic version took 3.6 s optimised (minutes unoptimised).
+        assert!(
+            start.elapsed().as_secs_f64() < 20.0,
+            "{:?}",
+            start.elapsed()
+        );
     }
 
     #[test]
