@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-26 (Phase 4b done)
+Last updated: 2026-11-26 (Phase 5 planned)
 
 ---
 
@@ -204,19 +204,23 @@ Results: on 8 table and card PDFs from four producers every block reflows as the
 
 Review: [reviews/phase-4b.md](reviews/phase-4b.md), 18 findings; the six wrong-output ones fixed (cell gaps, line spacing, a cut-off table row, numbering columns, labels taken for cards and headings, Typst reph). Carried: a permitted real PDF with tables, header labels in coloured boxes, headings followed by a table, one text-layer reorder seen on the real book.
 
-### Phase 5: More formats ⬜
+### Phase 5: Ready for the app 🔄
+
+Detailed design: [phases/phase-5.md](phases/phase-5.md). What the reader app needs from the engine, behind an interface that stops changing: book info and covers, locators that survive font and view changes, progress, whole-book search, ranges for highlights, sentences for read aloud, a PDF page-range writer, colour themes from the app, a documented and tested JNI interface (`docs/api/android.md`, `Native.kt`, `apiVersion`), fuzzing in CI, a missing-font hint, and numbers from a real phone.
+
+### Phase 6: More formats ⬜
 
 MOBI/AZW3 (PalmDB, PalmDOC and HUFF/CDIC decompression, KF8 skeleton/fragments → HTML → `Document`), FB2, CBZ. DRM-protected files are detected and reported, never opened.
 
-### Phase 6: More scripts ⬜
+### Phase 7: More scripts ⬜
 
 Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam fonts and test corpora; Sinhala syllable rules; then bidi and right-to-left (Arabic, Urdu), then CJK line breaking.
 
-### Phase 7: Hardening and release ⬜
+### Phase 8: Hardening and release ⬜
 
-`cargo-fuzz` targets for every parser, a real-world file corpus in CI, benchmarks against MuPDF as the bar to beat, Android AAR packaging, crates.io release, API docs.
+Fuzzing kept up as formats arrive (started in Phase 5), a real-world file corpus in CI, benchmarks against MuPDF as the bar to beat, Android AAR packaging, crates.io release, API docs.
 
-After Phase 7 (or earlier, once Phases 1 to 3 land): the reader app, in its own repository.
+After Phase 5: the reader app, in its own repository (designed separately); Phases 6 to 8 continue alongside it.
 
 ## 5. Targets (to measure, not promises)
 
