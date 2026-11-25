@@ -1,0 +1,12 @@
+[package]
+name = "akkhor-core"
+description = "Shared building blocks of the Akkhor reading engine: memory-mapped sources, format sniffing, caches, themes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+memmap2.workspace = true

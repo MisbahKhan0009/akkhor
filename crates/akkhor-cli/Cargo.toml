@@ -1,0 +1,18 @@
+[package]
+name = "akkhor-cli"
+description = "Benchmark and render tool for the Akkhor engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "akkhor"
+path = "src/main.rs"
+
+[dependencies]
+akkhor = { workspace = true, features = ["pdf", "epub", "txt", "bundled-fonts"] }
+png = "0.18"

@@ -1,0 +1,21 @@
+[package]
+name = "akkhor-pdf"
+description = "PDF support for the Akkhor reading engine: memory-mapped loading and tiled rendering."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+default = ["standard-fonts"]
+# Embeds the 14 standard PDF fonts (~a few hundred KB) for PDFs that use
+# them without embedding. Most books embed their fonts.
+standard-fonts = ["hayro/embed-fonts"]
+# Embeds CJK character maps. Only needed for Chinese/Japanese/Korean PDFs.
+cjk = ["hayro/embed-cmaps"]
+
+[dependencies]
+akkhor-core.workspace = true
+hayro.workspace = true

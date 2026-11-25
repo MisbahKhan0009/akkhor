@@ -1,0 +1,29 @@
+[package]
+name = "akkhor-android"
+description = "JNI bridge exposing the Akkhor engine to Android apps (class dev.akkhor.Native)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+name = "akkhor"
+crate-type = ["cdylib"]
+
+# Format switches pass straight through to the engine, so an app can build a
+# PDF-only or EPUB-only library.
+[features]
+default = ["pdf", "epub", "txt"]
+pdf = ["akkhor/pdf"]
+pdf-cjk = ["akkhor/pdf-cjk"]
+epub = ["akkhor/epub", "flow"]
+txt = ["akkhor/txt", "flow"]
+# Reflowable text (EPUB, TXT); switched on by either.
+flow = []
+
+[dependencies]
+akkhor.workspace = true
+jni-sys = "0.3"
