@@ -72,3 +72,21 @@ fn page_search_finds_hyphenated_words() {
     }
     assert!(failed.is_empty(), "search misses words: {failed:?}");
 }
+
+/// With the corpus fonts registered, every book's text is sure.
+#[test]
+fn text_quality_is_full_with_the_fonts() {
+    use akkhor_core::Source;
+    use akkhor_pdf::PdfDocument;
+    register_test_fonts();
+    let dir = corpus("books/pdf");
+    for e in std::fs::read_dir(&dir).unwrap().flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if !name.ends_with(".pdf") {
+            continue;
+        }
+        let doc = PdfDocument::open(&Source::open(e.path()).unwrap()).unwrap();
+        let q = doc.text_quality(0..3).unwrap();
+        assert!(q >= akkhor_pdf::TEXT_QUALITY_GOOD, "{name}: {q}");
+    }
+}

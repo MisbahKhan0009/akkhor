@@ -18,8 +18,14 @@ use crate::zip::ZipArchive;
 #[derive(Clone, Debug, Default)]
 pub struct Metadata {
     pub title: Option<String>,
+    /// The first author (`dc:creator`).
     pub creator: Option<String>,
+    /// Every author, in the order the book lists them.
+    pub creators: Vec<String>,
     pub language: Option<String>,
+    pub publisher: Option<String>,
+    /// Archive path of the cover image, if the book names one.
+    pub cover: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +67,7 @@ impl EpubBook {
         let mut spine_ids: Vec<String> = Vec::new();
         let mut ncx_id: Option<String> = None;
         let mut current_meta: Option<&'static str> = None;
+        let mut cover_id: Option<String> = None;
 
         for tok in Tokenizer::new(&opf) {
             match tok {
@@ -68,6 +75,14 @@ impl EpubBook {
                     "title" => current_meta = Some("title"),
                     "creator" => current_meta = Some("creator"),
                     "language" => current_meta = Some("language"),
+                    "publisher" => current_meta = Some("publisher"),
+                    // EPUB 2: <meta name="cover" content="item-id"/>.
+                    "meta" => {
+                        if attr(&attrs, "name").as_deref() == Some("cover") {
+                            cover_id = attr(&attrs, "content");
+                        }
+                        current_meta = None;
+                    }
                     "item" => {
                         let get = |k| attr(&attrs, k).unwrap_or_default();
                         manifest.push((
@@ -91,9 +106,13 @@ impl EpubBook {
                     if let Some(field) = current_meta.take() {
                         let v = t.trim().to_string();
                         if !v.is_empty() {
+                            if field == "creator" {
+                                metadata.creators.push(v.clone());
+                            }
                             let slot = match field {
                                 "title" => &mut metadata.title,
                                 "creator" => &mut metadata.creator,
+                                "publisher" => &mut metadata.publisher,
                                 _ => &mut metadata.language,
                             };
                             slot.get_or_insert(v);
@@ -105,6 +124,25 @@ impl EpubBook {
         }
 
         let resolve = |href: &str| join_path(&opf_dir, &percent_decode(href));
+        // Cover: EPUB 3 `properties="cover-image"`, else EPUB 2's meta, else
+        // an image item whose id or name says cover.
+        let is_image = |m: &&(String, String, String, String)| m.2.starts_with("image/");
+        metadata.cover = manifest
+            .iter()
+            .find(|m| m.3.split_whitespace().any(|p| p == "cover-image"))
+            .or_else(|| {
+                cover_id
+                    .as_ref()
+                    .and_then(|id| manifest.iter().find(|m| &m.0 == id))
+                    .filter(is_image)
+            })
+            .or_else(|| {
+                manifest.iter().filter(is_image).find(|m| {
+                    m.0.to_ascii_lowercase().contains("cover")
+                        || m.1.to_ascii_lowercase().contains("cover")
+                })
+            })
+            .map(|m| resolve(&m.1));
         let spine = spine_ids
             .iter()
             .filter_map(|id| manifest.iter().find(|m| &m.0 == id))
@@ -189,6 +227,29 @@ impl EpubBook {
                 .map(|p| parent_dir(p))
                 .unwrap_or_default(),
         }
+    }
+
+    /// The cover image's bytes (PNG or JPEG), if the book has one.
+    pub fn cover_bytes(&self) -> Option<Vec<u8>> {
+        self.metadata
+            .cover
+            .as_deref()
+            .and_then(|p| self.zip.read(p).ok())
+    }
+
+    /// Uncompressed size of each chapter's file, a cheap measure of how much
+    /// text it holds (for progress through the book).
+    pub fn chapter_sizes(&self) -> Vec<u64> {
+        self.spine
+            .iter()
+            .map(|p| {
+                self.zip
+                    .entries()
+                    .iter()
+                    .find(|e| &e.name == p)
+                    .map_or(1, |e| e.size.max(1))
+            })
+            .collect()
     }
 
     /// Raw bytes of any file in the book (images, CSS, fonts).
@@ -411,6 +472,10 @@ mod tests {
     }
 
     fn zip_with(files: &[(&str, &str)]) -> ZipArchive {
+        ZipArchive::open(Source::from_vec(zip_bytes(files))).unwrap()
+    }
+
+    fn zip_bytes(files: &[(&str, &str)]) -> Vec<u8> {
         // A stored (uncompressed) zip, written by hand.
         let mut out = Vec::new();
         let mut central = Vec::new();
@@ -440,7 +505,52 @@ mod tests {
         out.extend_from_slice(&(central.len() as u32).to_le_bytes());
         out.extend_from_slice(&cd.to_le_bytes());
         out.extend_from_slice(&[0, 0]);
-        ZipArchive::open(Source::from_vec(out)).unwrap()
+        out
+    }
+
+    fn book(opf_metadata: &str, manifest: &str) -> EpubBook {
+        let container = r#"<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>"#;
+        let opf = format!(
+            r#"<package version="3.0"><metadata>{opf_metadata}</metadata>
+            <manifest>{manifest}<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/></manifest>
+            <spine><itemref idref="c1"/></spine></package>"#
+        );
+        let bytes = zip_bytes(&[
+            ("mimetype", "application/epub+zip"),
+            ("META-INF/container.xml", container),
+            ("OEBPS/content.opf", &opf),
+            ("OEBPS/ch1.xhtml", "<html><body><p>এক</p></body></html>"),
+            ("OEBPS/img/c.png", "not really a png"),
+        ]);
+        EpubBook::open(Source::from_vec(bytes)).unwrap()
+    }
+
+    #[test]
+    fn metadata_authors_publisher_and_cover() {
+        // EPUB 3: properties="cover-image"; two authors.
+        let b = book(
+            "<dc:title>বই</dc:title><dc:creator>এক</dc:creator><dc:creator>দুই</dc:creator>\
+             <dc:publisher>প্রকাশক</dc:publisher><dc:language>bn</dc:language>",
+            r#"<item id="x" href="img/c.png" media-type="image/png" properties="cover-image"/>"#,
+        );
+        assert_eq!(b.metadata.creators, ["এক", "দুই"]);
+        assert_eq!(b.metadata.creator.as_deref(), Some("এক"));
+        assert_eq!(b.metadata.publisher.as_deref(), Some("প্রকাশক"));
+        assert_eq!(b.metadata.cover.as_deref(), Some("OEBPS/img/c.png"));
+        assert_eq!(b.cover_bytes().as_deref(), Some(&b"not really a png"[..]));
+        // EPUB 2: <meta name="cover" content="id"/>.
+        let b = book(
+            r#"<meta name="cover" content="pic"/>"#,
+            r#"<item id="pic" href="img/c.png" media-type="image/png"/>"#,
+        );
+        assert_eq!(b.metadata.cover.as_deref(), Some("OEBPS/img/c.png"));
+        // No cover named and no image called cover: none.
+        let b = book(
+            "",
+            r#"<item id="pic" href="img/c.png" media-type="image/png"/>"#,
+        );
+        assert_eq!(b.metadata.cover, None);
+        assert_eq!(b.chapter_sizes().len(), 1);
     }
 
     #[test]

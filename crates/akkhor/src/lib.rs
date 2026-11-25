@@ -24,6 +24,19 @@ pub use akkhor_epub as epub;
 
 use std::path::Path;
 
+#[cfg(feature = "flow")]
+pub mod info;
+pub mod json;
+#[cfg(feature = "flow")]
+pub mod reading;
+#[cfg(feature = "flow")]
+pub mod search;
+
+#[cfg(feature = "flow")]
+pub use info::{BookInfo, Cover};
+#[cfg(feature = "flow")]
+pub use reading::{Locator, Reading};
+
 /// An open book of any enabled format.
 pub enum Book {
     #[cfg(feature = "pdf")]

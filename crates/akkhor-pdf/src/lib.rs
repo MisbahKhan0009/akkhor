@@ -158,6 +158,12 @@ const TYPE3_IDS: u32 = 0x4000_0000;
 /// Pages per reflow chapter when the outline gives none (or a long one).
 pub const REFLOW_PAGES: usize = 16;
 
+/// [`PdfDocument::text_quality`] at or above this: the text is sure. Below
+/// it, some conjuncts cannot be read without the book's font (a font pack
+/// helps). Conjunct glyphs are a few percent of a page, so even a few
+/// unsure ones matter.
+pub const TEXT_QUALITY_GOOD: f32 = 0.98;
+
 /// Pages whose image boxes are kept for theming (a few KB each).
 const IMAGE_BOX_PAGES: usize = 16;
 
@@ -321,6 +327,35 @@ impl PdfDocument {
         self.render_page(index, scale, theme)
     }
 
+    /// Title, author and subject from the document information dictionary,
+    /// with text strings decoded (UTF-16 or PDFDocEncoding).
+    /// Producers often leave the title as a file name or "Untitled"; such
+    /// values are dropped.
+    pub fn info(&self) -> PdfInfo {
+        let m = self.pdf.metadata();
+        let text = |v: &Option<Box<[u8]>>| {
+            v.as_deref()
+                .map(glyphs::text_string)
+                .map(|t| t.trim().trim_matches('\0').trim().to_string())
+                .filter(|t| !t.is_empty())
+        };
+        let title = text(&m.title).filter(|t| {
+            let lower = t.to_ascii_lowercase();
+            !(lower == "untitled"
+                || lower.starts_with("microsoft word - ")
+                || [
+                    ".doc", ".docx", ".pdf", ".odt", ".indd", ".tex", ".html", ".htm", ".txt",
+                ]
+                .iter()
+                .any(|ext| lower.ends_with(ext)))
+        });
+        PdfInfo {
+            title,
+            author: text(&m.author),
+            subject: text(&m.subject),
+        }
+    }
+
     pub fn page_count(&self) -> usize {
         self.pdf.pages().len()
     }
@@ -370,6 +405,69 @@ impl PdfDocument {
     /// reading order: vowel signs drawn before their consonant, rephs drawn
     /// after their syllable and two-part vowels.
     pub fn page_text(&self, index: usize) -> Result<PageText> {
+        let (glyphs, fonts) = self.prepared(index)?;
+        let actual = read::ActualTexts::new(&glyphs);
+        contain(|| {
+            text::assemble(
+                &glyphs,
+                |word| read::word_pieces(word, &fonts, &actual),
+                text::reorder,
+            )
+        })
+    }
+
+    /// How sure the page text of `pages` is, 0 to 1, for Bangla and
+    /// Devanagari: the share of their glyphs whose letters come from the
+    /// producer's `/ActualText`, from a complete font (one with its shaping
+    /// rules, embedded or registered), or that are plain letters the font's
+    /// character map and the text layer agree on. The rest (conjuncts,
+    /// reordered signs) rest on the PDF's `ToUnicode` map alone, which often
+    /// loses them. Low means the phone lacks the book's font: offering a
+    /// font pack helps. `None` when the pages hold no Indic text.
+    pub fn text_quality(&self, pages: Range<usize>) -> Option<f32> {
+        let (mut sure, mut all) = (0usize, 0usize);
+        for i in pages.start..pages.end.min(self.page_count()) {
+            let Ok((glyphs, fonts)) = self.prepared(i) else {
+                continue;
+            };
+            for g in &glyphs.glyphs {
+                let reading = fonts.get(g.font);
+                let table = reading.and_then(|r| r.table.as_deref());
+                let recovered = table.and_then(|t| t.map.get(&g.glyph_id));
+                let letters = recovered
+                    .map(|r| r.text.as_str())
+                    .or(g.unicode.as_deref().filter(|u| text::usable(u)))
+                    .unwrap_or("");
+                // Bangla and Devanagari glyphs, and glyphs nothing names at
+                // all (no text layer, no font: unreadable in any script).
+                let indic = letters.chars().any(|c| {
+                    matches!(
+                        akkhor_flow::script::script_of(c),
+                        akkhor_flow::Script::Bengali | akkhor_flow::Script::Devanagari
+                    )
+                });
+                let unnamed = letters.is_empty() && g.actual.is_none() && g.advance > 0.0;
+                if !indic && !unnamed {
+                    continue;
+                }
+                all += 1;
+                let complete = table.is_some_and(|t| t.complete) && recovered.is_some();
+                // The text layer names it, and is believed for this font (a
+                // conjunct the layer leaves out is what goes wrong).
+                let layer = reading.is_some_and(|r| r.trust_text_layer)
+                    && g.unicode
+                        .as_deref()
+                        .is_some_and(|u| text::usable(u) && !u.trim().is_empty());
+                if g.actual.is_some() || complete || layer {
+                    sure += 1;
+                }
+            }
+        }
+        (all > 0).then(|| sure as f32 / all as f32)
+    }
+
+    /// A page's glyphs and how to read each of its fonts.
+    fn prepared(&self, index: usize) -> Result<(PageGlyphs, Vec<read::FontReading>)> {
         let mut glyphs = self.glyphs(index)?;
         let mut tables: Vec<Option<Arc<recover::Recovery>>> = glyphs
             .fonts
@@ -455,14 +553,7 @@ impl PdfDocument {
             }
         }
         let fonts = read::readings(&glyphs, tables);
-        let actual = read::ActualTexts::new(&glyphs);
-        contain(|| {
-            text::assemble(
-                &glyphs,
-                |word| read::word_pieces(word, &fonts, &actual),
-                text::reorder,
-            )
-        })
+        Ok((glyphs, fonts))
     }
 
     /// [`page_text`](Self::page_text), kept for the last few pages: hit
@@ -680,6 +771,14 @@ impl PdfDocument {
 }
 
 /// A rendered page: RGBA8, premultiplied alpha, rows tightly packed.
+/// A PDF's own description of itself.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PdfInfo {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub subject: Option<String>,
+}
+
 pub struct RenderedPage {
     pub width: u32,
     pub height: u32,
