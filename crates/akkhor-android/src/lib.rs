@@ -18,6 +18,12 @@
 //!     external fun layoutChapter(handle: Long, chapter: Int, width: Int, height: Int,
 //!                                fontSize: Float): Int               // page count, < 0 on error
 //!     external fun renderFlowPage(handle: Long, page: Int, bitmap: Bitmap, theme: Int): Int
+//!     // Positions are Longs: (block shl 32) or byteOffset. All snap to syllables.
+//!     external fun hitTest(handle: Long, page: Int, x: Float, y: Float): Long   // -1 if none
+//!     external fun wordAt(handle: Long, pos: Long): LongArray               // [start, end]
+//!     external fun selectionRects(handle: Long, page: Int, start: Long, end: Long): FloatArray
+//!     external fun textBetween(handle: Long, start: Long, end: Long): String
+//!     external fun search(handle: Long, chapter: Int, query: String): LongArray // [start, end, ...]
 //!     external fun lastError(): String?
 //! }
 //! ```
@@ -67,6 +73,8 @@ struct FlowState {
     height: u32,
     /// EPUB chapter the pages belong to (for resolving its images).
     chapter: usize,
+    /// The laid-out chapter, for hit-testing, selection and copy.
+    doc: akkhor::flow::Document,
 }
 
 #[cfg(feature = "flow")]
@@ -455,6 +463,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
             width: 0,
             height: 0,
             chapter: 0,
+            doc: Default::default(),
         });
         let opts = LayoutOptions {
             width: width as f32,
@@ -472,6 +481,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
         flow.pages =
             akkhor::flow::paginate_with_images(&doc, &opts, &flow.fonts, images.as_deref());
         flow.chapter = chapter.max(0) as usize;
+        flow.doc = doc;
         flow.width = width.max(0) as u32;
         flow.height = height.max(0) as u32;
         Ok(flow.pages.len() as jint)
@@ -516,6 +526,158 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderFlowPage(
         )
         .map_err(|e| e.to_string())?;
         Ok(0)
+    })
+}
+
+/// A position packed into one `Long`: block in the high 32 bits, byte
+/// offset in the low 32 bits. Positions compare like the numbers.
+#[cfg(feature = "flow")]
+fn pack(p: akkhor::flow::Position) -> jlong {
+    ((p.block as i64) << 32) | (p.offset as u32 as i64)
+}
+
+#[cfg(feature = "flow")]
+fn unpack(v: jlong) -> akkhor::flow::Position {
+    akkhor::flow::Position::new((v >> 32) as usize, (v & 0xFFFF_FFFF) as usize)
+}
+
+#[cfg(feature = "flow")]
+unsafe fn long_array(env: *mut JNIEnv, values: &[jlong]) -> Result<jni_sys::jlongArray, String> {
+    unsafe {
+        let new = (**env).NewLongArray.ok_or("JNI")?;
+        let set = (**env).SetLongArrayRegion.ok_or("JNI")?;
+        let arr = new(env, values.len() as jint);
+        if arr.is_null() {
+            return Err("out of memory".into());
+        }
+        set(env, arr, 0, values.len() as jint, values.as_ptr());
+        Ok(arr)
+    }
+}
+
+#[cfg(feature = "flow")]
+fn flow_state<'a>(h: jlong) -> Result<&'a mut FlowState, String> {
+    let h = unsafe { handle(h) }?;
+    h.flow
+        .as_mut()
+        .ok_or_else(|| "call layoutChapter first".into())
+}
+
+/// The position under (x, y) on a laid-out page, snapped to a syllable
+/// boundary; -1 if the page is empty.
+#[cfg(feature = "flow")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_hitTest(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    page: jint,
+    x: jfloat,
+    y: jfloat,
+) -> jlong {
+    guard(-1, || {
+        let flow = flow_state(h)?;
+        let p = flow.pages.get(page as usize).ok_or("page out of range")?;
+        Ok(akkhor::flow::hit_test(&flow.doc, p, x, y).map_or(-1, pack))
+    })
+}
+
+/// The word around a position (long-press): `[start, end]`.
+#[cfg(feature = "flow")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_wordAt(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    pos: jlong,
+) -> jni_sys::jlongArray {
+    guard(std::ptr::null_mut(), || {
+        let flow = flow_state(h)?;
+        let (s, e) = akkhor::flow::word_at(&flow.doc, unpack(pos));
+        unsafe { long_array(env, &[pack(s), pack(e)]) }
+    })
+}
+
+/// Highlight rectangles on a page: `[x, y, width, height, ...]`.
+#[cfg(feature = "flow")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_selectionRects(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    page: jint,
+    start: jlong,
+    end: jlong,
+) -> jni_sys::jfloatArray {
+    guard(std::ptr::null_mut(), || {
+        let flow = flow_state(h)?;
+        let p = flow.pages.get(page as usize).ok_or("page out of range")?;
+        let rects = akkhor::flow::selection_rects(p, unpack(start), unpack(end));
+        let flat: Vec<jfloat> = rects
+            .iter()
+            .flat_map(|r| [r.x, r.y, r.width, r.height])
+            .collect();
+        unsafe {
+            let new = (**env).NewFloatArray.ok_or("JNI")?;
+            let set = (**env).SetFloatArrayRegion.ok_or("JNI")?;
+            let arr = new(env, flat.len() as jint);
+            if arr.is_null() {
+                return Err("out of memory".into());
+            }
+            set(env, arr, 0, flat.len() as jint, flat.as_ptr());
+            Ok(arr)
+        }
+    })
+}
+
+/// The text between two positions of the laid-out chapter (copy).
+#[cfg(feature = "flow")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_textBetween(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    start: jlong,
+    end: jlong,
+) -> jstring {
+    guard(std::ptr::null_mut(), || {
+        let flow = flow_state(h)?;
+        let text = akkhor::flow::text_between(&flow.doc, unpack(start), unpack(end));
+        let c = CString::new(text.replace('\0', " ")).map_err(|e| e.to_string())?;
+        unsafe {
+            let new = (**env).NewStringUTF.ok_or("JNI")?;
+            Ok(new(env, c.as_ptr()))
+        }
+    })
+}
+
+/// Searches one chapter (EPUB) or the whole text (TXT): `[start, end, ...]`.
+#[cfg(feature = "flow")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_search(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    chapter: jint,
+    query: jstring,
+) -> jni_sys::jlongArray {
+    guard(std::ptr::null_mut(), || {
+        let _ = chapter; // unused in TXT-only builds
+        let query = unsafe { jstr(env, query) }.ok_or("query is null")?;
+        let hd = unsafe { handle(h) }?;
+        let doc = match &hd.book {
+            #[cfg(feature = "epub")]
+            Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
+            #[cfg(feature = "txt")]
+            Book::Text(t) => t.document.clone(),
+            #[allow(unreachable_patterns)]
+            _ => return Err("not a reflowable book".into()),
+        };
+        let hits: Vec<jlong> = akkhor::flow::find_all(&doc, &query)
+            .iter()
+            .flat_map(|m| [pack(m.start), pack(m.end)])
+            .collect();
+        unsafe { long_array(env, &hits) }
     })
 }
 

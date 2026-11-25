@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH]
-//!               [--theme paper|sepia|dusk|night] [--out page.png]
+//!               [--theme paper|sepia|dusk|night] [--out page.png] [--search TEXT]
 //! ```
 //!
 //! For PDFs `--page` is the page index; for EPUBs it is the chapter index and
@@ -21,6 +21,7 @@ struct Args {
     size: (u32, u32),
     theme: Theme,
     out: Option<String>,
+    search: Option<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -33,6 +34,7 @@ fn parse_args() -> Result<Args, String> {
         size: (1080, 1920),
         theme: Theme::PAPER,
         out: None,
+        search: None,
     };
     while let Some(a) = it.next() {
         let mut val = || it.next().ok_or(format!("{a} needs a value"));
@@ -40,6 +42,7 @@ fn parse_args() -> Result<Args, String> {
             "--page" => args.page = val()?.parse().map_err(|_| "bad --page")?,
             "--scale" => args.scale = val()?.parse().map_err(|_| "bad --scale")?,
             "--out" => args.out = Some(val()?),
+            "--search" => args.search = Some(val()?),
             "--size" => {
                 let v = val()?;
                 let (w, h) = v.split_once('x').ok_or("--size is WxH")?;
@@ -144,6 +147,10 @@ fn run(args: Args) -> Result<(), String> {
             heap as f64 / 1024.0,
             file as f64 / 1024.0
         );
+    }
+
+    if let Some(q) = &args.search {
+        return search(&book, q);
     }
 
     let (w, h, pixels) = match &book {
@@ -263,6 +270,47 @@ fn render_flow(
     Ok((w, h, px))
 }
 
+/// Prints every hit of `q` with its chapter and a snippet.
+fn search(book: &Book, q: &str) -> Result<(), String> {
+    use akkhor::flow::{find_all, snippet};
+    let t = Instant::now();
+    let mut shown = 0;
+    let mut print =
+        |chapter: Option<usize>, doc: &akkhor::flow::Document, m: &akkhor::flow::Match| {
+            if shown < 20 {
+                let (text, r) = snippet(doc, m, 25);
+                let place = chapter.map_or(String::new(), |c| format!("ch {c:>3} "));
+                println!(
+                    "  {place}[{}:{}] …{}[{}]{}…",
+                    m.start.block,
+                    m.start.offset,
+                    &text[..r.start],
+                    &text[r.clone()],
+                    &text[r.end..]
+                );
+            }
+            shown += 1;
+        };
+    match book {
+        Book::Epub(epub) => {
+            for c in 0..epub.chapter_count() {
+                let doc = epub.chapter(c).map_err(|e| e.to_string())?;
+                for m in find_all(&doc, q) {
+                    print(Some(c), &doc, &m);
+                }
+            }
+        }
+        Book::Text(text) => {
+            for m in find_all(&text.document, q) {
+                print(None, &text.document, &m);
+            }
+        }
+        Book::Pdf(_) => return Err("searching PDFs arrives in Phase 2".into()),
+    }
+    println!("search    {shown} hits for {q:?} in {:.2} ms", ms(t));
+    Ok(())
+}
+
 fn main() -> ExitCode {
     match parse_args().and_then(run) {
         Ok(()) => ExitCode::SUCCESS,
@@ -271,7 +319,7 @@ fn main() -> ExitCode {
                 eprintln!("error: {e}");
             }
             eprintln!(
-                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night] [--out page.png]"
+                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night] [--out page.png] [--search TEXT]"
             );
             ExitCode::FAILURE
         }
