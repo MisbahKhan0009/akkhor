@@ -517,6 +517,81 @@ mod tests {
         );
     }
 
+    /// A PDF from numbered object bodies (object 1 is the catalog).
+    fn pdf_from(objects: &[&str]) -> Vec<u8> {
+        let mut out = b"%PDF-1.4\n".to_vec();
+        let mut offsets = Vec::new();
+        for (i, o) in objects.iter().enumerate() {
+            offsets.push(out.len());
+            out.extend(format!("{} 0 obj\n{o}\nendobj\n", i + 1).as_bytes());
+        }
+        let xref = out.len();
+        out.extend(format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes());
+        for o in offsets {
+            out.extend(format!("{o:010} 00000 n \n").as_bytes());
+        }
+        out.extend(
+            format!(
+                "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+                objects.len() + 1
+            )
+            .as_bytes(),
+        );
+        out
+    }
+
+    fn page_widths(pdf: &PdfDocument) -> Vec<f32> {
+        (0..pdf.page_count())
+            .map(|i| pdf.page_size(i).unwrap().0)
+            .collect()
+    }
+
+    #[test]
+    fn nested_page_trees_are_walked_by_count() {
+        // Root → [node(2 pages: 100, 200), page 300, node(1 page: 400)];
+        // the media box of the first node is inherited by its pages.
+        let pdf = pdf_from(&[
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Count 4 /Kids [3 0 R 6 0 R 7 0 R] >>",
+            "<< /Type /Pages /Parent 2 0 R /Count 2 /Kids [4 0 R 5 0 R] /MediaBox [0 0 100 100] >>",
+            "<< /Type /Page /Parent 3 0 R >>",
+            "<< /Type /Page /Parent 3 0 R /MediaBox [0 0 200 100] >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 100] >>",
+            "<< /Type /Pages /Parent 2 0 R /Count 1 /Kids [8 0 R] >>",
+            "<< /Type /Page /Parent 7 0 R /MediaBox [0 0 400 100] >>",
+        ]);
+        let pdf = PdfDocument::open(&Source::from_vec(pdf)).unwrap();
+        // Asked out of order, as a reader jumping around would.
+        assert_eq!(pdf.page_size(3).unwrap().0, 400.0);
+        assert_eq!(pdf.page_size(0).unwrap().0, 100.0);
+        assert_eq!(page_widths(&pdf), vec![100.0, 200.0, 300.0, 400.0]);
+        assert!(pdf.page_size(4).is_err());
+    }
+
+    #[test]
+    fn a_page_tree_that_lies_about_its_count_falls_back() {
+        // Claims 3 pages, holds 2.
+        let pdf = pdf_from(&[
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Count 3 /Kids [3 0 R 4 0 R] >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] >>",
+        ]);
+        let pdf = PdfDocument::open(&Source::from_vec(pdf)).unwrap();
+        assert!(pdf.page_size(2).is_err());
+        assert_eq!(page_widths(&pdf), vec![100.0, 200.0]);
+        // A flat tree whose kid is really a node: also detected.
+        let pdf = pdf_from(&[
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Count 2 /Kids [3 0 R 5 0 R] >>",
+            "<< /Type /Pages /Parent 2 0 R /Count 1 /Kids [4 0 R] >>",
+            "<< /Type /Page /Parent 3 0 R /MediaBox [0 0 100 100] >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] >>",
+        ]);
+        let pdf = PdfDocument::open(&Source::from_vec(pdf)).unwrap();
+        assert_eq!(page_widths(&pdf), vec![100.0, 200.0]);
+    }
+
     #[test]
     fn recognizes_bijoy_fonts() {
         for name in [

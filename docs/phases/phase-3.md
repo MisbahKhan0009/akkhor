@@ -141,7 +141,10 @@ review of Phase 3, as for Phases 1 and 2.
 
 - [x] Night, dusk and sepia work on PDFs; images keep their colours (cost:
   about 2 ns a pixel, +1.2 ms for a 512×512 tile)
-- [ ] Cold open of the 2,000-page PDF under 30 ms on CI; identical renders
+- [x] Lazy page tree; identical page counts and renders on every corpus
+  and fixture PDF (`scripts/compare_renders.sh`). Warm open of the
+  2,000-page PDF 12 ms → 0.5 ms, heap after open 6.6 → 1.0 MB, file touched
+  at open 298 → 7 MB (desktop). Cold open on CI: see the benchmark.
 - [ ] Second and later tiles of a page under half the cost of the first
 - [ ] Batch rendering can be cancelled between tiles
 - [ ] Thumbnails and table of contents, in the CLI and on Android

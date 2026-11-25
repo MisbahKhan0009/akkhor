@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/akkhor-core", "crates/akkhor-pdf", "crates/akkhor-flow", "crates/akkhor-epub", "crates/akkhor", "crates/akkhor-cli", "crates/akkhor-android"]
+exclude = ["vendor"]
 
 [workspace.package]
 version = "0.1.0"
@@ -42,3 +43,7 @@ panic = "unwind"
 [profile.release-small]
 inherits = "release"
 opt-level = "z"
+
+# hayro-syntax with a lazy page tree (see vendor/README.md).
+[patch.crates-io]
+hayro-syntax = { path = "vendor/hayro-syntax" }

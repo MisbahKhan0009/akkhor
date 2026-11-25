@@ -1,0 +1,256 @@
+--- /tmp/page.orig.rs	2026-11-25 12:31:17.279649951 +0600
++++ vendor/hayro-syntax/src/page.rs	2026-11-25 12:32:07.624458915 +0600
+@@ -16,7 +16,6 @@
+ use crate::xref::XRef;
+ use alloc::vec;
+ use alloc::vec::Vec;
+-use core::ops::Deref;
+ 
+ /// Attributes that can be inherited.
+ #[derive(Debug, Clone)]
+@@ -39,11 +38,36 @@
+ }
+ 
+ /// A structure holding the pages of a PDF document.
++///
++/// Akkhor change: pages are found on demand. The count comes from the root's
++/// `/Count`, and page N is found by walking down the tree, using each
++/// node's `/Count` to skip whole subtrees; each page is resolved once and
++/// kept. A tree that turns out to be inconsistent falls back to reading the
++/// whole tree, as upstream always does. See `vendor/README.md`.
+ pub struct Pages<'a> {
+-    pages: Vec<Page<'a>>,
+     xref: &'a XRef,
++    source: PagesSource<'a>,
+ }
+ 
++enum PagesSource<'a> {
++    Eager(Vec<Page<'a>>),
++    Lazy(LazyPages<'a>),
++}
++
++struct LazyPages<'a> {
++    root: Dict<'a>,
++    ctx: ReaderContext<'a>,
++    count: usize,
++    slots: Vec<OnceLock<Option<Box<Page<'a>>>>>,
++    /// Set when the tree contradicted its own counts.
++    broken: core::sync::atomic::AtomicBool,
++    full: OnceLock<Vec<Page<'a>>>,
++}
++
++/// Page trees deeper than this are treated as broken (real ones are a few
++/// levels deep).
++const MAX_TREE_DEPTH: usize = 64;
++
+ impl<'a> Pages<'a> {
+     /// Create a new `Pages` object.
+     pub(crate) fn new(
+@@ -51,11 +75,35 @@
+         ctx: &ReaderContext<'a>,
+         xref: &'a XRef,
+     ) -> Option<Self> {
++        let count = pages_dict
++            .get::<i64>(COUNT)
++            .filter(|&c| c > 0 && (c as usize) <= xref.len().max(1));
++        if let (Some(count), Some(_)) = (count, pages_dict.get::<Array<'a>>(KIDS)) {
++            let count = count as usize;
++            return Some(Self {
++                xref,
++                source: PagesSource::Lazy(LazyPages {
++                    root: pages_dict.clone(),
++                    ctx: ctx.clone(),
++                    count,
++                    slots: (0..count).map(|_| OnceLock::new()).collect(),
++                    broken: core::sync::atomic::AtomicBool::new(false),
++                    full: OnceLock::new(),
++                }),
++            });
++        }
++        Self::new_eager(pages_dict, ctx, xref)
++    }
++
++    fn new_eager(pages_dict: &Dict<'a>, ctx: &ReaderContext<'a>, xref: &'a XRef) -> Option<Self> {
+         let mut pages = vec![];
+         let pages_ctx = PagesContext::new();
+         resolve_pages(pages_dict, &mut pages, pages_ctx, ctx)?;
+ 
+-        Some(Self { pages, xref })
++        Some(Self {
++            xref,
++            source: PagesSource::Eager(pages),
++        })
+     }
+ 
+     /// Create a new `Pages` object by bruteforce-searching.
+@@ -77,21 +125,142 @@
+             return None;
+         }
+ 
+-        Some(Self { pages, xref })
++        Some(Self {
++            xref,
++            source: PagesSource::Eager(pages),
++        })
+     }
+ 
+-    /// Return the xref table (of the document the pages belong to).   
++    /// Return the xref table (of the document the pages belong to).
+     pub fn xref(&self) -> &'a XRef {
+         self.xref
+     }
++
++    /// The number of pages.
++    pub fn len(&self) -> usize {
++        match &self.source {
++            PagesSource::Eager(pages) => pages.len(),
++            PagesSource::Lazy(lazy) => match lazy.fallback() {
++                Some(full) => full.len(),
++                None => lazy.count,
++            },
++        }
++    }
++
++    /// Whether the document has no pages.
++    pub fn is_empty(&self) -> bool {
++        self.len() == 0
++    }
++
++    /// The page at `index`, read from the file the first time it is asked
++    /// for.
++    pub fn get(&self, index: usize) -> Option<&Page<'a>> {
++        match &self.source {
++            PagesSource::Eager(pages) => pages.get(index),
++            PagesSource::Lazy(lazy) => lazy.get(index),
++        }
++    }
++
++    /// Every page, in order.
++    pub fn iter(&self) -> impl Iterator<Item = &Page<'a>> + '_ {
++        (0..self.len()).filter_map(move |i| self.get(i))
++    }
+ }
+ 
+-impl<'a> Deref for Pages<'a> {
+-    type Target = [Page<'a>];
++impl<'a> LazyPages<'a> {
++    fn fallback(&self) -> Option<&Vec<Page<'a>>> {
++        if !self.broken.load(core::sync::atomic::Ordering::Acquire) {
++            return None;
++        }
++        Some(self.full.get_or_init(|| {
++            let mut pages = vec![];
++            let _ = resolve_pages(&self.root, &mut pages, PagesContext::new(), &self.ctx);
++            if pages.is_empty() {
++                Pages::new_brute_force(&self.ctx, self.ctx.xref())
++                    .map(|p| match p.source {
++                        PagesSource::Eager(v) => v,
++                        PagesSource::Lazy(_) => vec![],
++                    })
++                    .unwrap_or_default()
++            } else {
++                pages
++            }
++        }))
++    }
++
++    fn get(&self, index: usize) -> Option<&Page<'a>> {
++        if let Some(full) = self.fallback() {
++            return full.get(index);
++        }
++        let slot = self.slots.get(index)?;
++        let found = slot.get_or_init(|| self.find(index).map(Box::new));
++        match found {
++            Some(page) => Some(page),
++            None => {
++                // The tree did not hold what its counts promised.
++                self.broken.store(true, core::sync::atomic::Ordering::Release);
++                self.fallback()?.get(index)
++            }
++        }
++    }
++
++    /// Walks down from the root to page `index`.
++    fn find(&self, mut index: usize) -> Option<Page<'a>> {
++        let resolve = |kid: MaybeRef<Object<'a>>| -> Option<Dict<'a>> {
++            match kid {
++                MaybeRef::Ref(id) => self.ctx.xref().get_with::<Dict<'a>>(id.into(), &self.ctx),
++                MaybeRef::NotRef(object) => object.into_dict(),
++            }
++        };
++        let is_node = |d: &Dict<'a>| d.get::<Name<'_>>(TYPE).as_deref() == Some(PAGES);
++        let mut node = self.root.clone();
++        let mut ctx = inherit(&node, PagesContext::new());
++        for _ in 0..MAX_TREE_DEPTH {
++            let kids = node.get::<Array<'a>>(KIDS)?;
++            let node_count = node.get::<i64>(COUNT).unwrap_or(-1);
++            let kid_count = kids.raw_iter().count();
++            // A flat node: every kid is a page, page `index` is kid `index`.
++            if node_count == kid_count as i64 {
++                let kid = resolve(kids.raw_iter().nth(index)?)?;
++                if is_node(&kid) {
++                    return None;
++                }
++                return Page::new(&kid, &ctx, &self.ctx, false);
++            }
++            let mut next = None;
++            for kid in kids.raw_iter() {
++                let Some(dict) = resolve(kid) else { continue };
++                let n = if is_node(&dict) {
++                    dict.get::<i64>(COUNT).filter(|&c| c >= 0)? as usize
++                } else {
++                    1
++                };
++                if index < n {
++                    next = Some(dict);
++                    break;
++                }
++                index -= n;
++            }
++            let dict = next?;
++            if !is_node(&dict) {
++                return Page::new(&dict, &ctx, &self.ctx, false);
++            }
++            ctx = inherit(&dict, ctx);
++            node = dict;
++        }
++        None
++    }
++}
+ 
+-    fn deref(&self) -> &Self::Target {
+-        &self.pages
++/// Attributes a page tree node passes down to its pages.
++fn inherit<'a>(dict: &Dict<'a>, mut ctx: PagesContext<'a>) -> PagesContext<'a> {
++    ctx.media_box = dict.get::<Rect>(MEDIA_BOX).or(ctx.media_box);
++    ctx.crop_box = dict.get::<Rect>(CROP_BOX).or(ctx.crop_box);
++    ctx.rotate = dict.get::<i32>(ROTATE).or(ctx.rotate);
++    if let Some(resources) = dict.get::<Dict<'a>>(RESOURCES) {
++        ctx.resources = resources;
+     }
++    ctx
+ }
+ 
+ struct PageTreeFrame<'a> {
+@@ -500,7 +669,7 @@
+     use crate::reader::ReaderContext;
+     use crate::xref::XRef;
+     use core::ops::Deref;
+-
++    
+     // Keep in sync with the implementation in `sync`. We duplicate it here
+     // to make it more visible since we have unsafe code here.
+     #[cfg(feature = "std")]
+@@ -537,7 +706,11 @@
+         }
+ 
+         pub(crate) fn get(&self) -> &Pages<'_> {
+-            &self.pages
++            // SAFETY (Akkhor change): `Pages` became invariant over its
++            // lifetime when it gained lazily filled cells, so the 'static
++            // lifetime is shortened by hand to the borrow of `self`, which
++            // owns the `XRef` all pages point into (see `new`).
++            unsafe { core::mem::transmute::<&Pages<'static>, &Pages<'_>>(&self.pages) }
+         }
+     }
+ }
