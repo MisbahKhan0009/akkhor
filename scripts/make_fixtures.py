@@ -130,16 +130,20 @@ def make_epub(path):
 {ncx_points}
 </navMap></ncx>
 """
+    def entry(name):
+        # Fixed timestamps keep the file identical between runs.
+        return zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+
     with zipfile.ZipFile(path, "w") as z:
-        z.writestr(zipfile.ZipInfo("mimetype"), "application/epub+zip", compress_type=zipfile.ZIP_STORED)
-        z.writestr("META-INF/container.xml", container, compress_type=zipfile.ZIP_DEFLATED)
-        z.writestr("OEBPS/content.opf", opf, compress_type=zipfile.ZIP_DEFLATED)
-        z.writestr("OEBPS/nav.xhtml", nav, compress_type=zipfile.ZIP_DEFLATED)
-        z.writestr("OEBPS/toc.ncx", ncx, compress_type=zipfile.ZIP_DEFLATED)
-        z.writestr("OEBPS/Styles/book.css", CSS, compress_type=zipfile.ZIP_DEFLATED)
-        z.writestr("OEBPS/Images/sample.png", png(600, 300), compress_type=zipfile.ZIP_STORED)
+        z.writestr(entry("mimetype"), "application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        z.writestr(entry("META-INF/container.xml"), container, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr(entry("OEBPS/content.opf"), opf, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr(entry("OEBPS/nav.xhtml"), nav, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr(entry("OEBPS/toc.ncx"), ncx, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr(entry("OEBPS/Styles/book.css"), CSS, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr(entry("OEBPS/Images/sample.png"), png(600, 300), compress_type=zipfile.ZIP_STORED)
         for name, lang, blocks in chapters:
-            z.writestr(f"OEBPS/Text/{name}", xhtml(blocks[0][1], blocks, lang), compress_type=zipfile.ZIP_DEFLATED)
+            z.writestr(entry(f"OEBPS/Text/{name}"), xhtml(blocks[0][1], blocks, lang), compress_type=zipfile.ZIP_DEFLATED)
 
 
 def make_pdf(path, pages, image_kb=0):

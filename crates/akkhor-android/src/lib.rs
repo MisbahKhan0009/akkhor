@@ -444,7 +444,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
             #[cfg(feature = "epub")]
             Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
             #[cfg(feature = "txt")]
-            Book::Text(d) => d.clone(),
+            Book::Text(t) => t.document.clone(),
             #[allow(unreachable_patterns)]
             _ => return Err("not a reflowable book".into()),
         };

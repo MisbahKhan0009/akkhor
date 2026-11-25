@@ -75,6 +75,15 @@ fn looks_like_text(b: &[u8]) -> bool {
     if b.starts_with(b"\xFF\xFE") || b.starts_with(b"\xFE\xFF") {
         return true;
     }
+    // UTF-16 without a byte-order mark: zeros in every other byte.
+    let pairs = b.len() / 2;
+    if pairs >= 4 {
+        let odd = b.iter().skip(1).step_by(2).filter(|&&x| x == 0).count();
+        let even = b.iter().step_by(2).filter(|&&x| x == 0).count();
+        if (odd * 10 > pairs * 7 && even == 0) || (even * 10 > pairs * 7 && odd == 0) {
+            return true;
+        }
+    }
     !b.iter()
         .any(|&c| c == 0 || (c < 0x09) || (0x0E..0x1B).contains(&c))
 }

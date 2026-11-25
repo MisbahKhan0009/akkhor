@@ -31,7 +31,16 @@ pub enum Book {
     #[cfg(feature = "epub")]
     Epub(akkhor_epub::EpubBook),
     #[cfg(feature = "txt")]
-    Text(akkhor_flow::Document),
+    Text(TextBook),
+}
+
+/// A plain-text book, with the encoding it was read in.
+#[cfg(feature = "txt")]
+pub struct TextBook {
+    pub document: akkhor_flow::Document,
+    /// `LegacyBijoy` means the text is Bangla typed with Bijoy and will look
+    /// like gibberish until converted (conversion arrives in Phase 2).
+    pub encoding: akkhor_flow::TextEncoding,
 }
 
 impl Book {
@@ -64,8 +73,11 @@ pub fn open_source(source: Source, name: Option<&str>) -> Result<Book> {
         Format::Epub => Ok(Book::Epub(akkhor_epub::EpubBook::open(source)?)),
         #[cfg(feature = "txt")]
         Format::Txt => {
-            let text = String::from_utf8_lossy(source.bytes());
-            Ok(Book::Text(akkhor_flow::Document::from_plain_text(&text)))
+            let decoded = akkhor_flow::decode_text(source.bytes());
+            Ok(Book::Text(TextBook {
+                document: akkhor_flow::Document::from_plain_text(&decoded.text),
+                encoding: decoded.encoding,
+            }))
         }
         other => Err(Error::FormatDisabled(other)),
     }

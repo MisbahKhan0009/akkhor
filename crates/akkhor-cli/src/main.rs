@@ -192,7 +192,10 @@ fn run(args: Args) -> Result<(), String> {
             let images = epub.chapter_images(args.page);
             render_flow(&doc, Some(&images), &args)?
         }
-        Book::Text(doc) => render_flow(doc, None, &args)?,
+        Book::Text(text) => {
+            println!("encoding  {:?}", text.encoding);
+            render_flow(&text.document, None, &args)?
+        }
     };
 
     if let Some((peak, now)) = memory_kb() {

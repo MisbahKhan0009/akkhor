@@ -14,6 +14,7 @@
 //! 5. [`paint`]: drawing a page into a pixel buffer.
 
 pub mod css;
+pub mod encoding;
 pub mod fonts;
 pub mod hyphen;
 pub mod image;
@@ -27,6 +28,7 @@ pub mod select;
 pub mod shape;
 
 pub use css::Align;
+pub use encoding::{DecodedText, TextEncoding, decode_text};
 pub use fonts::{FontId, FontSet, FontStyle, Synthetic};
 pub use image::ImageProvider;
 pub use layout::{
