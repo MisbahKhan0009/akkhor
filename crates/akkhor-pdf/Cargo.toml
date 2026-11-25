@@ -15,7 +15,15 @@ default = ["standard-fonts"]
 standard-fonts = ["hayro/embed-fonts"]
 # Embeds CJK character maps. Only needed for Chinese/Japanese/Korean PDFs.
 cjk = ["hayro/embed-cmaps"]
+# Uses the bundled Noto fonts as reference fonts for text recovery.
+bundled-fonts = ["akkhor-flow/bundled-fonts"]
 
 [dependencies]
 akkhor-core.workspace = true
+akkhor-flow.workspace = true
 hayro.workspace = true
+harfrust.workspace = true
+skrifa.workspace = true
+
+[dev-dependencies]
+akkhor-flow = { workspace = true, features = ["bundled-fonts"] }

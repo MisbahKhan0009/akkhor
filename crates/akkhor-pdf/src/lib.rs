@@ -9,11 +9,18 @@
 //! Android, the bitmap's own memory), so a zoomed-in page never needs a
 //! full-page bitmap.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub mod glyphs;
+pub mod recover;
+pub mod reference;
+pub mod text;
+
+pub use reference::register_reference_font;
 
 pub use glyphs::{PageGlyphs, PdfFont, PdfGlyph};
+pub use text::{PageText, TextSpan};
 
 use akkhor_core::{Error, Result, Source, Theme, Tile};
 use hayro::hayro_interpret::InterpreterSettings;
@@ -30,6 +37,8 @@ pub use hayro::vello_cpu::PixmapMut;
 pub struct PdfDocument {
     pdf: Pdf,
     interpreter: InterpreterSettings,
+    /// Glyph-to-letter tables per embedded font (see [`recover`]).
+    recoveries: Mutex<HashMap<u128, Option<Arc<recover::Recovery>>>>,
 }
 
 impl PdfDocument {
@@ -44,6 +53,7 @@ impl PdfDocument {
         Ok(Self {
             pdf,
             interpreter: InterpreterSettings::default(),
+            recoveries: Mutex::new(HashMap::new()),
         })
     }
 
@@ -62,6 +72,115 @@ impl PdfDocument {
     pub fn glyphs(&self, index: usize) -> Result<PageGlyphs> {
         let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
         contain(|| glyphs::collect(page))
+    }
+
+    /// The page's text exactly as the PDF's own text layer (`ToUnicode`)
+    /// gives it, with no repair. Useful for comparison; use
+    /// [`page_text`](Self::page_text) for reading, search and copy.
+    pub fn page_text_raw(&self, index: usize) -> Result<PageText> {
+        let glyphs = self.glyphs(index)?;
+        Ok(text::assemble(
+            &glyphs,
+            |word| {
+                word.iter()
+                    .map(|g| {
+                        let t = g
+                            .unicode
+                            .clone()
+                            .filter(|u| text::usable(u))
+                            .unwrap_or_default();
+                        text::GlyphPiece::new(g, t, recover::Role::Base)
+                    })
+                    .collect()
+            },
+            |line| line,
+        ))
+    }
+
+    /// The page's text, repaired for reading, search and copy.
+    ///
+    /// For every embedded font the letters of each glyph are recovered by
+    /// running the font's own shaping rules (see [`recover`]); that fixes
+    /// conjuncts and rephs the PDF's text layer lost, and works even when
+    /// the PDF has no text layer at all. Glyphs are then put back into
+    /// reading order: vowel signs drawn before their consonant, rephs drawn
+    /// after their syllable and two-part vowels.
+    pub fn page_text(&self, index: usize) -> Result<PageText> {
+        let glyphs = self.glyphs(index)?;
+        let tables: Vec<Option<Arc<recover::Recovery>>> =
+            glyphs.fonts.iter().map(|f| self.recovery(f)).collect();
+        contain(|| {
+            text::assemble(
+                &glyphs,
+                |word| {
+                    let mut out = Vec::with_capacity(word.len());
+                    let mut i = 0;
+                    while i < word.len() {
+                        let g = word[i];
+                        let rec = tables.get(g.font).and_then(|t| t.as_deref());
+                        // A run of glyphs that means more than its parts.
+                        if let Some(r) = rec.filter(|r| r.max_sequence >= 2) {
+                            let longest = r.max_sequence.min(word.len() - i);
+                            let hit = (2..=longest).rev().find_map(|n| {
+                                let run = &word[i..i + n];
+                                if run.iter().any(|x| x.font != g.font) {
+                                    return None;
+                                }
+                                let key: Vec<u32> = run.iter().map(|x| x.glyph_id).collect();
+                                r.sequences.get(&key).map(|t| (n, t))
+                            });
+                            if let Some((n, t)) = hit {
+                                let mut p =
+                                    text::GlyphPiece::new(g, t.clone(), recover::Role::Base);
+                                for x in &word[i + 1..i + n] {
+                                    p.rect = p.rect.union(x.rect);
+                                }
+                                out.push(p);
+                                i += n;
+                                continue;
+                            }
+                        }
+                        // An invisible, zero-width glyph in a recovered font
+                        // is a shaping leftover, whatever the text layer says.
+                        if g.advance == 0.0
+                            && rec.is_some_and(|r| r.indic && r.blank.contains(&g.glyph_id))
+                        {
+                            i += 1;
+                            continue;
+                        }
+                        let recovered = rec.and_then(|r| r.map.get(&g.glyph_id));
+                        let own = g.unicode.as_deref().filter(|u| text::usable(u));
+                        let (t, role) = match (recovered, own) {
+                            (Some(r), _) if rec.is_some_and(|r| r.indic) => {
+                                (r.text.clone(), r.role)
+                            }
+                            (_, Some(t)) => (recover::canonical(t), recover::role_of(t)),
+                            (Some(r), None) => (r.text.clone(), r.role),
+                            (None, None) => (String::new(), recover::Role::Base),
+                        };
+                        out.push(text::GlyphPiece::new(g, t, role));
+                        i += 1;
+                    }
+                    out
+                },
+                text::reorder,
+            )
+        })
+    }
+
+    /// The recovery table for a font, built once per document.
+    fn recovery(&self, font: &PdfFont) -> Option<Arc<recover::Recovery>> {
+        let data = font.data.as_ref()?;
+        let mut cache = self.recoveries.lock().unwrap_or_else(|e| e.into_inner());
+        cache
+            .entry(font.key)
+            .or_insert_with(|| {
+                contain(|| reference::recover(data))
+                    .ok()
+                    .flatten()
+                    .map(Arc::new)
+            })
+            .clone()
     }
 
     /// Pixel size of a whole page at `scale` (pixels per point).

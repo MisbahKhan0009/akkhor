@@ -14,6 +14,23 @@ use harfrust::font::{Blob, Font};
 
 use crate::script::Script;
 
+/// The compiled-in fonts and the scripts each one serves.
+#[cfg(feature = "bundled-fonts")]
+pub const BUNDLED: &[(&[Script], &[u8])] = &[
+    (
+        &[Script::Latin, Script::Common, Script::Other],
+        include_bytes!("../../../fonts/NotoSerif-Regular.ttf"),
+    ),
+    (
+        &[Script::Bengali],
+        include_bytes!("../../../fonts/NotoSerifBengali-Regular.ttf"),
+    ),
+    (
+        &[Script::Devanagari],
+        include_bytes!("../../../fonts/NotoSerifDevanagari-Regular.ttf"),
+    ),
+];
+
 /// Index of a font inside a [`FontSet`].
 pub type FontId = usize;
 
@@ -212,22 +229,9 @@ impl FontSet {
     #[cfg(feature = "bundled-fonts")]
     pub fn bundled() -> Self {
         let mut set = Self::new();
-        set.add(
-            &[Script::Latin, Script::Common, Script::Other],
-            FontData::Static(include_bytes!("../../../fonts/NotoSerif-Regular.ttf")),
-        );
-        set.add(
-            &[Script::Bengali],
-            FontData::Static(include_bytes!(
-                "../../../fonts/NotoSerifBengali-Regular.ttf"
-            )),
-        );
-        set.add(
-            &[Script::Devanagari],
-            FontData::Static(include_bytes!(
-                "../../../fonts/NotoSerifDevanagari-Regular.ttf"
-            )),
-        );
+        for (scripts, data) in BUNDLED {
+            set.add(scripts, FontData::Static(data));
+        }
         set
     }
 

@@ -3,9 +3,10 @@
 texts in tests/corpus/*.txt.
 
 Each text is printed by two producers (Chrome and LibreOffice) with the
-Noto Serif fonts from fonts/, and every PDF is also saved with its ToUnicode
-maps removed (*.raw.pdf), which forces the engine to recover the text from
-the glyphs alone.
+Noto Serif fonts from fonts/ ({stem}.{producer}.pdf) and with a second
+design from tests/fonts/ ({stem}.{font}.{producer}.pdf). Every PDF is also
+saved with its ToUnicode maps removed (*.raw.pdf), which forces the engine
+to recover the text from the glyphs alone.
 
 Needs google-chrome and soffice on PATH. Run from the repository root:
     python3 scripts/make_corpus.py
@@ -21,18 +22,23 @@ import tempfile
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 CORPUS = os.path.join(ROOT, "tests", "corpus")
 OUT = os.path.join(CORPUS, "pdf")
-FONTS = os.path.join(ROOT, "fonts")
+FONTS = [os.path.join(ROOT, "fonts"), os.path.join(ROOT, "tests", "fonts")]
 
-FAMILY = {"bn": "Noto Serif Bengali", "hi": "Noto Serif Devanagari"}
+# (file key, family) per language; key None is the default Noto design.
+FAMILIES = {
+    "bn": [(None, "Noto Serif Bengali"), ("hind", "Hind Siliguri")],
+    "hi": [(None, "Noto Serif Devanagari"), ("mukta", "Mukta")],
+}
 
 
 def install_fonts():
     """LibreOffice finds fonts through fontconfig."""
     dest = os.path.expanduser("~/.local/share/fonts/akkhor")
     os.makedirs(dest, exist_ok=True)
-    for f in os.listdir(FONTS):
-        if f.endswith(".ttf"):
-            shutil.copy(os.path.join(FONTS, f), dest)
+    for d in FONTS:
+        for f in os.listdir(d):
+            if f.endswith(".ttf"):
+                shutil.copy(os.path.join(d, f), dest)
     subprocess.run(["fc-cache", "-f", dest], check=False, capture_output=True)
 
 
@@ -89,13 +95,15 @@ def main():
         stem = name[:-4]
         lang = stem.split("-")[0]
         text = open(os.path.join(CORPUS, name), encoding="utf-8").read()
-        html_path = os.path.join(work, stem + ".html")
-        open(html_path, "w", encoding="utf-8").write(page_html(text, FAMILY[lang]))
-        for producer, make in (("chrome", chrome), ("libreoffice", libreoffice)):
-            pdf = os.path.join(OUT, f"{stem}.{producer}.pdf")
-            make(html_path, pdf)
-            n = strip_tounicode(pdf, os.path.join(OUT, f"{stem}.{producer}.raw.pdf"))
-            print(f"{stem}.{producer}.pdf  ({os.path.getsize(pdf)} bytes, {n} ToUnicode maps)")
+        for key, family in FAMILIES[lang]:
+            base = stem if key is None else f"{stem}.{key}"
+            html_path = os.path.join(work, base + ".html")
+            open(html_path, "w", encoding="utf-8").write(page_html(text, family))
+            for producer, make in (("chrome", chrome), ("libreoffice", libreoffice)):
+                pdf = os.path.join(OUT, f"{base}.{producer}.pdf")
+                make(html_path, pdf)
+                n = strip_tounicode(pdf, os.path.join(OUT, f"{base}.{producer}.raw.pdf"))
+                print(f"{base}.{producer}.pdf  ({os.path.getsize(pdf)} bytes, {n} ToUnicode maps)")
 
 
 if __name__ == "__main__":

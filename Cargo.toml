@@ -25,6 +25,8 @@ hayro = { version = "0.9", default-features = false }
 # harfrust 0.15 shares read-fonts 0.46 with hayro's skrifa 0.49, so the
 # binary carries a single font parser.
 harfrust = "=0.15.0"
+# Same read-fonts as harfrust and hayro: no second font parser.
+skrifa = { version = "0.49", default-features = false, features = ["std"] }
 # One rasterizer for everything: the same vello_cpu hayro draws PDFs with.
 vello_cpu = "0.3"
 kurbo = "0.13"

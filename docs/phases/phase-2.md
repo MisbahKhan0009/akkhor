@@ -31,25 +31,43 @@ font (name, a key, its program bytes) and size. `PdfDocument::glyphs(page)`.
 
 ## 2.2 Recovering letters from glyphs ("reverse shaping")
 
-For every embedded TrueType/OpenType font with a `cmap`, build a table
-glyph id → Unicode text, once per font per document:
+**Revised after 2.1.** Measuring the corpus showed the original assumption
+was wrong: both producers drop `GSUB` from the fonts they embed. Chrome
+keeps a `cmap` for the plain letters only (51 of 687 glyphs) and the
+original glyph ids; LibreOffice renumbers the glyphs and writes a symbol
+`cmap` from its own codes (glyph 109 is "h"). Reverse shaping on the
+embedded font alone recovers almost nothing. The plan became:
 
-1. Reverse the `cmap`: glyph → the character that selects it.
-2. Run the font's own OpenType rules forwards on candidate syllables and
-   record what comes out: for every consonant pair `C ্ C`, common triples,
-   reph `র্ C` / `र् C`, phala forms (`C ্ য/র/ব`), consonant + each vowel
-   sign, nukta forms. Each glyph produced only by a candidate maps back to
-   that candidate's text. Shaping is HarfRust (already in the engine) with
-   the embedded font, so the result is exactly what the producer drew.
-3. Mark glyph roles: pre-base vowel sign, reph, below-base, so ordering can
-   be repaired.
+1. **Reference fonts.** A glyph's outline survives subsetting. Each embedded
+   glyph is hashed by its outline (skrifa, unscaled, so renumbered
+   composites still match) and looked up in complete copies of fonts the
+   engine knows: the bundled Noto fonts and any the app registers
+   (`register_reference_font`, e.g. the phone's own Noto fonts). The
+   reference with most matches wins if it matches at least half the
+   subset. An embedded font that does keep `GSUB` is used directly.
+2. **Reverse shaping the reference** (once per process, lazily): reverse
+   `cmap`; candidate syllables shaped with HarfRust, reph first (its glyph
+   is reused inside ई), then consonant + vowel sign (+ candrabindu /
+   anusvara), independent vowels, consonant pairs, conjunct + vowel sign,
+   reph + conjunct, and three-consonant clusters ending in a phala. A
+   *deep* build adds every three-consonant cluster and only runs when a PDF
+   uses a glyph the quick build missed.
+3. **Sequences.** When a candidate's glyphs do not add up to its letters
+   (ई drawn as इ + the reph glyph), the glyph run itself is recorded and
+   matched first, longest run wins.
+4. **Fallbacks, marked weak:** glyph names (`uni09470902`) and the `GSUB`
+   tables read directly (a ligature means its components' letters). Weak
+   entries also trigger the deep build.
+5. Glyphs that draw nothing and map no character (Noto's `NullMark`, left
+   where ं fused into ि) are known as empty from the start, so the fused
+   glyph gets all the letters.
 
-Budget: under 50 ms per font, cached per document.
+Choosing the text for a glyph: for an Indic font, the recovered text; else
+a usable `ToUnicode` entry; else the recovered text; else nothing. A subset
+`cmap` that disagrees with the reference on most glyphs is discarded.
 
-Choosing the text for a glyph: a trustworthy `ToUnicode` entry (not empty,
-not `\0`, not private use, not `?`) unless the recovered entry is longer
-(a conjunct the map cut short); otherwise the recovered entry; otherwise the
-glyph name (`uni0995`, `ka-deva`, Adobe Glyph List); otherwise nothing.
+Budget: under 50 ms per font (measured 20 to 40 ms quick, 130 ms deep on a
+desktop core), once per process.
 
 ## 2.3 Visual to logical order
 
@@ -59,8 +77,14 @@ Glyphs come in drawing order. Per line, per script:
   Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam equivalents) moves after
   the consonant cluster that follows it;
 - two-part vowels are rejoined (ে … া → ো, ে … ৗ → ৌ);
-- a reph drawn at the end of its syllable moves to the start;
-- the result is checked with the Phase 1 syllable rules.
+- a reph drawn at the end of its syllable moves to the start, also when it
+  is fused with a vowel sign (Noto's ী + reph, Devanagari ि + reph over
+  र्ति, which moves both ways at once);
+- marks drawn before the rest of their cluster (a vowel sign or candrabindu
+  before a ya-phala, candrabindu before the vowel sign) are swapped back;
+- Devanagari ा + े/ै/ॅ/ॆ are rejoined as ो ौ ॉ ॊ;
+- reordering never crosses a word gap, which is decided in drawing order
+  (marks positioned back over their base do not open a gap).
 
 ## 2.4 Lines, words, reading order
 
@@ -102,14 +126,20 @@ removed, to test recovery on its own:
 | C | A and B | `ToUnicode` removed |
 | D | Bijoy text in a font named SutonnyMJ | ASCII |
 
+Each of A to C is printed in two designs per script: Noto Serif (bundled)
+and a second family from `tests/fonts` (Hind Siliguri, Mukta), whose glyph
+names are not `uniXXXX`. The whole corpus also runs with glyph names
+ignored (`accuracy_no_names`), since phone fonts often ship without them.
+
 Metric: character error rate (edit distance / length) after normalisation.
 Bijoy conversion is also checked by round trip: Unicode → Bijoy (with
 `poriborton`, test-only dependency) → Akkhor → Unicode.
 
 ## Done when
 
-- [ ] Sets A and B: character error rate under 2% for Bangla and Hindi
-- [ ] Set C (no `ToUnicode` at all): under 5%
+- [x] Sets A and B: character error rate under 2% for Bangla and Hindi
+  (0.0% on all 16 PDFs, with and without glyph names; raw text layer 2 to 45%)
+- [x] Set C (no `ToUnicode` at all): under 5% (0.0%)
 - [ ] Bijoy round trip: at least 98% of words exact
 - [ ] Text layer for one page under 30 ms; recovery table under 50 ms per font
 - [ ] Search finds words in PDFs that the raw text layer misses
@@ -118,7 +148,9 @@ Bijoy conversion is also checked by round trip: Unicode → Bijoy (with
 
 ## Known limits (stated up front)
 
-- Fonts embedded without a `cmap` (some CID-keyed subsets) cannot be
-  reverse-shaped; they fall back to `ToUnicode` and glyph names. Matching
-  glyph outlines against reference fonts is a possible later step.
+- A PDF whose font is not among the reference fonts (and keeps no `GSUB`)
+  falls back to its `ToUnicode` map with reordering. The app should
+  register the phone's Indic fonts; more designs can be bundled later.
+- Bare CFF and Type 1 fonts cannot be shaped; outline matching still works
+  if a reference font has the same outlines.
 - Scanned PDFs have no text layer at all; OCR is out of scope.

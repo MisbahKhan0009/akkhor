@@ -23,8 +23,9 @@ epub = ["dep:akkhor-epub", "flow"]
 txt = ["flow"]
 # The reflowable-text pipeline shared by EPUB, TXT and (later) MOBI and FB2.
 flow = ["dep:akkhor-flow"]
-# Compile Noto Serif fonts (Latin, Bengali, Devanagari) into the binary.
-bundled-fonts = ["flow", "akkhor-flow/bundled-fonts"]
+# Compile Noto Serif fonts (Latin, Bengali, Devanagari) into the binary; PDF
+# text recovery also uses them as reference fonts.
+bundled-fonts = ["flow", "akkhor-flow/bundled-fonts", "akkhor-pdf?/bundled-fonts"]
 
 [dependencies]
 akkhor-core.workspace = true

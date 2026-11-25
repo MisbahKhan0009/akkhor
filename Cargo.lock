@@ -73,7 +73,10 @@ name = "akkhor-pdf"
 version = "0.1.0"
 dependencies = [
  "akkhor-core",
+ "akkhor-flow",
+ "harfrust",
  "hayro",
+ "skrifa 0.49.0",
 ]
 
 [[package]]
