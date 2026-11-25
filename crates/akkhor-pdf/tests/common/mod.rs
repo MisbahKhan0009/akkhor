@@ -104,7 +104,7 @@ pub fn run_corpus() -> Vec<(String, f64, f64)> {
             rows.push((file, before, after));
         }
     }
-    println!("{:<48} {:>10} {:>10}", "file", "raw CER", "Akkhor CER");
+    println!("{:<48} {:>10} {:>10}", "file", "per glyph", "Akkhor");
     for (f, b, a) in &rows {
         println!("{f:<48} {:>9.1}% {:>9.1}%", b * 100.0, a * 100.0);
     }

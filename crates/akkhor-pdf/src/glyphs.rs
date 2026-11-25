@@ -55,6 +55,10 @@ pub struct PdfGlyph {
     pub size: f32,
     /// Box from ascender to descender over the advance, in points.
     pub rect: Rect,
+    /// The `/ActualText` span this glyph belongs to: an index into
+    /// [`PageGlyphs::actual_texts`]. Producers write the logical text of a
+    /// cluster there (Chrome and LibreOffice do for every Indic cluster).
+    pub actual: Option<usize>,
 }
 
 /// The glyphs of one page and the fonts they use.
@@ -62,6 +66,8 @@ pub struct PdfGlyph {
 pub struct PageGlyphs {
     pub glyphs: Vec<PdfGlyph>,
     pub fonts: Vec<Arc<PdfFont>>,
+    /// Text of each `/ActualText` span on the page.
+    pub actual_texts: Vec<String>,
 }
 
 fn strip_subset_prefix(name: &str) -> String {
@@ -77,6 +83,30 @@ fn strip_subset_prefix(name: &str) -> String {
 
 struct Collector {
     out: PageGlyphs,
+    /// Open marked-content sections: the `/ActualText` span each one
+    /// starts, if any.
+    marked: Vec<Option<usize>>,
+}
+
+/// Decodes a PDF text string: UTF-16 with a byte-order mark, else
+/// PDFDocEncoding (Latin-1 for the characters that matter here).
+fn text_string(bytes: &[u8]) -> String {
+    match bytes {
+        [0xFE, 0xFF, rest @ ..] => char::decode_utf16(
+            rest.chunks_exact(2)
+                .map(|p| u16::from_be_bytes([p[0], p[1]])),
+        )
+        .map(|c| c.unwrap_or('\u{FFFD}'))
+        .collect(),
+        [0xFF, 0xFE, rest @ ..] => char::decode_utf16(
+            rest.chunks_exact(2)
+                .map(|p| u16::from_le_bytes([p[0], p[1]])),
+        )
+        .map(|c| c.unwrap_or('\u{FFFD}'))
+        .collect(),
+        [0xEF, 0xBB, 0xBF, rest @ ..] => String::from_utf8_lossy(rest).into_owned(),
+        _ => bytes.iter().map(|&b| b as char).collect(),
+    }
 }
 
 impl Collector {
@@ -107,6 +137,27 @@ impl<'a> Device<'a> for Collector {
     fn draw_image(&mut self, _: hayro::hayro_interpret::Image<'a, '_>, _: ImageDrawProps<'a>) {}
     fn pop_clip(&mut self) {}
     fn pop_transparency_group(&mut self) {}
+
+    fn begin_marked_content(
+        &mut self,
+        _tag: &[u8],
+        properties: Option<&hayro::hayro_syntax::object::Dict<'_>>,
+    ) {
+        // The outermost ActualText wins: it replaces everything inside it.
+        let inside = self.marked.iter().flatten().next().is_some();
+        let span = properties
+            .filter(|_| !inside)
+            .and_then(|p| p.get::<hayro::hayro_syntax::object::String<'_>>(b"ActualText"))
+            .map(|t| {
+                self.out.actual_texts.push(text_string(t.as_bytes()));
+                self.out.actual_texts.len() - 1
+            });
+        self.marked.push(span);
+    }
+
+    fn end_marked_content(&mut self) {
+        self.marked.pop();
+    }
 
     fn draw_glyph_run(&mut self, run: &GlyphRun<'_, 'a>, props: DrawProps<'a>, _: &DrawMode) {
         let Some(first) = run.glyphs().first() else {
@@ -141,6 +192,7 @@ impl<'a> Device<'a> for Collector {
                 advance,
                 size,
                 rect: Rect::new(origin.x.min(end.x), top, origin.x.max(end.x), bottom),
+                actual: self.marked.iter().flatten().next().copied(),
             });
         }
     }
@@ -159,6 +211,7 @@ pub(crate) fn collect(page: &Page<'_>) -> PageGlyphs {
     );
     let mut collector = Collector {
         out: PageGlyphs::default(),
+        marked: Vec::new(),
     };
     interpret_page(page, &mut ctx, &mut collector);
     collector.out
@@ -177,6 +230,28 @@ impl<T: hayro::hayro_interpret::util::TransformExt> ToKurbo for T {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_strings_decode() {
+        assert_eq!(text_string(&[0xFE, 0xFF, 0x09, 0x95, 0x09, 0xBE]), "কা");
+        assert_eq!(text_string(b"Avwg"), "Avwg");
+    }
+
+    #[test]
+    fn actual_text_spans_are_collected() {
+        let path = format!(
+            "{}/../../tests/corpus/pdf/bn.libreoffice.pdf",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let pdf = crate::PdfDocument::open(&akkhor_core::Source::open(path).unwrap()).unwrap();
+        let g = pdf.glyphs(0).unwrap();
+        assert!(
+            g.actual_texts.iter().any(|t| t == "বাং"),
+            "{:?}",
+            &g.actual_texts[..3]
+        );
+        assert!(g.glyphs.iter().filter(|x| x.actual.is_some()).count() > g.glyphs.len() / 2);
+    }
 
     #[test]
     fn subset_prefixes_are_removed() {

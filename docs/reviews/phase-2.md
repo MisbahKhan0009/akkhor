@@ -16,7 +16,7 @@ cliffs, fragile behaviour) · 🟡 improve or document.
 
 | Check | Result |
 |---|---|
-| 36 corpus PDFs (Chrome, LibreOffice; Noto + Hind Siliguri / Mukta; Bijoy; with and without ToUnicode) | 0.0% character errors on all, with and without glyph names; their own text layers 2 to 100% wrong |
+| 36 corpus PDFs (Chrome, LibreOffice; Noto + Hind Siliguri / Mukta; Bijoy; with and without ToUnicode) | 0.0% character errors on all, with and without glyph names; read glyph by glyph through `ToUnicode` alone, 2 to 100% wrong (see the correction below) |
 | Same designs, font not registered ("unknown font") | Chrome: 27% → 14% (Bangla), 20% → 19% (Hindi); LibreOffice: 45% → 45%, 42% → 42% |
 | Bijoy round trip through `poriborton` | 99.7% of 3,842 words exact; all 11 misses are words `poriborton` cannot encode |
 | First page of text, tables not yet built (desktop core) | 25 to 50 ms; again: about 1 ms |
@@ -62,3 +62,15 @@ cliffs, fragile behaviour) · 🟡 improve or document.
 Phase 2's done criteria are met on the corpus. Findings 1 to 5, 9 and 10
 are fixed; 6, 7, 8 and 13 are the real-world gaps and are carried into the
 plan.
+
+## Correction (added in Phase 3)
+
+The "before" numbers in this review read each glyph's `ToUnicode` entry,
+as `hayro` exposes it. Comparing with MuPDF, PDFium and Poppler in Phase 3
+showed that Chrome and LibreOffice also write `/ActualText` spans with the
+correct text of every cluster, which those engines read: they reach under
+1% on the "as produced" corpus. So finding 7 (unknown fonts stay at
+42 to 45%) was a gap in Akkhor, not in the PDFs. Akkhor reads
+`/ActualText` since Phase 3, and the corpus's "no ToUnicode" PDFs no
+longer keep those spans, so they test recovery from glyphs alone. Data:
+`docs/case-study/data/text_accuracy.csv`.

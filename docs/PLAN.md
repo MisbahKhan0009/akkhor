@@ -143,7 +143,7 @@ Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point
 1. ✅ Text layer extraction (glyph boxes, `ToUnicode`, fonts).
 2. ✅ Recover letters for every glyph. Revised: producers strip `GSUB` from embedded subsets, so each glyph is found by its outline in a complete reference font (bundled or registered by the app) and that font's shaping rules are run in reverse.
 3. ✅ Visual-to-logical reordering (pre-base vowel signs, split vowels, reph, fused reph forms).
-4. ✅ Lines, words and reading order, with every character mapped to its box. Result: 0.0% character errors on all 32 corpus PDFs (two producers, two designs per script, with and without `ToUnicode`); the PDFs' own text layers are 2 to 45% wrong.
+4. ✅ Lines, words and reading order, with every character mapped to its box. Result: 0.0% character errors on all 32 corpus PDFs (two producers, two designs per script, with and without `ToUnicode`); read glyph by glyph through `ToUnicode` alone, the same PDFs are 2 to 45% wrong. (Correction from the Phase 3 engine comparison: MuPDF, PDFium and Poppler also read the `/ActualText` spans Chrome and LibreOffice write and get under 1% on these PDFs; Akkhor reads them too since Phase 3. See `docs/case-study/`.)
 5. ✅ Legacy encodings: Bijoy (table from the MIT `poriborton` crate, inverted) for PDFs and `.txt`. Kruti Dev moved later: no open table or corpus to verify one against.
 6. ✅ Search, selection and copy on PDFs (CLI and Android).
 7. ✅ Accuracy corpus: 36 PDFs from two producers, two designs per script, Bijoy, with and without `ToUnicode`; character error rate checked in CI.

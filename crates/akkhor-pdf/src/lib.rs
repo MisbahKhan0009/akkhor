@@ -148,10 +148,11 @@ impl PdfDocument {
             })
             .collect();
         let fonts = read::readings(&glyphs, tables);
+        let actual = read::ActualTexts::new(&glyphs);
         contain(|| {
             text::assemble(
                 &glyphs,
-                |word| read::word_pieces(word, &fonts),
+                |word| read::word_pieces(word, &fonts, &actual),
                 text::reorder,
             )
         })

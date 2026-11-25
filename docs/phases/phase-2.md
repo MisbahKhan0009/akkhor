@@ -127,7 +127,8 @@ PDF reference font, memory-mapped.
 When the font is unknown (not bundled, not registered), there is nothing
 to recover from: the text layer is used, reordered. Measured on the
 second designs with only Noto registered: Chrome PDFs improve (Bangla 27%
-to 14% errors), LibreOffice PDFs stay at their text layer's 42 to 45%. A
+to 14% errors), LibreOffice PDFs stay at their per-glyph text layer's 42
+to 45%. A
 test keeps this from ever getting worse than the text layer.
 
 ## 2.7 Accuracy corpus and measurement
@@ -156,7 +157,8 @@ Bijoy conversion is also checked by round trip: Unicode → Bijoy (with
 ## Done when
 
 - [x] Sets A and B: character error rate under 2% for Bangla and Hindi
-  (0.0% on all 16 PDFs, with and without glyph names; raw text layer 2 to 45%)
+  (0.0% on all 16 PDFs, with and without glyph names; read glyph by glyph
+  through `ToUnicode` alone: 2 to 45%)
 - [x] Set C (no `ToUnicode` at all): under 5% (0.0%)
 - [x] Bijoy round trip: at least 98% of words exact (99.7% of 3,842 words;
   the rest are words `poriborton` itself cannot encode). Bijoy PDFs: 0.0%
@@ -169,6 +171,21 @@ Bijoy conversion is also checked by round trip: Unicode → Bijoy (with
 - [x] Robustness test covers the text layer; CI green; PLAN.md updated
 - [x] Review of Phase 2 written and its findings fixed
   ([reviews/phase-2.md](../reviews/phase-2.md))
+
+## Correction (Phase 3)
+
+The engine comparison in Phase 3 (`docs/case-study/`) showed that the
+"before" numbers above overstate the problem for these two producers.
+They were measured by reading each glyph's `ToUnicode` entry, which is how
+`hayro` exposes text. Chrome and LibreOffice also wrap every Indic cluster
+in an `/ActualText` span holding its correct logical text, and MuPDF,
+PDFium and Poppler read those: on the "as produced" PDFs they reach under
+1% character error. Akkhor now reads `/ActualText` too. The corpus's
+"no ToUnicode" PDFs had kept their `/ActualText` spans; they are now
+written without either, so they test recovery from glyphs alone, where
+the other engines are 97 to 113% wrong and Akkhor is at 0% when it knows
+the font. The differences that hold: PDFs without text information,
+Bijoy, and words that stay whole for search.
 
 ## Known limits (stated up front)
 

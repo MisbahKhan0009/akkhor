@@ -13,6 +13,10 @@ publish = false
 name = "akkhor"
 path = "src/main.rs"
 
+[[bin]]
+name = "akkhor-bench"
+path = "src/bin/akkhor-bench.rs"
+
 [dependencies]
 akkhor = { workspace = true, features = ["pdf", "epub", "txt", "bundled-fonts"] }
 png = "0.18"

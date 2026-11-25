@@ -5,8 +5,9 @@ texts in tests/corpus/*.txt.
 Each text is printed by two producers (Chrome and LibreOffice) with the
 Noto Serif fonts from fonts/ ({stem}.{producer}.pdf) and with a second
 design from tests/fonts/ ({stem}.{font}.{producer}.pdf). Every PDF is also
-saved with its ToUnicode maps removed (*.raw.pdf), which forces the engine
-to recover the text from the glyphs alone. bn.txt is also printed in Bijoy
+saved with its ToUnicode maps and ActualText spans removed (*.raw.pdf),
+which forces the engine to recover the text from the glyphs alone.
+`--raw-only` regenerates just those from the existing PDFs. bn.txt is also printed in Bijoy
 (converted with the poriborton crate) in a font named SutonnyMJ
 (bn.bijoy.{producer}.pdf).
 
@@ -99,18 +100,46 @@ def libreoffice(html_path, pdf_path):
 
 
 def strip_tounicode(src, dst):
-    """Blanks out every /ToUnicode reference, keeping byte offsets intact."""
-    data = open(src, "rb").read()
+    """Writes `src` without any text information: every /ToUnicode map and
+    every /ActualText span removed, so only the glyphs are left. Returns the
+    number of maps and spans removed."""
+    import pikepdf
+
+    pdf = pikepdf.open(src)
     count = 0
+    for obj in pdf.objects:
+        if isinstance(obj, pikepdf.Dictionary) and "/ToUnicode" in obj:
+            del obj["/ToUnicode"]
+            count += 1
 
-    def blank(m):
+    def clean(stream_owner):
         nonlocal count
-        count += 1
-        return b" " * len(m.group(0))
+        ops = []
+        for operands, op in pikepdf.parse_content_stream(stream_owner):
+            if str(op) == "BDC" and len(operands) == 2 and isinstance(operands[1], pikepdf.Dictionary) \
+                    and "/ActualText" in operands[1]:
+                props = pikepdf.Dictionary({k: v for k, v in operands[1].items() if k != "/ActualText"})
+                operands = [operands[0], props]
+                count += 1
+            ops.append((operands, op))
+        return pikepdf.unparse_content_stream(ops)
 
-    data = re.sub(rb"/ToUnicode\s+\d+\s+\d+\s+R", blank, data)
-    open(dst, "wb").write(data)
+    for page in pdf.pages:
+        page.Contents = pdf.make_stream(clean(page))
+        for _, xobj in page.Resources.get("/XObject", {}).items():
+            if xobj.get("/Subtype") == "/Form":
+                xobj.write(clean(xobj))
+    pdf.save(dst, deterministic_id=True)
     return count
+
+
+def raw_only():
+    """Regenerates every *.raw.pdf from its as-produced PDF, without
+    printing anything again."""
+    for name in sorted(os.listdir(OUT)):
+        if name.endswith(".pdf") and not name.endswith(".raw.pdf"):
+            n = strip_tounicode(os.path.join(OUT, name), os.path.join(OUT, name[:-4] + ".raw.pdf"))
+            print(f"{name[:-4]}.raw.pdf  ({n} maps and spans removed)")
 
 
 def main():
@@ -145,4 +174,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    raw_only() if "--raw-only" in sys.argv else main()

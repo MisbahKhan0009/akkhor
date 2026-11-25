@@ -67,8 +67,53 @@ pub(crate) fn readings(
         .collect()
 }
 
+/// The `/ActualText` spans of a page: their text, and the glyph each one's
+/// text is given to (its first, in drawing order).
+pub(crate) struct ActualTexts<'g> {
+    texts: &'g [String],
+    first: Vec<Option<*const PdfGlyph>>,
+}
+
+impl<'g> ActualTexts<'g> {
+    pub(crate) fn new(glyphs: &'g PageGlyphs) -> Self {
+        let mut first = vec![None; glyphs.actual_texts.len()];
+        for g in &glyphs.glyphs {
+            if let Some(span) = g.actual
+                && let Some(slot) = first.get_mut(span)
+                && slot.is_none()
+            {
+                *slot = Some(g as *const PdfGlyph);
+            }
+        }
+        Self {
+            texts: &glyphs.actual_texts,
+            first,
+        }
+    }
+
+    /// For a glyph inside a usable ActualText span: `Some(text)` for the
+    /// span's first glyph, `Some("")` for the others. `None` outside.
+    fn of(&self, g: &PdfGlyph) -> Option<&'g str> {
+        let span = g.actual?;
+        let text = self.texts.get(span)?;
+        if text.trim().is_empty() || !text::usable(text.trim()) {
+            return None;
+        }
+        let first = self.first.get(span).copied().flatten()?;
+        Some(if std::ptr::eq(first, g) {
+            text.as_str()
+        } else {
+            ""
+        })
+    }
+}
+
 /// The pieces of one word (glyphs between visible gaps, in drawing order).
-pub(crate) fn word_pieces<'g>(word: &[&'g PdfGlyph], fonts: &[FontReading]) -> Vec<GlyphPiece<'g>> {
+pub(crate) fn word_pieces<'g>(
+    word: &[&'g PdfGlyph],
+    fonts: &[FontReading],
+    actual: &ActualTexts<'_>,
+) -> Vec<GlyphPiece<'g>> {
     let none = FontReading::default();
     let ids: Vec<u32> = word.iter().map(|g| g.glyph_id).collect();
     let mut out = Vec::with_capacity(word.len());
@@ -80,10 +125,27 @@ pub(crate) fn word_pieces<'g>(word: &[&'g PdfGlyph], fonts: &[FontReading]) -> V
         let same_font = word[i..].iter().take_while(|x| x.font == g.font).count();
 
         if font.bijoy
-            && let Some(p) = bijoy_piece(&word[i..i + same_font], font)
+            && let Some(p) = bijoy_piece(&word[i..i + same_font], font, actual)
         {
             out.push(p);
             i += same_font;
+            continue;
+        }
+
+        // The producer's own logical text for this cluster (/ActualText):
+        // given to the span's first glyph; the rest of the span in this word
+        // joins its box.
+        if let Some(t) = actual.of(g) {
+            let span = g.actual;
+            let n = word[i..].iter().take_while(|x| x.actual == span).count();
+            if !t.is_empty() {
+                let mut p = GlyphPiece::new(g, recover::canonical(t.trim_end()), Role::Base);
+                for x in &word[i + 1..i + n] {
+                    p.rect = p.rect.union(x.rect);
+                }
+                out.push(p);
+            }
+            i += n;
             continue;
         }
 
@@ -138,10 +200,18 @@ fn is_space(g: &PdfGlyph, rec: Option<&Recovery>) -> bool {
 
 /// A run of glyphs in a Bijoy font, converted as one piece. `None` when the
 /// run already reads as Unicode Bangla (a mislabelled font).
-fn bijoy_piece<'g>(run: &[&'g PdfGlyph], font: &FontReading) -> Option<GlyphPiece<'g>> {
+fn bijoy_piece<'g>(
+    run: &[&'g PdfGlyph],
+    font: &FontReading,
+    actual: &ActualTexts<'_>,
+) -> Option<GlyphPiece<'g>> {
     let rec = font.table.as_deref();
     let mut letters: Vec<char> = Vec::new();
     for x in run {
+        if let Some(t) = actual.of(x) {
+            letters.extend(t.chars());
+            continue;
+        }
         let own = x
             .unicode
             .as_deref()
