@@ -109,9 +109,9 @@ Findings to act on:
 - The Android library is over the 3 MB target. Main suspects: the 14 standard PDF fonts embedded by default, colour management and image codecs compiled in for every build. Size work is added to Phase 3.
 - Justification needs hyphenation to avoid loose Latin lines (Phase 1).
 
-### Phase 1: Indic text core ⏳
+### Phase 1: Indic text core 🔄
 
-Make reflowable text complete and correct.
+Make reflowable text complete and correct. Detailed design: [phases/phase-1.md](phases/phase-1.md).
 
 1. Selection and hit-testing API: point → (block, offset), snapping to syllables; range → highlight rectangles.
 2. Indic-aware search: normalise nukta forms, ZWJ/ZWNJ, khanda ta (ৎ / ত্‍), Bangla য়/ড়/ঢ় composed vs decomposed, Devanagari precomposed nukta letters; match across line breaks.
