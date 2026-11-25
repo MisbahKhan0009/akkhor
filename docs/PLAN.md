@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 1 done)
+Last updated: 2026-11-25 (Phase 1 reviewed, Phase 2 planned)
 
 ---
 
@@ -109,7 +109,7 @@ Findings to act on:
 - The Android library is over the 3 MB target. Main suspects: the 14 standard PDF fonts embedded by default, colour management and image codecs compiled in for every build. Size work is added to Phase 3.
 - Justification needs hyphenation to avoid loose Latin lines (Phase 1).
 
-### Phase 1: Indic text core ✅ (2026-11-25)
+### Phase 1: Indic text core ✅ (2026-11-25, reviewed: [reviews/phase-0-1.md](reviews/phase-0-1.md))
 
 Make reflowable text complete and correct. Detailed design and checklist: [phases/phase-1.md](phases/phase-1.md).
 
@@ -136,16 +136,17 @@ Results (GitHub CI runner, release build):
 
 Known limits carried forward: adjacent-sibling and attribute CSS selectors are ignored; GIF and WebP images are sized but not drawn; Bijoy text is detected but not yet converted (Phase 2).
 
-### Phase 2: PDF Indic text layer ⏳ (the headline novelty)
+### Phase 2: PDF Indic text layer 🔄 (the headline novelty)
 
-1. Text extraction with positions from hayro's interpreter (glyph, font, transform).
-2. Use `ToUnicode` maps when present and trustworthy.
-3. Glyph-to-Unicode recovery when they are missing or wrong: reverse the font's cmap and GSUB ligature/conjunct rules to map shaped glyphs back to character sequences; reorder pre-base vowel signs back to logical order.
-4. Legacy encodings: detect Bijoy/SutonnyMJ (Bangla) and Kruti Dev / Chanakya (Hindi) fonts by name and glyph usage; convert with mapping tables to Unicode.
-5. Search, selection and copy on PDFs using this text layer.
-6. Accuracy corpus: real Bangla and Hindi PDFs (Unicode, Bijoy, Kruti Dev), scored by character error rate.
+Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point: a Chrome-printed Bangla/Hindi PDF reads back as `ক্ষম , ম  , কম` for `ক্ষমা, মন্ত্রী, কর্ম`.
 
-Done when: copy/search works on the corpus with under 2% character errors.
+1. Text layer extraction (glyph boxes, `ToUnicode`, fonts).
+2. Reverse shaping: recover letters for every glyph from the embedded font's own `cmap` and OpenType rules.
+3. Visual-to-logical reordering (pre-base vowel signs, split vowels, reph).
+4. Lines, words and reading order, with every character mapped to its box.
+5. Legacy encodings: Bijoy (table from the MIT `poriborton` crate, inverted) for PDFs and `.txt`; Kruti Dev experimental.
+6. Search, selection and copy on PDFs (CLI and Android).
+7. Accuracy corpus from several PDF producers, with and without `ToUnicode`; character error rate targets.
 
 ### Phase 3: PDF speed and memory ⬜
 
