@@ -120,6 +120,9 @@ pub(crate) fn word_pieces<'g>(
     let mut i = 0;
     // Text of the ActualText span that made the last piece, if it did.
     let mut last_span: Option<String> = None;
+    // Glyphs the last span's piece holds: a cluster split into one-glyph
+    // spans repeating its text holds at most one glyph per character.
+    let mut span_glyphs = 0usize;
     while i < word.len() {
         let g = word[i];
         if g.actual.is_none() {
@@ -157,16 +160,19 @@ pub(crate) fn word_pieces<'g>(
                 let text = recover::canonical(t.trim_end());
                 // ... or splits one cluster into two spans with the same
                 // text, the second holding only its marks.
+                let room = span_glyphs + n <= text.chars().count();
                 if last_span.as_deref() == Some(text.as_str())
                     && let Some(prev) = out.last_mut()
                     && word[i..i + n].iter().all(|x| {
                         sits_over(x, prev.rect)
                             || continues_span(x, &text, prev.rect, fonts, rec_of(fonts, x))
+                            || (room && n == 1 && rec_of(fonts, x).is_none())
                     })
                 {
                     for x in &word[i..i + n] {
                         prev.rect = prev.rect.union(x.rect);
                     }
+                    span_glyphs += n;
                     i += n;
                     continue;
                 }
@@ -176,7 +182,6 @@ pub(crate) fn word_pieces<'g>(
                     && let Some(prev) = out.last_mut()
                     && !prev.text.is_empty()
                     && text.starts_with(prev.text.as_str())
-                    && text != prev.text
                     && word[i..i + n].iter().all(|x| sits_over(x, prev.rect))
                 {
                     prev.text = text.clone();
@@ -184,10 +189,12 @@ pub(crate) fn word_pieces<'g>(
                         prev.rect = prev.rect.union(x.rect);
                     }
                     last_span = Some(text);
+                    span_glyphs = 1 + n;
                     i += n;
                     continue;
                 }
                 last_span = Some(text.clone());
+                span_glyphs = n;
                 let mut p = GlyphPiece::new(g, text, Role::Base);
                 for x in &word[i + 1..i + n] {
                     p.rect = p.rect.union(x.rect);
@@ -228,6 +235,19 @@ pub(crate) fn word_pieces<'g>(
             .unicode
             .as_deref()
             .filter(|u| font.trust_text_layer && text::usable(u));
+        // Some producers (Typst) map every glyph of a cluster to the whole
+        // cluster's text: a mark that repeats the text of the glyph it sits
+        // on adds nothing.
+        if recovered.is_none()
+            && let (Some(t), Some(prev)) = (own, out.last_mut())
+            && !t.is_empty()
+            && recover::canonical(t) == prev.text
+            && sits_over(g, prev.rect)
+        {
+            prev.rect = prev.rect.union(g.rect);
+            i += 1;
+            continue;
+        }
         let (t, role) = match (recovered, own) {
             (Some(r), _) if rec.is_some_and(|r| r.indic) => (r.text.clone(), r.role),
             (_, Some(t)) => (recover::canonical(t), recover::role_of(t)),
@@ -296,7 +316,11 @@ fn continues_span(
     let trusted = fonts.get(x.font).is_some_and(|f| f.trust_text_layer);
     x.unicode.as_deref().is_some_and(|u| {
         let u = recover::canonical(u);
-        trusted && !u.is_empty() && span_text.contains(u.as_str()) && (over || is_mark(&u))
+        let next_to = x.rect.x0 <= span_rect.x1 + f64::from(x.size) * 0.05;
+        trusted
+            && !u.is_empty()
+            && span_text.contains(u.as_str())
+            && (over || is_mark(&u) || (u == span_text && next_to))
     })
 }
 

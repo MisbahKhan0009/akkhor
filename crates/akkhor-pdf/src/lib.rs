@@ -10,6 +10,7 @@
 //! full-page bitmap.
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 pub mod glyphs;
@@ -17,6 +18,8 @@ pub mod outline;
 mod read;
 pub mod recover;
 pub mod reference;
+pub mod reflow;
+pub mod structure;
 pub mod text;
 mod theme;
 
@@ -53,6 +56,9 @@ pub struct PdfDocument {
     /// Where colour images land on recently themed pages.
     image_boxes: Mutex<Vec<(usize, Arc<theme::ImageBoxes>)>>,
 }
+
+/// Pages per reflow chapter when the outline gives none (or a long one).
+pub const REFLOW_PAGES: usize = 16;
 
 /// Pages whose image boxes are kept for theming (a few KB each).
 const IMAGE_BOX_PAGES: usize = 16;
@@ -117,6 +123,61 @@ impl PdfDocument {
     /// the PDF has none.
     pub fn outline(&self) -> Vec<OutlineItem> {
         contain(|| outline::read(&self.pdf)).unwrap_or_default()
+    }
+
+    /// The chapters a reflow is made of, as page ranges: one per top-level
+    /// outline entry when the outline points at increasing pages, else runs
+    /// of [`REFLOW_PAGES`] pages. Together they cover every page once.
+    pub fn reflow_chapters(&self) -> Vec<Range<usize>> {
+        let n = self.page_count();
+        let mut starts: Vec<usize> = self
+            .outline()
+            .into_iter()
+            .filter(|o| o.level == 0)
+            .filter_map(|o| o.page)
+            .filter(|&p| p < n)
+            .collect();
+        starts.dedup();
+        let increasing = starts.windows(2).all(|w| w[0] < w[1]);
+        let mut cuts: Vec<usize> = if starts.len() >= 2 && increasing {
+            starts
+        } else {
+            Vec::new()
+        };
+        if cuts.first() != Some(&0) {
+            cuts.insert(0, 0);
+        }
+        cuts.push(n);
+        let mut out = Vec::new();
+        for w in cuts.windows(2) {
+            // A long chapter is still split, so one reflow stays small.
+            let mut s = w[0];
+            while s < w[1] {
+                let e = (s + REFLOW_PAGES).min(w[1]);
+                out.push(s..e);
+                s = e;
+            }
+        }
+        out
+    }
+
+    /// Reflows the pages of `pages` (see [`reflow`]): paragraphs and
+    /// headings in reading order, without running headers or page numbers,
+    /// for the flow layout to set on any screen.
+    pub fn reflow(&self, pages: Range<usize>) -> Result<reflow::Reflow> {
+        let end = pages.end.min(self.page_count());
+        let pages = pages.start.min(end)..end;
+        let mut texts = Vec::with_capacity(pages.len());
+        let mut pictures = Vec::with_capacity(pages.len());
+        let mut sizes = Vec::with_capacity(pages.len());
+        for i in pages.clone() {
+            texts.push(self.page_text_cached(i)?);
+            let page = self.pdf.pages().get(i).ok_or(Error::OutOfRange)?;
+            pictures.push(contain(|| theme::picture_boxes(page))?);
+            sizes.push(self.page_size(i)?);
+        }
+        let refs: Vec<&PageText> = texts.iter().map(|t| &**t).collect();
+        contain(|| reflow::reflow(pages.start, &refs, &pictures, &sizes))
     }
 
     /// A small picture of a page, its longer side `max_side` pixels.

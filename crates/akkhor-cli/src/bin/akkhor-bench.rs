@@ -5,6 +5,7 @@
 //!
 //! ```text
 //! akkhor-bench text    FILE                    all pages' text
+//! akkhor-bench reflow  FILE                    every reflow chapter's blocks
 //! akkhor-bench speed   FILE PAGE SCALE RUNS    open, first render, warm render
 //! akkhor-bench mem     FILE PAGE SCALE         resident memory before and at peak
 //! akkhor-bench survive FILE                    open, count, render and read page 1
@@ -107,6 +108,36 @@ fn run(args: &[String]) -> Result<String, String> {
             Ok(format!(
                 "{{\"ms\":{total:.4},\"pages\":[{}]}}",
                 pages.join(",")
+            ))
+        }
+        Some("reflow") => {
+            let t = Instant::now();
+            let pdf = open(&arg(1)?)?;
+            let mut blocks = Vec::new();
+            let mut chapters = Vec::new();
+            for range in pdf.reflow_chapters() {
+                let tc = Instant::now();
+                let r = pdf.reflow(range.clone()).map_err(|e| e.to_string())?;
+                chapters.push(format!("[{},{},{:.4}]", range.start, range.end, ms(tc)));
+                for (i, b) in r.document.blocks.iter().enumerate() {
+                    let (kind, level) = match b.kind {
+                        akkhor::flow::BlockKind::Heading(l) => ("heading", l),
+                        akkhor::flow::BlockKind::Image => ("image", 0),
+                        _ if b.style.font_scale.is_some_and(|s| s < 1.0) => ("footnote", 0),
+                        _ => ("paragraph", 0),
+                    };
+                    blocks.push(format!(
+                        "{{\"kind\":\"{kind}\",\"level\":{level},\"page\":{},\"text\":{}}}",
+                        r.block_page(i).unwrap_or(0),
+                        json_str(&b.text)
+                    ));
+                }
+            }
+            Ok(format!(
+                "{{\"ms\":{:.4},\"chapters\":[{}],\"blocks\":[{}]}}",
+                ms(t),
+                chapters.join(","),
+                blocks.join(",")
             ))
         }
         Some("speed") => {

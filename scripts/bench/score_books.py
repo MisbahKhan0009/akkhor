@@ -17,6 +17,10 @@ Reflow, Akkhor only (`akkhor-bench reflow`):
                 footnotes)
   headings      share of truth headings found as headings with the right level
   furniture     running headers and page numbers that leaked into the reflow
+  footnotes     share of truth footnotes found as footnote blocks (they are
+                left out of reflow_cer: after the paragraph or at the end of
+                the page are both fine)
+  images        image blocks found minus image blocks in the truth
 """
 
 import argparse
@@ -69,8 +73,12 @@ def starts(blocks):
 
 
 def score_reflow(t, r):
-    truth_blocks = [b for b in t["blocks"] if b["kind"] != "image"]
-    got = [b for b in r["blocks"] if b["kind"] != "image"]
+    # Footnotes are compared on their own: a reflow may put them after
+    # their paragraph or at the end of the page, both readable.
+    truth_blocks = [b for b in t["blocks"] if b["kind"] not in ("image", "footnote")]
+    got = [b for b in r["blocks"] if b["kind"] not in ("image", "footnote")]
+    t_notes = [normal(b["text"]) for b in t["blocks"] if b["kind"] == "footnote"]
+    g_notes = [normal(b["text"]) for b in r["blocks"] if b["kind"] == "footnote"]
     # Footnote markers are part of the paragraph text in producers with
     # footnotes; the truth does not have them, so digits right after a
     # paragraph's last letter are dropped before comparing.
@@ -97,6 +105,8 @@ def score_reflow(t, r):
         "starts_r": sum(1 for s in ts if s in gs) / max(1, len(ts)),
         "headings": sum(1 for h in heads if (normal(h["text"]), h["level"]) in got_heads) / max(1, len(heads)),
         "furniture": leaks,
+        "footnotes": sum(1 for n in t_notes if any(n in g for g in g_notes)) / len(t_notes) if t_notes else 1.0,
+        "images": sum(1 for b in r["blocks"] if b["kind"] == "image") - sum(1 for b in t["blocks"] if b["kind"] == "image"),
     }
 
 
@@ -116,7 +126,7 @@ def main():
             out, _ = call(e, "text", path)
             row = {"file": name, "engine": ENGINES[e]}
             row.update(score_page_text(t, out["pages"] if out else []))
-            if e == "akkhor":
+            if e.startswith("akkhor"):
                 r, code = call(e, "reflow", path)
                 if r and "blocks" in r:
                     row.update(score_reflow(t, r))
@@ -135,7 +145,7 @@ def main():
     for e in engines:
         rs = [r for r in rows if r["engine"] == ENGINES[e]]
         summary = {k: sum(r[k] for r in rs if k in r) / max(1, sum(1 for r in rs if k in r))
-                   for k in ("words_intact", "words_found", "reflow_cer", "starts_p", "starts_r", "headings")
+                   for k in ("words_intact", "words_found", "reflow_cer", "starts_p", "starts_r", "headings", "footnotes")
                    if any(k in r for r in rs)}
         leaks = sum(r.get("furniture", 0) for r in rs)
         print(f"{ENGINES[e]:8} " + " ".join(f"{k} {v * 100:.1f}%" for k, v in summary.items())

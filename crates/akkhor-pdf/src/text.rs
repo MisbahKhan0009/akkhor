@@ -30,6 +30,27 @@ pub struct PageText {
     pub spans: Vec<TextSpan>,
     /// Byte range of each line in `text`.
     pub lines: Vec<Range<usize>>,
+    /// What each line looks like, for page structure (headings, columns,
+    /// running headers); parallel to `lines`.
+    pub line_info: Vec<LineInfo>,
+}
+
+/// The look and place of one line of a page.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LineInfo {
+    /// Box of the line's glyphs, in points (top-left origin).
+    pub rect: Rect,
+    /// Baseline, in points from the top.
+    pub baseline: f32,
+    /// Font size in points (the most common on the line).
+    pub size: f32,
+    /// Most glyphs bold: a bold font, or text stroked or drawn twice.
+    pub bold: bool,
+    /// Most glyphs in an italic or oblique font.
+    pub italic: bool,
+    /// Every glyph tagged by the producer as an artifact (running header,
+    /// page number).
+    pub artifact: bool,
 }
 
 impl PageText {
@@ -162,6 +183,66 @@ impl<'g> GlyphPiece<'g> {
 /// Groups glyph pieces into lines and paragraphs. Glyphs are taken in
 /// drawing order, which for text is reading order; a new line starts when
 /// the baseline moves or the pen jumps back to the left.
+/// Splits lines where they cross a gutter between columns (or table
+/// cells): a gap of over 0.6 em that lines up with such gaps on at least
+/// four other lines of the page and that fewer lines run across than leave
+/// it open. A loose justified line has wide word gaps too, but other lines
+/// of its paragraph run across them. Producers that draw
+/// a page row by row put both columns on one baseline.
+fn split_at_gutters(lines: Vec<Vec<&PdfGlyph>>) -> Vec<Vec<&PdfGlyph>> {
+    // Gaps per line: (line, index of the glyph after the gap, x0, x1, size).
+    let mut gaps: Vec<(usize, usize, f32, f32, f32)> = Vec::new();
+    for (li, line) in lines.iter().enumerate() {
+        let mut end = f32::MIN;
+        for (i, g) in line.iter().enumerate() {
+            let size = g.size.max(1.0);
+            if i > 0 && g.origin.0 - end > size * 0.6 {
+                gaps.push((li, i, end, g.origin.0, size));
+            }
+            end = end.max(g.origin.0 + g.advance);
+        }
+    }
+    if gaps.is_empty() {
+        return lines;
+    }
+    let mut cuts: Vec<Vec<usize>> = vec![Vec::new(); lines.len()];
+    for &(li, i, x0, x1, _) in &gaps {
+        let lined_up = gaps
+            .iter()
+            .filter(|&&(lj, _, y0, y1, _)| lj != li && y0 < x1 && x0 < y1)
+            .map(|&(lj, ..)| lj)
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        // Lines whose glyphs run across the middle of the gap: in a column
+        // layout only full-width lines do; in a loose paragraph most do.
+        let mid = (x0 + x1) / 2.0;
+        let crossing = lines
+            .iter()
+            .filter(|l| {
+                l.iter()
+                    .any(|g| g.origin.0 < mid && mid < g.origin.0 + g.advance)
+            })
+            .count();
+        if lined_up >= 4 && crossing < lined_up {
+            cuts[li].push(i);
+        }
+    }
+    let mut out = Vec::with_capacity(lines.len());
+    for (line, cut) in lines.into_iter().zip(cuts) {
+        if cut.is_empty() {
+            out.push(line);
+            continue;
+        }
+        let mut start = 0;
+        for c in cut {
+            out.push(line[start..c].to_vec());
+            start = c;
+        }
+        out.push(line[start..].to_vec());
+    }
+    out
+}
+
 /// The smallest gap, in ems, that counts as a space on this line.
 ///
 /// Producers that draw no space glyphs (XeLaTeX, InDesign) leave gaps that a
@@ -211,6 +292,7 @@ pub(crate) fn assemble(
         }
         lines.last_mut().expect("pushed").push(g);
     }
+    let lines = split_at_gutters(lines);
 
     let mut out = PageText::default();
     let mut prev_line: Option<(f32, f32, f32)> = None; // baseline, size, left
@@ -282,9 +364,76 @@ pub(crate) fn assemble(
             out.text.pop();
         }
         out.lines.push(line_start..out.text.len());
+        out.line_info.push(line_info(&line, page));
         prev_line = Some((first.origin.1, first.size, first.origin.0));
     }
     out
+}
+
+fn line_info(line: &[&PdfGlyph], page: &PageGlyphs) -> LineInfo {
+    let visible: Vec<&&PdfGlyph> = line
+        .iter()
+        .filter(|g| g.advance > 0.0 || g.size > 0.0)
+        .collect();
+    let rect = visible
+        .iter()
+        .map(|g| g.rect)
+        .reduce(|a, b| a.union(b))
+        .unwrap_or_default();
+    let mut sizes: Vec<f32> = visible
+        .iter()
+        .map(|g| (g.size * 4.0).round() / 4.0)
+        .collect();
+    sizes.sort_by(f32::total_cmp);
+    // The most common size: sizes sorted, the longest run.
+    let mut size = sizes.first().copied().unwrap_or(0.0);
+    let (mut run, mut best) = (0, 0);
+    for (i, s) in sizes.iter().enumerate() {
+        run = if i > 0 && sizes[i - 1] == *s {
+            run + 1
+        } else {
+            1
+        };
+        if run > best {
+            best = run;
+            size = *s;
+        }
+    }
+    let name = |g: &PdfGlyph| {
+        page.fonts
+            .get(g.font)
+            .and_then(|f| f.name.as_deref())
+            .unwrap_or("")
+            .to_ascii_lowercase()
+    };
+    let half = visible.len().div_ceil(2).max(1);
+    let bold = visible
+        .iter()
+        .filter(|g| {
+            let n = name(g);
+            g.bold
+                || ["bold", "black", "heavy", "semibold", "demi"]
+                    .iter()
+                    .any(|w| n.contains(w))
+        })
+        .count()
+        >= half;
+    let italic = visible
+        .iter()
+        .filter(|g| {
+            let n = name(g);
+            n.contains("italic") || n.contains("oblique")
+        })
+        .count()
+        >= half;
+    LineInfo {
+        rect,
+        baseline: line.first().map_or(0.0, |g| g.origin.1),
+        size,
+        bold,
+        italic,
+        artifact: !line.is_empty() && line.iter().all(|g| g.artifact),
+    }
 }
 
 /// Whether text from a PDF's own text layer can be trusted for a glyph.

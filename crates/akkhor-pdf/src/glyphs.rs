@@ -15,7 +15,7 @@ use hayro::hayro_interpret::{
     InterpreterSettings, SoftMask, interpret_page,
 };
 use hayro::hayro_syntax::page::Page;
-use hayro::kurbo::{Affine, BezPath, Point, Rect};
+use hayro::kurbo::{Affine, BezPath, Point, Rect, Shape};
 
 /// A font that drew glyphs on the page.
 pub struct PdfFont {
@@ -93,6 +93,10 @@ struct Collector {
     marked: Vec<Option<usize>>,
     /// Open marked-content sections tagged `/Artifact`.
     artifacts: Vec<bool>,
+    /// Bounding boxes of the open clip paths, each within the one before:
+    /// a glyph drawn outside is not on the page (Chrome draws the start of
+    /// the next page's lines and clips them away).
+    clips: Vec<Rect>,
     /// Where each glyph was drawn: (font, glyph id, char code, x and y in
     /// half points) to its index, to drop copies drawn on top.
     placed: std::collections::HashMap<(usize, u32, u32, i64, i64), usize>,
@@ -146,10 +150,19 @@ impl Collector {
 
 impl<'a> Device<'a> for Collector {
     fn draw_path(&mut self, _: &BezPath, _: DrawProps<'a>, _: &DrawMode) {}
-    fn push_clip_path(&mut self, _: &ClipPath) {}
+    fn push_clip_path(&mut self, clip: &ClipPath) {
+        let b = clip.path.bounding_box();
+        let next = match self.clips.last() {
+            Some(c) => c.intersect(b),
+            None => b,
+        };
+        self.clips.push(next);
+    }
     fn push_transparency_group(&mut self, _: f32, _: Option<SoftMask<'a>>, _: BlendMode) {}
     fn draw_image(&mut self, _: hayro::hayro_interpret::Image<'a, '_>, _: ImageDrawProps<'a>) {}
-    fn pop_clip(&mut self) {}
+    fn pop_clip(&mut self) {
+        self.clips.pop();
+    }
     fn pop_transparency_group(&mut self) {}
 
     fn begin_marked_content(
@@ -191,7 +204,9 @@ impl<'a> Device<'a> for Collector {
             let size = up.hypot() as f32;
             let (advance_units, glyph_id) = match &**g {
                 Glyph::Outline(o) => (o.advance_width().unwrap_or(500.0), o.glyph_id().to_u32()),
-                Glyph::Type3(t3) => (t3.advance_width().unwrap_or(500.0) * 1000.0, 0),
+                // Already in units of 1000 per em (hayro-font scales by the
+                // font matrix).
+                Glyph::Type3(t3) => (t3.advance_width().unwrap_or(500.0), 0),
             };
             let end = t * Point::new(advance_units as f64, 0.0);
             let advance = (end - origin).hypot() as f32;
@@ -201,6 +216,15 @@ impl<'a> Device<'a> for Collector {
                 BfString::Char(c) => c.to_string(),
                 BfString::String(s) => s,
             });
+            // Clipped away: its middle is outside the clip.
+            let middle = Point::new((origin.x + end.x) / 2.0, origin.y - 0.3 * size as f64);
+            if self
+                .clips
+                .last()
+                .is_some_and(|c| !c.inflate(0.5, 0.5).contains(middle))
+            {
+                continue;
+            }
             // The same glyph drawn again on itself (fill, then stroke as a
             // second pass: how many tools fake bold) is one glyph, in bold.
             // Positions are bucketed by half a point; a copy within 0.03 em
@@ -262,6 +286,7 @@ pub(crate) fn collect(page: &Page<'_>) -> PageGlyphs {
         marked: Vec::new(),
         artifacts: Vec::new(),
         placed: Default::default(),
+        clips: Vec::new(),
     };
     interpret_page(page, &mut ctx, &mut collector);
     collector.out

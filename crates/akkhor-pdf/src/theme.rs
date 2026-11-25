@@ -26,6 +26,8 @@ pub struct ImageBoxes(pub Vec<Rect>);
 
 struct Collector {
     boxes: Vec<Rect>,
+    /// Greyscale and 1-bit pictures too (for reflow), not only colour ones.
+    all: bool,
 }
 
 impl<'a> Device<'a> for Collector {
@@ -39,7 +41,7 @@ impl<'a> Device<'a> for Collector {
     fn draw_image(&mut self, image: Image<'a, '_>, props: ImageDrawProps<'a>) {
         // Stencil masks are painted in the fill colour: like text.
         let Image::Raster(raster) = image else { return };
-        if is_greyscale(raster.stream()) {
+        if !self.all && is_greyscale(raster.stream()) {
             return;
         }
         // The transform maps image pixels, not the unit square.
@@ -95,6 +97,16 @@ fn is_greyscale(stream: &hayro::hayro_syntax::object::Stream<'_>) -> bool {
 
 /// The colour images on `page` (a light pass: nothing is decoded or drawn).
 pub(crate) fn image_boxes(page: &Page<'_>) -> ImageBoxes {
+    boxes(page, false)
+}
+
+/// Every raster picture on `page`, greyscale ones included (stencil masks
+/// are not pictures: they paint like text).
+pub(crate) fn picture_boxes(page: &Page<'_>) -> Vec<Rect> {
+    boxes(page, true).0
+}
+
+fn boxes(page: &Page<'_>, all: bool) -> ImageBoxes {
     let (w, h) = page.render_dimensions();
     let cache = InterpreterCache::new();
     let transform: Affine = {
@@ -108,7 +120,10 @@ pub(crate) fn image_boxes(page: &Page<'_>) -> ImageBoxes {
         page.xref(),
         InterpreterSettings::default(),
     );
-    let mut collector = Collector { boxes: Vec::new() };
+    let mut collector = Collector {
+        boxes: Vec::new(),
+        all,
+    };
     interpret_page(page, &mut ctx, &mut collector);
     ImageBoxes(collector.boxes)
 }
