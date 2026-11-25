@@ -64,7 +64,9 @@ def mupdf():
             return doc.page_count
 
         def render(self, doc, page, scale):
-            pix = doc[page].get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)
+            # Four bytes a pixel, like Akkhor and Android's ARGB_8888
+            # bitmaps (three-byte RGB would make MuPDF look 25% lighter).
+            pix = doc[page].get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=True)
             return pix.width
 
         def text(self, doc, page):
@@ -88,7 +90,8 @@ def pdfium():
             return len(doc)
 
         def render(self, doc, page, scale):
-            bitmap = doc[page].render(scale=scale)
+            # Four bytes a pixel, as for every engine (default is BGR).
+            bitmap = doc[page].render(scale=scale, force_bitmap_format=pdfium.raw.FPDFBitmap_BGRA)
             return bitmap.width
 
         def text(self, doc, page):
