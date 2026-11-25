@@ -37,6 +37,11 @@ pub use hayro::vello_cpu::PixmapMut;
 
 /// An open PDF.
 pub struct PdfDocument {
+    /// Parsed fonts, glyph outlines and decoded images, kept between draws.
+    /// Declared before `pdf` so it is dropped first: it points into `pdf`.
+    render_cache: Mutex<Option<render_cache::Shared>>,
+    /// The file, kept to open it afresh in [`trimmed`](Self::trimmed).
+    data: Arc<akkhor_core::Bytes>,
     pdf: Pdf,
     interpreter: InterpreterSettings,
     /// Glyph-to-letter tables per embedded font (see [`recover`]).
@@ -71,18 +76,39 @@ impl PdfDocument {
     /// Opens a PDF from a memory-mapped source.
     pub fn open(source: &Source) -> Result<Self> {
         source.advise_random();
-        let data: Arc<akkhor_core::Bytes> = source.shared();
-        let pdf = contain(|| Pdf::new(data))?.map_err(|e| match e {
+        Self::from_bytes(source.shared())
+    }
+
+    fn from_bytes(data: Arc<akkhor_core::Bytes>) -> Result<Self> {
+        let pdf = contain(|| Pdf::new(data.clone()))?.map_err(|e| match e {
             LoadPdfError::Decryption(_) => Error::Protected,
             LoadPdfError::Invalid => Error::malformed("unreadable PDF structure"),
         })?;
         Ok(Self {
+            render_cache: Mutex::new(None),
+            data,
             pdf,
             interpreter: InterpreterSettings::default(),
             recoveries: Mutex::new(HashMap::new()),
             texts: Mutex::new(Vec::new()),
             image_boxes: Mutex::new(Vec::new()),
         })
+    }
+
+    /// The same document opened afresh, without what reading it has
+    /// accumulated: every page read keeps its decoded content (a few KB to
+    /// tens of KB each), and the render cache keeps fonts and images. For
+    /// low-memory moments (Android's `onTrimMemory`); opening costs well
+    /// under a millisecond. The text recovery tables are carried over.
+    pub fn trimmed(&self) -> Result<Self> {
+        let fresh = Self::from_bytes(self.data.clone())?;
+        let tables = self
+            .recoveries
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        *fresh.recoveries.lock().unwrap_or_else(|e| e.into_inner()) = tables;
+        Ok(fresh)
     }
 
     pub fn page_count(&self) -> usize {
@@ -255,6 +281,30 @@ impl PdfDocument {
         contain(|| self.draw_tile(index, scale, tile, theme, w, h, &mut out[..needed]))?
     }
 
+    /// Draws several tiles of one page, in order, sharing parsed fonts,
+    /// glyph outlines and decoded images. `cancelled` is asked before each
+    /// tile; once it says yes the rest are skipped (a tile already started
+    /// finishes: the interpreter cannot be stopped mid-page). Returns how
+    /// many tiles were drawn.
+    pub fn render_tiles(
+        &self,
+        index: usize,
+        scale: f32,
+        theme: &Theme,
+        tiles: &mut [(Tile, &mut [u8])],
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<usize> {
+        let mut done = 0;
+        for (tile, out) in tiles.iter_mut() {
+            if cancelled() {
+                break;
+            }
+            self.render_tile(index, scale, *tile, theme, out)?;
+            done += 1;
+        }
+        Ok(done)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn draw_tile(
         &self,
@@ -273,17 +323,28 @@ impl PdfDocument {
             * Affine::scale(scale as f64)
             * to_affine(page.initial_transform(true));
 
-        let cache = RenderCache::new();
+        // The document's shared cache when no other thread is drawing with
+        // it; a fresh one otherwise, so drawing never waits.
+        let fresh;
+        let mut slot = render_cache::lock(&self.render_cache);
+        let cache: &RenderCache<'_> = match slot.as_deref_mut() {
+            Some(slot) => render_cache::for_page(slot, index),
+            None => {
+                fresh = RenderCache::new();
+                &fresh
+            }
+        };
         let mut ctx = RenderContext::new(w, h);
         render_into(
             page,
-            &cache,
+            cache,
             &self.interpreter,
             &RenderSettings::default(),
             &mut ctx,
             transform,
         );
         ctx.flush();
+        drop(slot);
 
         // Drawn on white, as the PDF was designed; the theme is applied after.
         let target =
@@ -357,6 +418,65 @@ impl RenderedPage {
             }
         }
         px
+    }
+}
+
+/// The render cache shared by draws of one document.
+mod render_cache {
+    use std::sync::{Mutex, MutexGuard, TryLockError};
+
+    use hayro::RenderCache;
+
+    /// Pages drawn with one cache before it is replaced: hayro's cache only
+    /// grows, so it is bounded by starting over.
+    const PAGES_PER_CACHE: usize = 16;
+
+    pub(crate) struct Shared {
+        cache: RenderCache<'static>,
+        pages: Vec<usize>,
+    }
+
+    // SAFETY: `RenderCache` is not `Send` because it holds `Rc`s. A `Shared`
+    // is only reached through the document's `Mutex`, so one thread at a
+    // time uses it, and the `Rc` clones hayro makes while drawing are
+    // dropped before `render_into` returns: no clone is ever on two
+    // threads.
+    unsafe impl Send for Shared {}
+
+    /// The cache slot, or `None` if another thread is drawing with it. A
+    /// cache left behind by a panic is thrown away.
+    pub(crate) fn lock(m: &Mutex<Option<Shared>>) -> Option<MutexGuard<'_, Option<Shared>>> {
+        match m.try_lock() {
+            Ok(g) => Some(g),
+            Err(TryLockError::WouldBlock) => None,
+            Err(TryLockError::Poisoned(p)) => {
+                let mut g = p.into_inner();
+                *g = None;
+                m.clear_poison();
+                Some(g)
+            }
+        }
+    }
+
+    /// The cache to draw `page` with.
+    pub(crate) fn for_page<'a>(slot: &'a mut Option<Shared>, page: usize) -> &'a RenderCache<'a> {
+        let shared = slot.get_or_insert_with(|| Shared {
+            cache: RenderCache::new(),
+            pages: Vec::new(),
+        });
+        if !shared.pages.contains(&page) {
+            if shared.pages.len() >= PAGES_PER_CACHE {
+                shared.cache = RenderCache::new();
+                shared.pages.clear();
+            }
+            shared.pages.push(page);
+        }
+        // SAFETY: the cache only ever holds data borrowed from the
+        // document's `Pdf`, which outlives it (it is declared after the
+        // cache in `PdfDocument`, so dropped later), and the `Pdf`'s data
+        // sits behind `Arc`s, so moving the document moves no borrowed
+        // bytes. The 'static lifetime is shortened to the borrow here.
+        unsafe { std::mem::transmute::<&RenderCache<'static>, &RenderCache<'a>>(&shared.cache) }
     }
 }
 
@@ -591,6 +711,80 @@ mod tests {
         ]);
         let pdf = PdfDocument::open(&Source::from_vec(pdf)).unwrap();
         assert_eq!(page_widths(&pdf), vec![100.0, 200.0]);
+    }
+
+    #[test]
+    fn tiles_match_the_whole_page_and_can_be_cancelled() {
+        let pdf = open("fixtures/indic.pdf");
+        let whole = pdf.render_page(0, 1.0, &Theme::NIGHT).unwrap();
+        let (w, h) = (whole.width, whole.height);
+        let half = h / 2;
+        let mut top = vec![0u8; (w * half * 4) as usize];
+        let mut bottom = vec![0u8; (w * (h - half) * 4) as usize];
+        {
+            let mut tiles: Vec<(Tile, &mut [u8])> = vec![
+                (Tile::new(0, 0, w, half), &mut top),
+                (Tile::new(0, half, w, h - half), &mut bottom),
+            ];
+            assert_eq!(
+                pdf.render_tiles(0, 1.0, &Theme::NIGHT, &mut tiles, &|| false)
+                    .unwrap(),
+                2
+            );
+        }
+        let row = (w * 4) as usize;
+        // Anti-aliasing at the seam can differ by a step; compare away from it.
+        assert_eq!(
+            &top[..row * (half as usize - 2)],
+            &whole.pixels[..row * (half as usize - 2)]
+        );
+        assert_eq!(
+            &bottom[row * 2..],
+            &whole.pixels[row * (half as usize + 2)..]
+        );
+        // Drawn again with the shared cache: identical.
+        let again = pdf.render_page(0, 1.0, &Theme::NIGHT).unwrap();
+        assert_eq!(again.pixels, whole.pixels);
+        // Cancelled after the first tile.
+        let mut tiles: Vec<(Tile, &mut [u8])> = vec![
+            (Tile::new(0, 0, w, half), &mut top),
+            (Tile::new(0, half, w, h - half), &mut bottom),
+        ];
+        let calls = std::cell::Cell::new(0);
+        let n = pdf
+            .render_tiles(0, 1.0, &Theme::NIGHT, &mut tiles, &|| {
+                calls.set(calls.get() + 1);
+                calls.get() > 1
+            })
+            .unwrap();
+        assert_eq!(n, 1);
+    }
+
+    #[test]
+    fn the_shared_cache_is_bounded_and_survives_threads() {
+        let pdf = std::sync::Arc::new(open("fixtures/indic.pdf"));
+        let reference = pdf.render_page(0, 0.5, &Theme::PAPER).unwrap().pixels;
+        let len = reference.len();
+        let threads: Vec<_> = (0..4)
+            .map(|_| {
+                let pdf = pdf.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..10 {
+                        assert_eq!(
+                            pdf.render_page(0, 0.5, &Theme::PAPER).unwrap().pixels.len(),
+                            len
+                        );
+                    }
+                })
+            })
+            .collect();
+        for t in threads {
+            t.join().unwrap();
+        }
+        assert_eq!(
+            pdf.render_page(0, 0.5, &Theme::PAPER).unwrap().pixels,
+            reference
+        );
     }
 
     #[test]

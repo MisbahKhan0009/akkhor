@@ -15,6 +15,13 @@
 //!     external fun pageHeight(handle: Long, page: Int): Float
 //!     external fun renderPdfTile(handle: Long, page: Int, scale: Float,
 //!                                x: Int, y: Int, bitmap: Bitmap, theme: Int): Int
+//!     // Several tiles of one page, sharing its fonts and images; returns how
+//!     // many were drawn. cancelRendering stops a batch before its next tile.
+//!     external fun renderPdfTiles(handle: Long, page: Int, scale: Float,
+//!                                 bitmaps: Array<Bitmap>, xs: IntArray, ys: IntArray,
+//!                                 theme: Int): Int
+//!     external fun cancelRendering(handle: Long)
+//!     external fun trimMemory(handle: Long): Int                    // from onTrimMemory
 //!     external fun layoutChapter(handle: Long, chapter: Int, width: Int, height: Int,
 //!                                fontSize: Float): Int               // page count, < 0 on error
 //!     external fun renderFlowPage(handle: Long, page: Int, bitmap: Bitmap, theme: Int): Int
@@ -180,6 +187,20 @@ type Shared = Arc<Mutex<Handle>>;
 static HANDLES: Mutex<BTreeMap<jlong, Shared>> = Mutex::new(BTreeMap::new());
 static NEXT_ID: AtomicI64 = AtomicI64::new(1);
 
+/// Per open book, a counter that `cancelRendering` bumps. Kept outside the
+/// book's own lock, which a running render holds.
+static GENERATIONS: Mutex<BTreeMap<jlong, Arc<std::sync::atomic::AtomicU64>>> =
+    Mutex::new(BTreeMap::new());
+
+#[cfg(feature = "pdf")]
+fn generation(h: jlong) -> Option<Arc<std::sync::atomic::AtomicU64>> {
+    GENERATIONS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&h)
+        .cloned()
+}
+
 fn registry() -> MutexGuard<'static, BTreeMap<jlong, Shared>> {
     HANDLES.lock().unwrap_or_else(|e| e.into_inner())
 }
@@ -215,6 +236,10 @@ fn into_handle(book: Book) -> jlong {
         flow: None,
     };
     registry().insert(id, Arc::new(Mutex::new(handle)));
+    GENERATIONS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(id, Arc::new(std::sync::atomic::AtomicU64::new(0)));
     id
 }
 
@@ -292,6 +317,14 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_close(_: *mut JNIEnv, _: jc
     // Remove it from the registry, then drop it outside the registry lock.
     // A call still running on another thread keeps it alive until it ends.
     let removed = registry().remove(&h);
+    if let Some(g) = GENERATIONS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .remove(&h)
+    {
+        // A render still running on another thread stops at its next tile.
+        g.fetch_add(1, Ordering::Relaxed);
+    }
     let _ = catch_unwind(AssertUnwindSafe(|| drop(removed)));
 }
 
@@ -490,6 +523,111 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTile(
             Ok(0)
         })
     })
+}
+
+/// Draws several tiles of one page, one per bitmap, at `xs[i]`, `ys[i]`
+/// (each tile is its bitmap's size), sharing the page's parsed fonts and
+/// images. Stops before the next tile once `cancelRendering` is called.
+/// Returns the number of tiles drawn, or -1 on error.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTiles(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    page: jint,
+    scale: jfloat,
+    bitmaps: jni_sys::jobjectArray,
+    xs: jni_sys::jintArray,
+    ys: jni_sys::jintArray,
+    theme_code: jint,
+) -> jint {
+    guard(-1, || {
+        let generation = generation(h).ok_or("closed or invalid handle")?;
+        let started = generation.load(Ordering::Relaxed);
+        let (n, xs, ys) = unsafe {
+            let len = (**env).GetArrayLength.ok_or("JNI")?;
+            let n = len(env, bitmaps).max(0) as usize;
+            if len(env, xs) as usize != n || len(env, ys) as usize != n {
+                return Err("bitmaps, xs and ys differ in length".into());
+            }
+            let get = (**env).GetIntArrayRegion.ok_or("JNI")?;
+            let (mut vx, mut vy) = (vec![0 as jint; n], vec![0 as jint; n]);
+            get(env, xs, 0, n as jint, vx.as_mut_ptr());
+            get(env, ys, 0, n as jint, vy.as_mut_ptr());
+            (n, vx, vy)
+        };
+        with_handle(h, |hd| {
+            #[allow(irrefutable_let_patterns)]
+            let Book::Pdf(pdf) = &hd.book else {
+                return Err("not a PDF".into());
+            };
+            let mut drawn = 0;
+            for i in 0..n {
+                if generation.load(Ordering::Relaxed) != started {
+                    break;
+                }
+                let bitmap = unsafe {
+                    let get = (**env).GetObjectArrayElement.ok_or("JNI")?;
+                    get(env, bitmaps, i as jint)
+                };
+                let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
+                let tile = akkhor::Tile::new(
+                    xs[i].max(0) as u32,
+                    ys[i].max(0) as u32,
+                    bmp.width,
+                    bmp.height,
+                );
+                let out = bmp.pixels()?;
+                pdf.render_tile(page.max(0) as usize, scale, tile, &theme(theme_code), out)
+                    .map_err(|e| e.to_string())?;
+                drop(bmp);
+                unsafe {
+                    if let Some(del) = (**env).DeleteLocalRef {
+                        del(env, bitmap);
+                    }
+                }
+                drawn += 1;
+            }
+            Ok(drawn)
+        })
+    })
+}
+
+/// Frees what reading a PDF has accumulated (decoded page content, fonts
+/// and images kept for redraws) by opening it afresh; call it from
+/// `onTrimMemory`. Waits for a render in progress. Returns 0, or -1 on error.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_trimMemory(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+) -> jint {
+    guard(-1, || {
+        with_handle(h, |hd| {
+            #[allow(irrefutable_let_patterns)]
+            if let Book::Pdf(pdf) = &hd.book {
+                let fresh = pdf.trimmed().map_err(|e| e.to_string())?;
+                hd.book = Book::Pdf(fresh);
+            }
+            Ok(0)
+        })
+    })
+}
+
+/// Stops the tile batches running for `handle` before their next tile
+/// (the user scrolled away). Never waits for them.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_cancelRendering(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+) {
+    if let Some(g) = generation(h) {
+        g.fetch_add(1, Ordering::Relaxed);
+    }
 }
 
 /// Lays out one EPUB chapter (or a text file) for a screen of `width` x
@@ -998,6 +1136,28 @@ mod tests {
         assert!(pdf_pos(1, 0) > pdf_pos(0, 99_999));
         assert!(with_pdf_text(id, 99, |_| Ok(())).is_err());
         unsafe { Java_dev_akkhor_Native_close(std::ptr::null_mut(), std::ptr::null_mut(), id) };
+    }
+
+    #[cfg(feature = "pdf")]
+    #[test]
+    fn cancelling_never_waits_for_a_running_render() {
+        let id = into_handle(akkhor::open(fixture("small.pdf")).unwrap());
+        let g = generation(id).unwrap();
+        let before = g.load(Ordering::Relaxed);
+        // Hold the book's lock, as a render does: cancelling must not block.
+        let shared = registry().get(&id).cloned().unwrap();
+        let _busy = shared.lock().unwrap();
+        unsafe {
+            Java_dev_akkhor_Native_cancelRendering(std::ptr::null_mut(), std::ptr::null_mut(), id)
+        };
+        assert_eq!(g.load(Ordering::Relaxed), before + 1);
+        drop(_busy);
+        unsafe { Java_dev_akkhor_Native_close(std::ptr::null_mut(), std::ptr::null_mut(), id) };
+        assert!(generation(id).is_none());
+        // Cancelling a closed handle is harmless.
+        unsafe {
+            Java_dev_akkhor_Native_cancelRendering(std::ptr::null_mut(), std::ptr::null_mut(), id)
+        };
     }
 
     #[test]

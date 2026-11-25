@@ -8,6 +8,12 @@
 //! akkhor-bench speed   FILE PAGE SCALE RUNS    open, first render, warm render
 //! akkhor-bench mem     FILE PAGE SCALE         resident memory before and at peak
 //! akkhor-bench survive FILE                    open, count, render and read page 1
+//! akkhor-bench tiles   FILE PAGE SCALE         every 512×512 tile of a zoomed page
+//! akkhor-bench session FILE PAGES SCALE        render pages 1..PAGES in one document:
+//!                                              memory after every 10 pages (all
+//!                                              resident, and heap only: the rest
+//!                                              is the file's pages, which the OS
+//!                                              can drop at any time)
 //! ```
 //!
 //! `AKKHOR_REFERENCE_FONTS=DIR` registers every font in DIR as a PDF
@@ -32,6 +38,20 @@ fn status_kb(field: &str) -> u64 {
                 .and_then(|v| v.parse().ok())
         })
         .unwrap_or(0)
+}
+
+/// glibc keeps freed memory for reuse; ask it to hand it back so resident
+/// memory shows what is really in use (no-op elsewhere).
+fn release_freed_memory() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        unsafe extern "C" {
+            fn malloc_trim(pad: usize) -> i32;
+        }
+        unsafe {
+            malloc_trim(0);
+        }
+    }
 }
 
 fn json_str(s: &str) -> String {
@@ -130,6 +150,63 @@ fn run(args: &[String]) -> Result<String, String> {
             let peak = status_kb("VmHWM:");
             drop(rendered);
             Ok(format!("{{\"rss_before_kb\":{before},\"peak_kb\":{peak}}}"))
+        }
+        Some("tiles") => {
+            let (file, page, scale) = (
+                arg(1)?,
+                arg(2)?.parse::<usize>().map_err(|_| "page")?,
+                arg(3)?.parse::<f32>().map_err(|_| "scale")?,
+            );
+            let pdf = open(&file)?;
+            let (w, h) = pdf.page_pixels(page, scale).map_err(|e| e.to_string())?;
+            let mut times = vec![];
+            let mut buf = vec![0u8; 512 * 512 * 4];
+            for y in (0..h).step_by(512) {
+                for x in (0..w).step_by(512) {
+                    let tile = akkhor::Tile::new(x, y, 512.min(w - x), 512.min(h - y));
+                    let t = Instant::now();
+                    pdf.render_tile(page, scale, tile, &Theme::ORIGINAL, &mut buf)
+                        .map_err(|e| e.to_string())?;
+                    times.push(ms(t));
+                }
+            }
+            Ok(format!("{{\"tile_ms\":{}}}", list(&times)))
+        }
+        Some("session") => {
+            let (file, pages, scale) = (
+                arg(1)?,
+                arg(2)?.parse::<usize>().map_err(|_| "pages")?,
+                arg(3)?.parse::<f32>().map_err(|_| "scale")?,
+            );
+            let _ = std::fs::write("/proc/self/clear_refs", "5");
+            let before = status_kb("VmRSS:");
+            let anon_before = status_kb("RssAnon:");
+            let pdf = open(&file)?;
+            let mut rss = vec![];
+            let mut anon = vec![];
+            let t = Instant::now();
+            for p in 0..pages.min(pdf.page_count()) {
+                pdf.render_page(p, scale, &Theme::ORIGINAL)
+                    .map_err(|e| e.to_string())?;
+                if (p + 1) % 10 == 0 {
+                    release_freed_memory();
+                    rss.push((status_kb("VmRSS:").saturating_sub(before)) as f64 / 1024.0);
+                    anon.push((status_kb("RssAnon:").saturating_sub(anon_before)) as f64 / 1024.0);
+                }
+            }
+            let total = ms(t);
+            let trimmed = pdf.trimmed().map_err(|e| e.to_string())?;
+            drop(pdf);
+            release_freed_memory();
+            let after_trim = status_kb("RssAnon:").saturating_sub(anon_before) as f64 / 1024.0;
+            drop(trimmed);
+            Ok(format!(
+                "{{\"total_ms\":{:.3},\"rss_added_mb\":{},\"heap_added_mb\":{},\"heap_after_trim_mb\":{after_trim:.2},\"peak_added_mb\":{:.2}}}",
+                total,
+                list(&rss),
+                list(&anon),
+                status_kb("VmHWM:").saturating_sub(before) as f64 / 1024.0
+            ))
         }
         Some("survive") => {
             let outcome = (|| -> Result<(), String> {

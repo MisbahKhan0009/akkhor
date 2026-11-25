@@ -192,8 +192,19 @@ review of Phase 3, as for Phases 1 and 2.
   and fixture PDF (`scripts/compare_renders.sh`). Warm open of the
   2,000-page PDF 12 ms → 0.5 ms, heap after open 6.6 → 1.0 MB, file touched
   at open 298 → 7 MB (desktop). Cold open on CI: see the benchmark.
-- [ ] Second and later tiles of a page under half the cost of the first
-- [ ] Batch rendering can be cancelled between tiles
+- [x] Second and later tiles of a page under half the cost of the first
+  (512×512 tiles of a Bangla/Hindi page at 4x: first 6.1 ms, then about
+  1.1 ms; drawing a page again 5.4 → 2.9 ms). One render cache per
+  document, never waited for (a busy cache means a fresh one), started over
+  after 16 pages because hayro's cache only grows.
+- [x] Batch rendering can be cancelled between tiles (`render_tiles`,
+  Android `renderPdfTiles` and `cancelRendering`, which never waits for the
+  render it stops)
+- [x] Memory over a reading session measured (`akkhor-bench session`): the
+  heap grows about 7 KB per page read (each page keeps its decoded
+  content, as upstream hayro does). `PdfDocument::trimmed()` and Android
+  `trimMemory` reopen the file (under 1 ms) and shed it: 2.1 → 1.1 MB after
+  200 pages.
 - [ ] Thumbnails and table of contents, in the CLI and on Android
 - [ ] arm64 library under 3.5 MB with all formats
 - [x] Case study data, figures and drafts in `docs/case-study/`,
