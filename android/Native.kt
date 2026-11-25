@@ -104,6 +104,14 @@ object Native {
     external fun pdfTextBetween(handle: Long, start: Long, end: Long): String?
     external fun pdfSearch(handle: Long, page: Int, query: String): LongArray
 
+    /** Chosen pages (0-based, in this order) saved as a new PDF at [path]
+     *  (share a chapter or a few pages). Each page keeps everything it uses,
+     *  so its text stays selectable; links, form fields' links to other
+     *  pages and the outline are left out. Returns the bytes written, or -1:
+     *  encrypted PDFs are refused (lastError says so), as are pages out of
+     *  range. Write to the app's cache, then share the file. */
+    external fun pdfWritePages(handle: Long, pages: IntArray, path: String): Long
+
     // --- reflowed text (EPUB, TXT, PDF reflow) -------------------------
 
     /** Reflowed chapters: EPUB chapters, 1 for TXT, a PDF's reflow

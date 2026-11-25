@@ -22,6 +22,9 @@ ccitt = ["hayro-syntax/ccitt"]
 standard-fonts = ["hayro/embed-fonts"]
 # Embeds CJK character maps. Only needed for Chinese/Japanese/Korean PDFs.
 cjk = ["hayro/embed-cmaps"]
+# Writes chosen pages as a new PDF (`PdfDocument::write_pages`). Small:
+# no new dependency.
+write = []
 # Uses the bundled Noto fonts as reference fonts for text recovery.
 bundled-fonts = ["akkhor-flow/bundled-fonts"]
 

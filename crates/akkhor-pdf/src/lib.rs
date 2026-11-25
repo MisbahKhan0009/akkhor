@@ -24,6 +24,8 @@ pub mod structure;
 pub mod tables;
 pub mod text;
 mod theme;
+#[cfg(feature = "write")]
+mod write;
 
 pub use reference::register_reference_font;
 
@@ -221,6 +223,16 @@ impl PdfDocument {
             .clone();
         *fresh.recoveries.lock().unwrap_or_else(|e| e.into_inner()) = tables;
         Ok(fresh)
+    }
+
+    /// Chosen pages (0-based, in this order, repeats allowed) as a new
+    /// PDF: each page with everything it uses, streams copied as they are,
+    /// so text stays selectable. Links, form fields, the outline and the
+    /// rest of the document are left out. Encrypted PDFs are refused
+    /// ([`Error::Protected`]).
+    #[cfg(feature = "write")]
+    pub fn write_pages(&self, pages: &[usize]) -> Result<Vec<u8>> {
+        contain(|| write::pages(&self.pdf, pages))?
     }
 
     /// The table of contents (PDF outlines), read on demand. Empty when
@@ -770,7 +782,6 @@ impl PdfDocument {
     }
 }
 
-/// A rendered page: RGBA8, premultiplied alpha, rows tightly packed.
 /// A PDF's own description of itself.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfInfo {
@@ -779,6 +790,7 @@ pub struct PdfInfo {
     pub subject: Option<String>,
 }
 
+/// A rendered page: RGBA8, premultiplied alpha, rows tightly packed.
 pub struct RenderedPage {
     pub width: u32,
     pub height: u32,

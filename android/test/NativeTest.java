@@ -119,7 +119,21 @@ public class NativeTest {
         check(Native.pdfPageText(pdf, 0) != null, "pdfPageText");
         check(Native.renderPdfTile(pdf, 0, 1f, 0, 0, new Object(), 16) < 0, "drawing needs an Android bitmap");
         check(Native.renderCover(pdf, new Object()) == -1, "cover needs an Android bitmap");
+        // Two pages, last first, as a new PDF that reads the same.
+        String out = System.getProperty("java.io.tmpdir") + "/akkhor-copy.pdf";
+        check(Native.pdfWritePages(pdf, new int[] {1, 0}, out) > 1000, "pdfWritePages");
+        long copy = Native.openPath(out);
+        check(copy != 0 && Native.format(copy) == 0, "open the copy");
+        check(Native.pdfPageText(pdf, 1).equals(Native.pdfPageText(copy, 0)), "the copy's text");
+        Native.close(copy);
+        check(Native.pdfWritePages(pdf, new int[] {7}, out) == -1, "a page out of range");
+        check(Native.pdfWritePages(pdf, new int[] {-1}, out) == -1, "a negative page");
         Native.close(pdf);
+        long locked = Native.openPath(root + "/tests/corpus/write/encrypted.pdf");
+        check(locked != 0, "an encrypted PDF with an empty password opens");
+        check(Native.pdfWritePages(locked, new int[] {0}, out) == -1, "but is not copied");
+        check(String.valueOf(Native.lastError()).contains("protected"), "lastError: " + Native.lastError());
+        Native.close(locked);
 
         // Strings: UTF-8 bytes against UTF-16 units.
         check(Native.utf16Offset("আ😀b", 7) == 3, "utf16Offset");

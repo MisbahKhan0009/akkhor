@@ -410,6 +410,15 @@ impl XRef {
         self.trailer_data().root_ref
     }
 
+    /// Whether the PDF is encrypted (with any password, the empty one
+    /// included).
+    pub fn is_encrypted(&self) -> bool {
+        match &self.0 {
+            Inner::Dummy => false,
+            Inner::Some(r) => !matches!(r.decryptor.as_ref(), Decryptor::None),
+        }
+    }
+
     /// Whether the PDF has optional content groups.
     pub fn has_optional_content_groups(&self) -> bool {
         match &self.0 {

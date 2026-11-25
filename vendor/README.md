@@ -34,6 +34,11 @@ page was lost; MuPDF skips the token the same way. Content streams are
 unchanged. Test: `a_damaged_number_does_not_lose_the_page`; renders of every
 fixture and corpus PDF identical.
 
+**Third change** (`src/xref.rs` only; diff in
+`hayro-syntax.is-encrypted.diff`, Phase 5): `XRef::is_encrypted`, so that
+copying pages can refuse encrypted files, including those that open with
+the empty password. Upstream keeps the decryptor private.
+
 To update: copy the new upstream version here, re-apply the diffs, run the
 workspace tests and `scripts/compare_renders.sh` (identical page counts and
 renders on every corpus and fixture PDF). The change is meant to be

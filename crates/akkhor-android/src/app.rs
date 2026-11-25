@@ -142,7 +142,12 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderCover(
             let src = &cover.rgba[y * cover.width as usize * 4..][..w * 4];
             let dst = &mut out[y * bw as usize * 4..][..w * 4];
             // Android bitmaps hold premultiplied colour.
-            for (d, s) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            for (d, s) in dst
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(src.as_chunks::<4>().0)
+            {
                 let a = u16::from(s[3]);
                 for k in 0..3 {
                     d[k] = ((u16::from(s[k]) * a + 127) / 255) as u8;
@@ -492,4 +497,45 @@ pub fn forget_searches(h: jlong) {
     if let Ok(mut s) = SEARCHES.lock() {
         s.retain(|_, r| r.lock().is_ok_and(|g| g.0 != h));
     }
+}
+
+/// Chosen pages (0-based, in that order) of an open PDF saved as a new PDF
+/// at `path`; returns the bytes written, or -1 (encrypted file, a page out
+/// of range, a write failure; see lastError).
+#[cfg(feature = "pdf-write")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfWritePages(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    pages: jni_sys::jintArray,
+    path: jstring,
+) -> jlong {
+    guard(-1, || {
+        let path = unsafe { jstr(env, path) }.ok_or("no path")?;
+        let chosen = unsafe {
+            let len = (**env).GetArrayLength.ok_or("JNI")?;
+            let n = len(env, pages).max(0) as usize;
+            let get = (**env).GetIntArrayRegion.ok_or("JNI")?;
+            let mut v = vec![0 as jint; n];
+            get(env, pages, 0, n as jint, v.as_mut_ptr());
+            v
+        };
+        if chosen.iter().any(|&p| p < 0) {
+            return Err("a page number is negative".into());
+        }
+        let chosen: Vec<usize> = chosen.into_iter().map(|p| p as usize).collect();
+        let bytes = with_handle(h, |hd| {
+            #[allow(irrefutable_let_patterns)]
+            let Book::Pdf(pdf) = &hd.book else {
+                return Err("not a PDF".into());
+            };
+            pdf.write_pages(&chosen).map_err(|e| e.to_string())
+        })?;
+        // Written beside, then moved in: a failed write leaves no half file.
+        let part = format!("{path}.part");
+        std::fs::write(&part, &bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&part, &path).map_err(|e| e.to_string())?;
+        Ok(bytes.len() as jlong)
+    })
 }

@@ -154,6 +154,17 @@ page places (`convertLocator` for the reflow view). Indic spellings fold
 (nukta letters, split vowels, ৎ, ZWJ/ZWNJ), and a word split by a line-end
 hyphen is found.
 
+## Sharing pages of a PDF
+
+`pdfWritePages(handle, pages, path)` saves chosen pages (0-based, in the
+given order) as a new PDF, for "share this chapter" or "send these pages".
+Each page is copied with everything it uses, streams untouched, so its
+text stays selectable and the file is about the size of what the pages
+use (11 pages of a 41 MB book: 2.5 MB, 30 ms). Highlights, notes and
+drawn form fields come along; links and the outline do not. Encrypted
+PDFs are refused, even those that open without a password. Write to the
+app's cache directory, then share the file.
+
 ## Memory
 
 `trimMemory(handle)` frees caches (fonts, glyphs, page text, images) and

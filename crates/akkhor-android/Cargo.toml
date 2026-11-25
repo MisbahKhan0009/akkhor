@@ -16,11 +16,13 @@ crate-type = ["cdylib"]
 # Format switches pass straight through to the engine, so an app can build a
 # PDF-only or EPUB-only library.
 [features]
-default = ["pdf", "pdf-scans", "epub", "txt"]
+default = ["pdf", "pdf-scans", "pdf-write", "epub", "txt"]
 pdf = ["akkhor/pdf", "flow"]
 # JBIG2, CCITT and JPEG 2000 decoders for scanned pages.
 pdf-scans = ["pdf", "akkhor/pdf-scans"]
 pdf-cjk = ["akkhor/pdf-cjk"]
+# Chosen pages saved as a new PDF (pdfWritePages).
+pdf-write = ["pdf", "akkhor/pdf-write"]
 # The 14 standard PDF fonts compiled in. Off by default on Android: the app
 # registers the phone's fonts for them (registerStandardFont).
 pdf-standard-fonts = ["pdf", "akkhor/pdf-standard-fonts"]

@@ -28,6 +28,8 @@ pdf-standard-fonts = ["pdf", "akkhor-pdf/standard-fonts"]
 pdf-scans = ["pdf", "akkhor-pdf/jbig2", "akkhor-pdf/ccitt", "akkhor-pdf/jpx"]
 # Embedded CJK character maps for Chinese/Japanese/Korean PDFs.
 pdf-cjk = ["pdf", "akkhor-pdf/cjk"]
+# Pages of a PDF saved as a new PDF (share a chapter, a few pages).
+pdf-write = ["pdf", "akkhor-pdf/write"]
 epub = ["dep:akkhor-epub", "flow"]
 txt = ["flow"]
 # The reflowable-text pipeline shared by EPUB, TXT and (later) MOBI and FB2.
