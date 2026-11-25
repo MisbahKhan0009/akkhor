@@ -1,4 +1,4 @@
 engine,file,cold_open_ms,cold_open_plus_last_page_ms
-Akkhor,"big.pdf (2,000 pages, 308 MB)",3.72,19.55
-MuPDF,"big.pdf (2,000 pages, 308 MB)",14.11,305.08
-PDFium,"big.pdf (2,000 pages, 308 MB)",5.49,191.43
+Akkhor,"big.pdf (2,000 pages, 308 MB)",2.96,13.52
+MuPDF,"big.pdf (2,000 pages, 308 MB)",5.75,218.82
+PDFium,"big.pdf (2,000 pages, 308 MB)",2.57,184.82

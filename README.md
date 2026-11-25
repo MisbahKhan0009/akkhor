@@ -48,6 +48,7 @@ akkhor = { version = "0.1", default-features = false, features = ["epub"] }  # E
 | `pdf` (default) | PDF |
 | `epub` (default) | EPUB 2 and 3 |
 | `txt` (default) | plain text |
+| `pdf-scans` (default) | JBIG2, CCITT fax and JPEG 2000 decoders for scanned PDFs (about 0.45 MB on arm64) |
 | `pdf-cjk` | CJK character maps for Chinese, Japanese and Korean PDFs |
 | `bundled-fonts` | Noto Serif Latin, Bengali and Devanagari compiled in |
 

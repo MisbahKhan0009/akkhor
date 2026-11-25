@@ -25,6 +25,7 @@ behind every number, all reproducible.
 | `size` | library sizes (not like for like; see the note on the chart) |
 | `robustness` | 200 damaged PDFs: opened, refused, crashed |
 | `progress-lazy-page-tree` | Phase 3.2 before and after |
+| `progress-phase-3` | Phase 3 before and after: cold open, redraw, session memory, Android size |
 | `themes.png` | one PDF page in the five reading themes |
 
 ## Reproduce

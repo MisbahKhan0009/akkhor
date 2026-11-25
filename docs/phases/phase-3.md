@@ -211,11 +211,17 @@ review of Phase 3, as for Phases 1 and 2.
   a photo: 1.5 ms. The outline of a Chrome PDF with Bangla, Hindi and
   English headings matches MuPDF's entry for entry; explicit, named and
   `GoTo` destinations, loops and depth are handled.
-- [ ] arm64 library under 3.5 MB with all formats
+- [ ] arm64 library under 3.5 MB with all formats. **Missed**: 6.42 →
+  5.81 MB (packed relocations, size-optimised cold crates, scan codecs as
+  the `pdf-scans` switch); without scan codecs 5.37 MB, PDF only 4.97 MB,
+  EPUB and TXT 2.19 MB. Most of the rest is code every build needs (see
+  the review, finding 2). Target revised to under 5.5 MB for all formats,
+  remaining steps in Phase 4.
 - [x] Case study data, figures and drafts in `docs/case-study/`,
   reproducible with two scripts (first run 2026-11-25; it also exposed the
   overstated Phase 2 baseline and led to `/ActualText` support)
-- [ ] Review written and its findings fixed; CI green
+- [x] Review written (`docs/reviews/phase-3.md`) and its findings fixed or
+  carried to Phase 4; CI green
 
 ## Risks
 

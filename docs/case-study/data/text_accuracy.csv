@@ -1,181 +1,181 @@
 engine,file,language,text,font,producer,text_layer,cer,words_found,ms
-Akkhor,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.0,1.0,32.041
-Akkhor (+ device fonts),pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.0,1.0,33.58
-MuPDF,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.01377,0.89865,35.152
-PDFium,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.01271,0.41216,11.633
-Poppler,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.0,0.93919,25.4
-Akkhor,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,30.733
-Akkhor (+ device fonts),pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,35.033
-MuPDF,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,1.07309,0.0,3.482
-PDFium,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,0.98941,0.0,3.38
-Poppler,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,1.07309,0.0,12.708
-Akkhor,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,38.825
-Akkhor (+ device fonts),pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,23.207
-MuPDF,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.00212,0.92568,4.177
-PDFium,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.01165,0.95946,4.223
-Poppler,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.00106,0.93919,11.731
-Akkhor,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,29.808
-Akkhor (+ device fonts),pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,30.988
-MuPDF,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.98941,0.0,3.515
-PDFium,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.98835,0.0,2.58
-Poppler,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.98517,0.0,22.989
-Akkhor,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.0,1.0,12.551
-Akkhor (+ device fonts),pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.0,1.0,27.651
-MuPDF,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.01907,0.89865,3.557
-PDFium,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.00742,0.38514,3.626
-Poppler,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.0,0.93243,12.626
-Akkhor,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,0.31568,0.40541,15.755
-Akkhor (+ device fonts),pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,0.0,1.0,38.734
-MuPDF,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,1.47775,0.0,2.459
-PDFium,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,1.32627,0.0,3.658
-Poppler,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,1.47775,0.0,21.11
-Akkhor,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,1.0,10.837
-Akkhor (+ device fonts),pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,1.0,29.121
-MuPDF,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.00212,0.91892,5.63
-PDFium,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,1.0,3.368
-Poppler,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,0.93243,11.604
-Akkhor,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.9947,0.0,10.339
-Akkhor (+ device fonts),pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.0,1.0,61.874
-MuPDF,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.99682,0.0,3.999
-PDFium,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.99576,0.0,4.785
-Poppler,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.99576,0.0,11.939
-Akkhor,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0,1.0,42.472
-Akkhor (+ device fonts),pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0,1.0,38.745
-MuPDF,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0136,0.92701,7.382
-PDFium,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.01236,0.53285,3.244
-Poppler,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0,0.91241,15.2
-Akkhor,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,71.145
-Akkhor (+ device fonts),pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,81.773
-MuPDF,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,1.09642,0.0,2.285
-PDFium,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,0.99753,0.0,3.55
-Poppler,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,1.09642,0.0,11.806
-Akkhor,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,35.718
-Akkhor (+ device fonts),pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,50.99
-MuPDF,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,0.9927,3.798
-PDFium,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.00371,0.9927,2.867
-Poppler,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,0.91241,14.62
-Akkhor,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,35.275
-Akkhor (+ device fonts),pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,35.355
-MuPDF,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.99382,0.0,4.474
-PDFium,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.99382,0.0,2.732
-Poppler,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.98517,0.0,11.749
-Akkhor,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.0,1.0,10.09
-Akkhor (+ device fonts),pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.0,1.0,38.352
-MuPDF,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.02349,0.89781,3.329
-PDFium,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.03708,0.54015,3.348
-Poppler,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.0,0.9854,13.654
-Akkhor,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,0.32633,0.47445,13.186
-Akkhor (+ device fonts),pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,0.0,1.0,42.688
-MuPDF,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,1.58714,0.0,3.177
-PDFium,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,1.39431,0.0,4.865
-Poppler,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,1.58714,0.0,11.774
-Akkhor,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,1.0,11.072
-Akkhor (+ device fonts),pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,1.0,37.328
-MuPDF,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,0.9927,4.408
-PDFium,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.00494,1.0,3.459
-Poppler,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,0.9854,11.921
-Akkhor,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99011,0.0,8.032
-Akkhor (+ device fonts),pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.0,1.0,35.791
-MuPDF,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99506,0.0,3.296
-PDFium,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99258,0.0,2.127
-Poppler,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99011,0.0,10.242
-Akkhor,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,30.713
-Akkhor (+ device fonts),pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,32.26
-MuPDF,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,3.355
-PDFium,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,2.173
-Poppler,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,9.78
-Akkhor,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,31.943
-Akkhor (+ device fonts),pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,52.399
-MuPDF,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,2.627
-PDFium,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,2.843
-Poppler,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,14.991
-Akkhor,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,29.973
-Akkhor (+ device fonts),pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,30.008
-MuPDF,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,3.968
-PDFium,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,1.93
-Poppler,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,14.632
-Akkhor,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,29.766
-Akkhor (+ device fonts),pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,29.96
-MuPDF,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,2.406
-PDFium,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,1.629
-Poppler,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,13.091
-Akkhor,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,10.807
-Akkhor (+ device fonts),pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,22.792
-MuPDF,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,3.886
-PDFium,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,2.148
-Poppler,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,10.765
-Akkhor,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,0.94231,0.0,10.465
-Akkhor (+ device fonts),pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,0.0,1.0,23.034
-MuPDF,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,1.0,0.0,3.577
-PDFium,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,1.0,0.0,2.051
-Poppler,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,1.0,0.0,10.944
-Akkhor,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,10.029
-Akkhor (+ device fonts),pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,22.074
-MuPDF,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,2.543
-PDFium,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,1.733
-Poppler,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,9.635
-Akkhor,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,10.453
-Akkhor (+ device fonts),pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,0.0,1.0,22.026
-MuPDF,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,2.265
-PDFium,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,1.246
-Poppler,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,11.453
-Akkhor,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,38.527
-Akkhor (+ device fonts),pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,27.183
-MuPDF,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,2.644
-PDFium,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,1.708
-Poppler,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,20.628
-Akkhor,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,80.275
-Akkhor (+ device fonts),pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,57.458
-MuPDF,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,1.07107,0.0,2.478
-PDFium,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,1.63
-Poppler,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,1.07107,0.0,9.39
-Akkhor,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,34.782
-Akkhor (+ device fonts),pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,35.367
-MuPDF,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,1.953
-PDFium,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,1.581
-Poppler,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,11.759
-Akkhor,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,44.726
-Akkhor (+ device fonts),pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,26.961
-MuPDF,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,1.438
-PDFium,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,1.223
-Poppler,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,10.211
-Akkhor,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,11.264
-Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,36.229
-MuPDF,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,2.896
-PDFium,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,1.837
-Poppler,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,20.445
-Akkhor,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,0.98731,0.0,23.132
-Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,0.0,1.0,88.761
-MuPDF,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,1.0,0.0,2.051
-PDFium,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,1.0,0.0,1.825
-Poppler,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,1.0,0.0,10.102
-Akkhor,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,9.922
-Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,35.558
-MuPDF,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,2.968
-PDFium,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,1.636
-Poppler,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,9.038
-Akkhor,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,17.694
-Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,0.0,1.0,53.372
-MuPDF,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,1.681
-PDFium,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,1.37
-Poppler,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,19.408
-Akkhor,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.0,1.0,40.527
-Akkhor (+ device fonts),pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.0,1.0,34.136
-MuPDF,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.95233,0.0,1.768
-PDFium,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.95233,0.0,2.95
-Poppler,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.95233,0.0,16.909
-Akkhor,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,0.0,1.0,34.067
-Akkhor (+ device fonts),pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,0.0,1.0,34.861
-MuPDF,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,1.10064,0.0,2.134
-PDFium,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,0.99682,0.0,2.519
-Poppler,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,1.10064,0.0,11.384
-Akkhor,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.0,1.0,30.148
-Akkhor (+ device fonts),pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.0,1.0,69.836
-MuPDF,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.95233,0.0,1.631
-PDFium,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.95233,0.0,1.444
-Poppler,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.95233,0.0,15.49
-Akkhor,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.0,1.0,34.206
-Akkhor (+ device fonts),pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.0,1.0,33.605
-MuPDF,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.95657,0.0,2.486
-PDFium,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.95445,0.0,1.086
-Poppler,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.95233,0.0,10.329
+Akkhor,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.0,1.0,35.143
+Akkhor (+ device fonts),pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.0,1.0,32.301
+MuPDF,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.01377,0.89865,3.657
+PDFium,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.01271,0.41216,3.457
+Poppler,pdf/bn.chrome.pdf,Bangla,prose,Noto Serif,Chrome,as produced,0.0,0.93919,10.191
+Akkhor,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,33.328
+Akkhor (+ device fonts),pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,35.803
+MuPDF,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,1.07309,0.0,2.529
+PDFium,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,0.98941,0.0,2.345
+Poppler,pdf/bn.chrome.raw.pdf,Bangla,prose,Noto Serif,Chrome,no ToUnicode,1.07309,0.0,8.612
+Akkhor,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,24.294
+Akkhor (+ device fonts),pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,23.603
+MuPDF,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.00212,0.92568,3.255
+PDFium,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.01165,0.95946,3.036
+Poppler,pdf/bn.libreoffice.pdf,Bangla,prose,Noto Serif,LibreOffice,as produced,0.00106,0.93919,10.88
+Akkhor,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,30.722
+Akkhor (+ device fonts),pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,30.247
+MuPDF,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.98941,0.0,3.518
+PDFium,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.98835,0.0,2.586
+Poppler,pdf/bn.libreoffice.raw.pdf,Bangla,prose,Noto Serif,LibreOffice,no ToUnicode,0.98517,0.0,11.297
+Akkhor,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.0,1.0,12.507
+Akkhor (+ device fonts),pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.0,1.0,24.571
+MuPDF,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.01907,0.89865,2.784
+PDFium,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.00742,0.38514,2.771
+Poppler,pdf/bn.hind.chrome.pdf,Bangla,prose,Hind Siliguri,Chrome,as produced,0.0,0.93243,8.963
+Akkhor,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,0.31568,0.40541,9.468
+Akkhor (+ device fonts),pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,0.0,1.0,18.844
+MuPDF,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,1.47775,0.0,2.145
+PDFium,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,1.32627,0.0,2.615
+Poppler,pdf/bn.hind.chrome.raw.pdf,Bangla,prose,Hind Siliguri,Chrome,no ToUnicode,1.47775,0.0,9.925
+Akkhor,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,1.0,10.999
+Akkhor (+ device fonts),pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,1.0,23.033
+MuPDF,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.00212,0.91892,4.256
+PDFium,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,1.0,2.883
+Poppler,pdf/bn.hind.libreoffice.pdf,Bangla,prose,Hind Siliguri,LibreOffice,as produced,0.0,0.93243,11.116
+Akkhor,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.9947,0.0,10.879
+Akkhor (+ device fonts),pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.0,1.0,23.913
+MuPDF,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.99682,0.0,3.304
+PDFium,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.99576,0.0,2.755
+Poppler,pdf/bn.hind.libreoffice.raw.pdf,Bangla,prose,Hind Siliguri,LibreOffice,no ToUnicode,0.99576,0.0,10.9
+Akkhor,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0,1.0,38.731
+Akkhor (+ device fonts),pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0,1.0,37.325
+MuPDF,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0136,0.92701,3.242
+PDFium,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.01236,0.53285,2.956
+Poppler,pdf/hi.chrome.pdf,Hindi,prose,Noto Serif,Chrome,as produced,0.0,0.91241,10.62
+Akkhor,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,36.86
+Akkhor (+ device fonts),pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,0.0,1.0,36.363
+MuPDF,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,1.09642,0.0,2.359
+PDFium,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,0.99753,0.0,2.685
+Poppler,pdf/hi.chrome.raw.pdf,Hindi,prose,Noto Serif,Chrome,no ToUnicode,1.09642,0.0,10.1
+Akkhor,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,44.297
+Akkhor (+ device fonts),pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,1.0,41.476
+MuPDF,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,0.9927,3.948
+PDFium,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.00371,0.9927,2.442
+Poppler,pdf/hi.libreoffice.pdf,Hindi,prose,Noto Serif,LibreOffice,as produced,0.0,0.91241,10.809
+Akkhor,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,35.6
+Akkhor (+ device fonts),pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,34.987
+MuPDF,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.99382,0.0,5.495
+PDFium,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.99382,0.0,2.578
+Poppler,pdf/hi.libreoffice.raw.pdf,Hindi,prose,Noto Serif,LibreOffice,no ToUnicode,0.98517,0.0,14.454
+Akkhor,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.0,1.0,13.879
+Akkhor (+ device fonts),pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.0,1.0,38.839
+MuPDF,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.02349,0.89781,2.802
+PDFium,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.03708,0.54015,3.152
+Poppler,pdf/hi.mukta.chrome.pdf,Hindi,prose,Mukta,Chrome,as produced,0.0,0.9854,10.344
+Akkhor,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,0.32633,0.47445,13.146
+Akkhor (+ device fonts),pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,0.0,1.0,40.937
+MuPDF,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,1.58714,0.0,2.458
+PDFium,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,1.39431,0.0,3.087
+Poppler,pdf/hi.mukta.chrome.raw.pdf,Hindi,prose,Mukta,Chrome,no ToUnicode,1.58714,0.0,11.976
+Akkhor,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,1.0,12.424
+Akkhor (+ device fonts),pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,1.0,38.37
+MuPDF,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,0.9927,4.063
+PDFium,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.00494,1.0,3.096
+Poppler,pdf/hi.mukta.libreoffice.pdf,Hindi,prose,Mukta,LibreOffice,as produced,0.0,0.9854,11.945
+Akkhor,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99011,0.0,8.664
+Akkhor (+ device fonts),pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.0,1.0,36.888
+MuPDF,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99506,0.0,3.482
+PDFium,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99258,0.0,2.513
+Poppler,pdf/hi.mukta.libreoffice.raw.pdf,Hindi,prose,Mukta,LibreOffice,no ToUnicode,0.99011,0.0,10.72
+Akkhor,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,41.423
+Akkhor (+ device fonts),pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,30.237
+MuPDF,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,3.096
+PDFium,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,1.63
+Poppler,pdf/bn-conjuncts.chrome.pdf,Bangla,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,8.401
+Akkhor,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,33.145
+Akkhor (+ device fonts),pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,42.708
+MuPDF,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,2.369
+PDFium,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,1.979
+Poppler,pdf/bn-conjuncts.chrome.raw.pdf,Bangla,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,9.17
+Akkhor,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,23.747
+Akkhor (+ device fonts),pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,33.001
+MuPDF,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,2.382
+PDFium,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,1.709
+Poppler,pdf/bn-conjuncts.libreoffice.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,9.867
+Akkhor,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,30.389
+Akkhor (+ device fonts),pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,29.649
+MuPDF,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,2.252
+PDFium,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,1.739
+Poppler,pdf/bn-conjuncts.libreoffice.raw.pdf,Bangla,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,11.705
+Akkhor,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,16.678
+Akkhor (+ device fonts),pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,24.166
+MuPDF,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,3.699
+PDFium,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,2.25
+Poppler,pdf/bn-conjuncts.hind.chrome.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,as produced,0.0,1.0,10.719
+Akkhor,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,0.94231,0.0,11.685
+Akkhor (+ device fonts),pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,0.0,1.0,24.433
+MuPDF,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,1.0,0.0,3.533
+PDFium,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,1.0,0.0,2.036
+Poppler,pdf/bn-conjuncts.hind.chrome.raw.pdf,Bangla,conjunct list,Hind Siliguri,Chrome,no ToUnicode,1.0,0.0,9.653
+Akkhor,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,13.346
+Akkhor (+ device fonts),pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,22.913
+MuPDF,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,2.766
+PDFium,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,1.821
+Poppler,pdf/bn-conjuncts.hind.libreoffice.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,as produced,0.0,1.0,9.81
+Akkhor,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,11.053
+Akkhor (+ device fonts),pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,0.0,1.0,23.035
+MuPDF,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,5.753
+PDFium,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,1.56
+Poppler,pdf/bn-conjuncts.hind.libreoffice.raw.pdf,Bangla,conjunct list,Hind Siliguri,LibreOffice,no ToUnicode,1.0,0.0,9.772
+Akkhor,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,41.221
+Akkhor (+ device fonts),pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,35.246
+MuPDF,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,2.19
+PDFium,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,1.733
+Poppler,pdf/hi-conjuncts.chrome.pdf,Hindi,conjunct list,Noto Serif,Chrome,as produced,0.0,1.0,22.001
+Akkhor,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,43.907
+Akkhor (+ device fonts),pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,0.0,1.0,36.997
+MuPDF,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,1.07107,0.0,1.98
+PDFium,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,1.0,0.0,1.653
+Poppler,pdf/hi-conjuncts.chrome.raw.pdf,Hindi,conjunct list,Noto Serif,Chrome,no ToUnicode,1.07107,0.0,10.21
+Akkhor,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,39.659
+Akkhor (+ device fonts),pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,33.821
+MuPDF,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,1.72
+PDFium,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,1.063
+Poppler,pdf/hi-conjuncts.libreoffice.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,as produced,0.0,1.0,10.384
+Akkhor,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,39.955
+Akkhor (+ device fonts),pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,0.0,1.0,36.944
+MuPDF,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,1.96
+PDFium,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,1.197
+Poppler,pdf/hi-conjuncts.libreoffice.raw.pdf,Hindi,conjunct list,Noto Serif,LibreOffice,no ToUnicode,1.0,0.0,12.307
+Akkhor,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,11.15
+Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,36.255
+MuPDF,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,2.37
+PDFium,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,1.894
+Poppler,pdf/hi-conjuncts.mukta.chrome.pdf,Hindi,conjunct list,Mukta,Chrome,as produced,0.0,1.0,9.86
+Akkhor,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,0.98731,0.0,11.117
+Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,0.0,1.0,55.724
+MuPDF,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,1.0,0.0,2.163
+PDFium,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,1.0,0.0,1.743
+Poppler,pdf/hi-conjuncts.mukta.chrome.raw.pdf,Hindi,conjunct list,Mukta,Chrome,no ToUnicode,1.0,0.0,9.483
+Akkhor,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,10.896
+Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,38.227
+MuPDF,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,2.424
+PDFium,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,1.447
+Poppler,pdf/hi-conjuncts.mukta.libreoffice.pdf,Hindi,conjunct list,Mukta,LibreOffice,as produced,0.0,1.0,10.119
+Akkhor,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,11.277
+Akkhor (+ device fonts),pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,0.0,1.0,36.522
+MuPDF,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,2.155
+PDFium,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,3.639
+Poppler,pdf/hi-conjuncts.mukta.libreoffice.raw.pdf,Hindi,conjunct list,Mukta,LibreOffice,no ToUnicode,1.0,0.0,9.309
+Akkhor,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.0,1.0,32.141
+Akkhor (+ device fonts),pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.0,1.0,37.331
+MuPDF,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.95233,0.0,2.325
+PDFium,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.95233,0.0,2.765
+Poppler,pdf/bn.bijoy.chrome.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,as produced,0.95233,0.0,13.232
+Akkhor,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,0.0,1.0,45.061
+Akkhor (+ device fonts),pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,0.0,1.0,33.988
+MuPDF,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,1.10064,0.0,2.289
+PDFium,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,0.99682,0.0,2.779
+Poppler,pdf/bn.bijoy.chrome.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),Chrome,no ToUnicode,1.10064,0.0,8.209
+Akkhor,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.0,1.0,31.058
+Akkhor (+ device fonts),pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.0,1.0,32.461
+MuPDF,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.95233,0.0,2.074
+PDFium,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.95233,0.0,1.489
+Poppler,pdf/bn.bijoy.libreoffice.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,as produced,0.95233,0.0,9.754
+Akkhor,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.0,1.0,46.382
+Akkhor (+ device fonts),pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.0,1.0,39.505
+MuPDF,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.95657,0.0,2.118
+PDFium,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.95445,0.0,1.061
+Poppler,pdf/bn.bijoy.libreoffice.raw.pdf,Bangla (Bijoy),prose,SutonnyMJ (Bijoy),LibreOffice,no ToUnicode,0.95233,0.0,8.213

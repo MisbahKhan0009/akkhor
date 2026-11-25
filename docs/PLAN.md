@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 3 planned)
+Last updated: 2026-11-25 (Phase 3 done)
 
 ---
 
@@ -150,7 +150,7 @@ Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point
 
 Review: [reviews/phase-2.md](reviews/phase-2.md), 16 findings; the wrong-output ones fixed (Unicode "OMJ" fonts treated as Bijoy, learning from malformed candidates, Assamese spellings claiming Bangla glyphs). Carried forward: Chrome's synthetic bold (Type 3 fonts), fonts the engine does not know, no real-world PDFs in the corpus yet, UTF-16 positions for read-aloud.
 
-### Phase 3: PDF speed, memory and size 🔄
+### Phase 3: PDF speed, memory and size ✅
 
 Detailed design: [phases/phase-3.md](phases/phase-3.md). Measured starting point: night and dusk themes make PDF text invisible (dark text drawn on the dark background); cold open of a 2,000-page PDF takes 333 ms because every page dictionary is read at open; each zoomed tile re-interprets the whole page; the arm64 library is 6.27 MB.
 
@@ -162,6 +162,10 @@ Detailed design: [phases/phase-3.md](phases/phase-3.md). Measured starting point
 6. Library size: packed relocations, size-optimised cold code, JBIG2/JPEG 2000/CCITT as switches, standard fonts from a file. Target revised to 3.5 MB for all formats (the PDF text recovery needs the shaper), under 3 MB for PDF-only without rare codecs.
 7. Case study material (`docs/case-study/`): reproducible comparison with MuPDF, PDFium and Poppler (Indic text accuracy, search, open time, render time, memory, size, robustness), charts, a long-form draft and a LinkedIn post draft. From now on every phase adds its numbers to `docs/case-study/data/history.csv`.
 8. CI benchmarks and the review.
+
+Results: night, dusk and sepia work on PDFs with photos kept in colour; cold open of the 2,000-page PDF 333 → 12 ms on CI; redraw of an Indic page 5.4 → 3.0 ms; later tiles of a page about 1.1 ms against 6.1 ms for the first; cancellation between tiles; `trimMemory`; outlines and thumbnails; arm64 library 6.42 → 5.81 MB (size target missed, revised). Comparison with MuPDF, PDFium and Poppler, figures and drafts in [`case-study/`](case-study/).
+
+Review: [reviews/phase-3.md](reviews/phase-3.md), 13 findings. Fixed: night-theme cost growing with the number of images on a page, the hayro version the render cache's `unsafe` relies on now pinned, benchmark load check. Carried forward: library size, redraw speed against MuPDF, memory on Indic pages, damaged-file recovery.
 
 ### Phase 4: Indic PDF reflow ⬜
 
@@ -175,6 +179,13 @@ Carried from the Phase 2 review:
 4. Reference fonts beyond Noto: a downloadable pack of freely licensed Bangla and Hindi fonts (SolaimanLipi, Kalpurush, Nikosh, ...), registered like the phone's own.
 5. UTF-16 positions in the Android API, for read-aloud highlighting.
 6. Kruti Dev / Chanakya, once a table can be verified against a corpus.
+
+Carried from the Phase 3 review:
+
+7. Library size: standard PDF fonts from a file, a `cargo bloat` pass on arm64, unused HarfRust tables. Target under 5.5 MB all formats, under 4.5 MB PDF only.
+8. Redraw speed: study recording a page once and replaying it per tile.
+9. Memory on Indic pages: share parsed fonts between text recovery and rendering.
+10. Damaged files: rebuild a broken cross-reference table by scanning for objects.
 
 ### Phase 5: More formats ⬜
 
@@ -194,7 +205,7 @@ After Phase 7 (or earlier, once Phases 1 to 3 land): the reader app, in its own 
 
 | Metric | Target | Spike |
 |---|---|---|
-| Engine `.so` size per CPU architecture, all formats | under 3 MB | 5.8 MB arm64 after Phase 1 (work planned in Phase 3) |
+| Engine `.so` size per CPU architecture, all formats | under 3 MB (revised: under 5.5 MB, see `docs/reviews/phase-3.md`) | 5.81 MB arm64 after Phase 3; PDF only 4.97 MB; EPUB and TXT 2.19 MB |
 | RAM while reading a 1 GB PDF | under 60 MB | 30 MB peak (308 MB file) |
 | First page, any file size | under 300 ms | PDF: 89 ms cold (laptop), 338 ms cold (CI disk), 5 to 13 ms warm. Long Bangla text: under 1 ms |
 | Reopen | under 100 ms | yes |

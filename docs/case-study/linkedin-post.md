@@ -4,7 +4,7 @@
 
 1. `copied-text-samples.png`: the hook, readable without any context
 2. `text-accuracy.png`
-3. `speed-big-pdf.png`
+3. `speed-big-pdf.png` (or `cold-open.png`)
 4. `themes.png`
 
 ---
@@ -36,11 +36,14 @@ Measured against MuPDF, PDFium (the engine inside Chrome) and Poppler, on
 the font, the others 97 to 100%
 🔤 Bijoy PDFs: Akkhor 0%, the others about 96%
 🔎 Words you can find by search: Akkhor 100%, the others 86 to 97%
-⚡ A 2,000-page, 308 MB PDF: opens in 0.16 ms, last page drawn in 2.1 ms
-(MuPDF 9.6 ms, PDFium 13.3 ms)
+⚡ A 2,000-page, 308 MB PDF: opens in 0.16 ms, last page drawn in 2.2 ms
+(MuPDF 7.5 ms, PDFium 12.8 ms). Straight from disk, open + last page:
+13.5 ms (MuPDF 219 ms, PDFium 185 ms)
 
-It isn't ahead everywhere. MuPDF redraws a page faster, opens more damaged
-files, and uses less memory on Indic pages. Those are next on the list.
+It isn't ahead everywhere. MuPDF still redraws a page faster (1.1 ms vs
+3.0 ms, down from 5.4), opens more damaged files, and uses less memory on
+Indic pages. And I missed my library size target: 5.8 MB, not 3.5. Those
+are next on the list.
 Every number, chart and script is in the repo, so anyone can rerun it.
 
 Engine first, the Android reader next.

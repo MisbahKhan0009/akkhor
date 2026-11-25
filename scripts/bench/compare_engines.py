@@ -342,6 +342,11 @@ def write_csv(name, rows):
 
 
 def main():
+    # Timings are only fair on an idle machine: a build running alongside
+    # once skewed a whole run (Phase 3 review).
+    load = os.getloadavg()[0]
+    if load > 0.5:
+        print(f"warning: load average {load:.2f}; timings may be skewed. Wait for an idle machine.", file=sys.stderr)
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default="text,speed,memory,size,robustness")
     ap.add_argument("--quick", action="store_true", help="fewer runs and damaged files")

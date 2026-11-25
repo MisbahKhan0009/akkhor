@@ -18,3 +18,17 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-25,Phase 3.2,heap after open 2000-page PDF,1.0,MB,desktop,after lazy page tree
 2026-11-25,Phase 3.2,file touched at open 2000-page PDF,298,MB,desktop,before lazy page tree
 2026-11-25,Phase 3.2,file touched at open 2000-page PDF,7,MB,desktop,after lazy page tree
+2026-11-25,Phase 3.2,cold open 2000-page 308 MB PDF,12.0,ms,GitHub Actions ubuntu-latest,CI benchmark run 45570240434
+2026-11-25,Phase 3.3,redraw Bangla and Hindi page at 2x,5.4,ms,cloud VM 2 cores,data/speed.csv first comparison run (before shared render cache)
+2026-11-25,Phase 3.3,redraw Bangla and Hindi page at 2x,2.96,ms,cloud VM 2 cores,data/speed.csv (after shared render cache)
+2026-11-25,Phase 3.3,first 512x512 tile Indic page at 4x,6.1,ms,desktop,crates/akkhor-pdf/examples/cachegain.rs
+2026-11-25,Phase 3.3,later 512x512 tiles same page at 4x,1.1,ms,desktop,crates/akkhor-pdf/examples/cachegain.rs
+2026-11-25,Phase 3.4,heap after 200 pages read,2.1,MB,desktop,akkhor-bench session (before trim)
+2026-11-25,Phase 3.4,heap after 200 pages read,1.1,MB,desktop,akkhor-bench session (after trimMemory)
+2026-11-25,Phase 3.5,200 px thumbnail of a photo page,1.5,ms,desktop,akkhor-bench
+2026-11-25,Phase 3.6,arm64 Android library size,6.42,MB,GitHub Actions cargo-ndk,CI run 45567863438 (before 3.6)
+2026-11-25,Phase 3.6,arm64 Android library size,5.81,MB,GitHub Actions cargo-ndk,CI run 45570240434 (after 3.6)
+2026-11-25,Phase 3.6,x86_64 stripped library all formats,5.97,MB,cloud VM,before 3.6
+2026-11-25,Phase 3.6,x86_64 stripped library all formats,5.77,MB,cloud VM,data/size.csv (after 3.6)
+2026-11-25,Phase 3 review,night theme on a page with 100000 images at 2x (extra over paper),450,ms,cloud VM 2 cores,docs/reviews/phase-3.md (before fix)
+2026-11-25,Phase 3 review,night theme on a page with 100000 images at 2x (extra over paper),40,ms,cloud VM 2 cores,docs/reviews/phase-3.md (after fix)

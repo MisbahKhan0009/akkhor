@@ -179,8 +179,8 @@ def speed():
         labels, vals = ordered(pick("warm_render", 1, 2.0, f))
         bars(ax, labels, vals, lambda v: f"{v:.1f} ms", title, "milliseconds (best of 5, lower is better)")
     header(fig, "Drawing the same page a second time",
-           "MuPDF and PDFium keep what they parsed and decoded between draws; Akkhor does not yet "
-           "(planned in Phase 3.3).")
+           "Every engine keeps what it parsed between draws. Akkhor shares one render cache per document "
+           "since Phase 3.3 (5.4 → 3.0 ms on the first page); MuPDF stays ahead.")
     save(fig, "speed-redraw")
 
 
@@ -188,9 +188,11 @@ def cold_open():
     rows = read("cold_open.csv")
     if not rows:
         return
-    labels, vals = ordered({r["engine"]: float(r["cold_open_ms"]) for r in rows})
-    fig, ax = plt.subplots(figsize=(8, 2.8))
-    bars(ax, labels, vals, lambda v: f"{v:.1f} ms", "", "milliseconds (median of 3, lower is better)")
+    fig, axes = plt.subplots(1, 2, figsize=(11, 2.9), sharey=True)
+    for ax, (col, title) in zip(axes, [("cold_open_ms", "Open"),
+                                       ("cold_open_plus_last_page_ms", "Open and draw the last page (1x)")]):
+        labels, vals = ordered({r["engine"]: float(r[col]) for r in rows if r.get(col)})
+        bars(ax, labels, vals, lambda v: f"{v:.1f} ms", title, "milliseconds (median of 3, lower is better)")
     header(fig, "Opening the 2,000-page PDF straight from disk (cold cache)",
            "OS file cache dropped before every run. Poppler is left out: as a new process, "
            "its own start-up is also cold and would dominate.")
@@ -270,6 +272,34 @@ def progress():
         ax.tick_params(axis="y", length=0)
     header(fig, "Phase 3.2: reading the page tree lazily (2,000-page PDF)")
     save(fig, "progress-lazy-page-tree", note="Desktop, warm file cache. Source: docs/case-study/data/history.csv")
+
+    # Phase 3 as a whole: the first and last value of each metric, except the
+    # library size, compared with the build just before Phase 3.6.
+    def first_last(metric, before_where=None):
+        r = [x for x in rows if x["metric"] == metric]
+        if before_where:
+            r = [x for x in r if before_where in x["source"]] + [r[-1]]
+        return [float(r[0]["value"]), float(r[-1]["value"])] if len(r) >= 2 else None
+
+    panels = [("Cold open, 2,000-page PDF (ms, CI)", first_last("cold open 2000-page 308 MB PDF")),
+              ("Redraw a Bangla/Hindi page at 2x (ms)", first_last("redraw Bangla and Hindi page at 2x")),
+              ("Heap after reading 200 pages (MB)", first_last("heap after 200 pages read")),
+              ("Android arm64 library (MB)", first_last("arm64 Android library size", "before 3.6"))]
+    panels = [p for p in panels if p[1]]
+    fig, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 2.6))
+    for ax, (title, vals) in zip(axes, panels):
+        ax.barh([1, 0], vals, height=0.55, color=["#84b9f3", OURS], edgecolor="white", linewidth=2)
+        ax.set_yticks([1, 0], ["before", "after"])
+        ax.set_title(title, loc="left", fontsize=10)
+        top = max(vals) * 1.35
+        ax.set_xlim(0, top)
+        for yy, v in zip([1, 0], vals):
+            ax.text(v + top * 0.02, yy, f"{v:g}", va="center", fontsize=9)
+        for sp in ("top", "right", "left"):
+            ax.spines[sp].set_visible(False)
+        ax.tick_params(axis="y", length=0)
+    header(fig, "Phase 3: speed, memory and size, before and after")
+    save(fig, "progress-phase-3", note="Each value and where it was measured: docs/case-study/data/history.csv")
 
 
 # --- pictures made by the engine and by Chrome -----------------------------

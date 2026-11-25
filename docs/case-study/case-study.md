@@ -125,12 +125,17 @@ the others break some words with stray spaces.
 
 | | Open (warm) | Last page, 1x | Last page, 2x | Open from disk (cold) |
 |---|---|---|---|---|
-| **Akkhor** | **0.16 ms** | **2.1 ms** | **4.4 ms** | 3.0 ms |
-| MuPDF | 0.51 ms | 9.6 ms | 11.1 ms | 5.9 ms |
-| PDFium | 0.92 ms | 13.3 ms | 16.2 ms | **2.2 ms** |
-| Poppler | 2.8 ms* | 29.4 ms* | 33.6 ms* | n/a |
+| **Akkhor** | **0.16 ms** | **2.2 ms** | **4.5 ms** | 3.0 ms |
+| MuPDF | 0.38 ms | 7.5 ms | 11.2 ms | 5.8 ms |
+| PDFium | 0.91 ms | 12.8 ms | 15.8 ms | **2.6 ms** |
+| Poppler | 2.2 ms* | 24.4 ms* | 39.1 ms* | n/a |
 
 \* Poppler measured through its command-line tools, start-up subtracted.
+
+From a cold disk, opening the file *and* drawing its last page takes Akkhor
+13.5 ms, MuPDF 219 ms and PDFium 185 ms
+([`data/cold_open.csv`](data/cold_open.csv)): they read far more of the
+file to find page 2,000.
 
 The open time came from a change I made to the PDF parser: it used to read
 the dictionary of every page when the file was opened. Reading the page
@@ -139,6 +144,25 @@ opening from 6.6 MB to 1.0 MB, and the share of the file pulled into memory
 from 298 MB to 7 MB.
 
 ![Lazy page tree, before and after](figures/progress-lazy-page-tree.png)
+
+On the CI machine, opening the same file straight from disk went from
+333 ms to 12 ms.
+
+### Phase 3 in four numbers
+
+![Phase 3 before and after](figures/progress-phase-3.png)
+
+- **Cold open** of the 2,000-page PDF on CI: 333 → 12 ms.
+- **Redrawing** a Bangla and Hindi page at 2x: 5.4 → 3.0 ms. One render
+  cache is now shared by every page and tile of a document, so fonts,
+  glyph outlines and images are parsed once. Zoomed tiles of a page cost
+  about 1.1 ms each after the first (6.1 ms).
+- **A long reading session** grows the heap by about 7 KB a page; when
+  Android asks apps to trim memory, Akkhor reopens the file in under 1 ms
+  and drops back from 2.1 to 1.1 MB.
+- **The Android library** (arm64): 6.42 → 5.81 MB, with scan decoders
+  (JBIG2, CCITT, JPEG 2000) now a switch. A PDF-only build is 4.97 MB,
+  EPUB and text only 2.19 MB.
 
 ### Reading themes
 
@@ -161,19 +185,21 @@ hung**. MuPDF manages to open the most damaged files (180); Akkhor opens
 
 Being honest about this is part of the point:
 
-- **Drawing the same page again.** MuPDF and PDFium keep what they parsed
-  between draws; Akkhor does not yet. Redrawing the Bangla and Hindi page
-  takes 5.4 ms against MuPDF's 0.9 ms
-  ([`figures/speed-redraw.png`](figures/speed-redraw.png)). Sharing the
-  render cache between tiles is the next step.
-- **Memory on an Indic page at 2x:** 11.9 MB added against 7.7 to 9.1 MB
-  for the others ([`figures/memory.png`](figures/memory.png)).
+- **Drawing the same page again.** Sharing the render cache took Akkhor
+  from 5.4 to 3.0 ms on the Bangla and Hindi page, ahead of PDFium (3.7 ms)
+  but still behind MuPDF (1.1 ms), which records a page once and replays
+  it ([`figures/speed-redraw.png`](figures/speed-redraw.png)).
+- **Memory on an Indic page at 2x:** 11.4 MB added against 7.7 to 9.1 MB
+  for the others ([`figures/memory.png`](figures/memory.png)): fonts are
+  parsed once for text recovery and again for drawing.
 - **Damaged files:** MuPDF recovers more of them.
 - **Unknown fonts with no text layer:** if neither the PDF nor the phone
   has the font, there is nothing to recover from.
-- **Library size:** 6.8 MB on Linux with all formats and Indic shaping, the
-  same as PDFium (PDF only) and far below MuPDF (36 MB), but above my
-  3.5 MB target for Android.
+- **Library size:** 5.8 MB on Linux and on Android (arm64) with all
+  formats and Indic shaping: smaller than PDFium (6.7 MB, PDF only) and far
+  below MuPDF (36 MB), but I missed my 3.5 MB target. Most of what is left
+  is the shaper and font parsers, which both EPUB layout and PDF text
+  recovery need.
 
 ## What I got wrong along the way
 
@@ -190,6 +216,12 @@ Being honest about this is part of the point:
   background) and no test caught it; I only found it when I measured
   everything before planning Phase 3. A render test now checks the colour
   of text, background and images in every theme.
+- I set a 3 MB, then 3.5 MB, size target before knowing what Indic text
+  recovery would need. Measuring every build showed the floor; the target
+  is now 5.5 MB and the reasons are in the Phase 3 review.
+- The review of the night theme found a page that draws 100,000 small
+  images made it 450 ms slower, because every pixel was checked against
+  every image. A row-by-row sweep brought that to 40 ms.
 
 ## How it was built
 
