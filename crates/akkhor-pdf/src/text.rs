@@ -162,6 +162,33 @@ impl<'g> GlyphPiece<'g> {
 /// Groups glyph pieces into lines and paragraphs. Glyphs are taken in
 /// drawing order, which for text is reading order; a new line starts when
 /// the baseline moves or the pen jumps back to the left.
+/// The smallest gap, in ems, that counts as a space on this line.
+///
+/// Producers that draw no space glyphs (XeLaTeX, InDesign) leave gaps that a
+/// justified line squeezes to about 0.2 em, while the gaps between the
+/// glyphs of a word are zero or kerning-sized. The line's own word gaps
+/// set the threshold: 60% of their median, between 0.1 and 0.22 em.
+fn word_gap(line: &[&PdfGlyph]) -> f32 {
+    const DEFAULT: f32 = 0.22;
+    let mut pen_end: Option<f32> = None;
+    let mut gaps: Vec<f32> = Vec::new();
+    for g in line {
+        if let Some(end) = pen_end {
+            let gap = (g.origin.0 - end) / g.size.max(1.0);
+            if (0.1..1.5).contains(&gap) {
+                gaps.push(gap);
+            }
+        }
+        let end = g.origin.0 + g.advance;
+        pen_end = Some(pen_end.map_or(end, |e: f32| e.max(end)));
+    }
+    if gaps.len() < 2 {
+        return DEFAULT;
+    }
+    gaps.sort_by(f32::total_cmp);
+    (gaps[gaps.len() / 2] * 0.6).clamp(0.1, DEFAULT)
+}
+
 pub(crate) fn assemble(
     page: &PageGlyphs,
     mut word_pieces: impl for<'g> FnMut(&[&'g PdfGlyph]) -> Vec<GlyphPiece<'g>>,
@@ -192,8 +219,20 @@ pub(crate) fn assemble(
         // space the PDF did not draw. Reordering then stays inside a word.
         let mut spans: Vec<Range<usize>> = Vec::new();
         let mut pen_end: Option<f32> = None;
+        let threshold = word_gap(&line);
         for (i, g) in line.iter().enumerate() {
-            let gap = pen_end.is_some_and(|end| g.origin.0 - end > g.size * 0.22);
+            // A superscript (a footnote marker) is a word of its own: smaller
+            // and raised or lowered against its neighbour.
+            let shifted = i > 0 && {
+                let p = line[i - 1];
+                let (big, small) = if p.size > g.size {
+                    (p.size, g.size)
+                } else {
+                    (g.size, p.size)
+                };
+                big > small * 1.3 && (p.origin.1 - g.origin.1).abs() > small * 0.15
+            };
+            let gap = shifted || pen_end.is_some_and(|end| g.origin.0 - end > g.size * threshold);
             // Marks are positioned back over their base: the pen is at the
             // furthest point reached, not where the last glyph ended.
             let end = g.origin.0 + g.advance;
