@@ -9,7 +9,7 @@ use akkhor_pdf::PdfDocument;
 
 fn ink(pdf: &PdfDocument) -> usize {
     let page = pdf.render_page(0, 1.0, &Theme::ORIGINAL).unwrap();
-    page.pixels.chunks_exact(4).filter(|p| p[0] < 128).count()
+    page.pixels.as_chunks::<4>().0.iter().filter(|p| p[0] < 128).count()
 }
 
 #[test]
