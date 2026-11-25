@@ -67,6 +67,8 @@ pub struct PdfGlyph {
     /// For a Type 3 glyph without text: index into
     /// [`PageGlyphs::type3_shapes`].
     pub type3: Option<u32>,
+    /// Drawn from a Type 3 font (with or without text).
+    pub drawn_type3: bool,
 }
 
 /// The glyphs of one page and the fonts they use.
@@ -79,7 +81,15 @@ pub struct PageGlyphs {
     /// Shapes of the page's Type 3 glyphs that carry no text, with their
     /// advance (1000-unit ems), for recognition against reference fonts.
     pub type3_shapes: Vec<(crate::shape::Shape, f32)>,
+    /// A few shapes of Type 3 glyphs that do carry text, to tell whether
+    /// the page's Type 3 fonts are synthetic bold.
+    pub type3_probes: Vec<(crate::shape::Shape, f32)>,
+    /// Thin vertical lines drawn on the page (table cell borders).
+    pub vertical_rules: Vec<Rect>,
 }
+
+/// Type 3 glyphs with text pictured per page to tell synthetic bold.
+const TYPE3_PROBES: usize = 8;
 
 fn strip_subset_prefix(name: &str) -> String {
     match name.split_once('+') {
@@ -105,6 +115,7 @@ struct Collector {
     clips: Vec<Rect>,
     /// Type 3 glyphs already pictured: glyph cache key to shape index.
     type3_seen: std::collections::HashMap<u128, u32>,
+    type3_probed: std::collections::HashSet<u128>,
     /// While drawing a Type 3 glyph's procedure for its shape: the paths.
     capture: Option<BezPath>,
     /// Where each glyph was drawn: (font, glyph id, char code, x and y in
@@ -146,6 +157,7 @@ impl Collector {
             placed: Default::default(),
             clips: Vec::new(),
             type3_seen: Default::default(),
+            type3_probed: Default::default(),
             capture: None,
         }
     }
@@ -174,10 +186,39 @@ impl<'a> Device<'a> for Collector {
     fn draw_path(&mut self, path: &BezPath, props: DrawProps<'a>, mode: &DrawMode) {
         // Capturing a Type 3 glyph: the fill is the glyph; a stroke on top
         // only makes it bolder.
-        if let Some(out) = self.capture.as_mut()
-            && matches!(mode, DrawMode::Fill(_) | DrawMode::FillAndStroke(..))
-        {
-            out.extend(props.transform * path.clone());
+        if let Some(out) = self.capture.as_mut() {
+            if matches!(mode, DrawMode::Fill(_) | DrawMode::FillAndStroke(..)) {
+                out.extend(props.transform * path.clone());
+            }
+            return;
+        }
+        // Vertical rules: table cell borders, which split a line of text
+        // into cells even where the gap is narrow or the table short.
+        if !crate::theme::shows_on_white(&props.paint) {
+            return;
+        }
+        let path = props.transform * path.clone();
+        match mode {
+            DrawMode::Fill(_) => {
+                let b = path.bounding_box();
+                if b.width() <= 2.5 && b.height() >= 4.0 {
+                    self.out.vertical_rules.push(b);
+                }
+            }
+            DrawMode::Stroke(_) | DrawMode::FillAndStroke(..) => {
+                for seg in path.segments() {
+                    if let hayro::kurbo::PathSeg::Line(l) = seg
+                        && (l.p0.x - l.p1.x).abs() < 0.5
+                        && (l.p0.y - l.p1.y).abs() >= 4.0
+                    {
+                        let (x, y0, y1) = (l.p0.x, l.p0.y.min(l.p1.y), l.p0.y.max(l.p1.y));
+                        self.out
+                            .vertical_rules
+                            .push(Rect::new(x - 0.25, y0, x + 0.25, y1));
+                    }
+                }
+            }
+            DrawMode::Invisible => {}
         }
     }
     fn push_clip_path(&mut self, clip: &ClipPath) {
@@ -262,8 +303,20 @@ impl<'a> Device<'a> for Collector {
                         }
                     }
                 }
+                Glyph::Type3(t3) => {
+                    let key = hayro::hayro_interpret::CacheKey::cache_key(&**t3)
+                        ^ u128::from(g.char_code()).rotate_left(64);
+                    if self.out.type3_probes.len() < TYPE3_PROBES && self.type3_probed.insert(key) {
+                        let shape = type3_shape(t3, &props.paint);
+                        if !shape.is_empty() {
+                            self.out.type3_probes.push((shape, advance_units));
+                        }
+                    }
+                    None
+                }
                 _ => None,
             };
+            let drawn_type3 = matches!(&**g, Glyph::Type3(_));
             // Clipped away: its middle is outside the clip.
             let middle = Point::new((origin.x + end.x) / 2.0, origin.y - 0.3 * size as f64);
             if self
@@ -314,6 +367,7 @@ impl<'a> Device<'a> for Collector {
                 artifact,
                 bold: stroked,
                 type3,
+                drawn_type3,
             });
         }
     }

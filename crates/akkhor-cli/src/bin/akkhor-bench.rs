@@ -123,6 +123,7 @@ fn run(args: &[String]) -> Result<String, String> {
                     let (kind, level) = match b.kind {
                         akkhor::flow::BlockKind::Heading(l) => ("heading", l),
                         akkhor::flow::BlockKind::Image => ("image", 0),
+                        akkhor::flow::BlockKind::Quote => ("card", 0),
                         _ if b.style.font_scale.is_some_and(|s| s < 1.0) => ("footnote", 0),
                         _ => ("paragraph", 0),
                     };

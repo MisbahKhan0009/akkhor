@@ -121,6 +121,11 @@ impl Shape {
         (covered as f32 / mine as f32).min(inside as f32 / theirs as f32)
     }
 
+    /// Cells inked.
+    pub fn ink(&self) -> u32 {
+        self.0.iter().map(|r| r.count_ones()).sum()
+    }
+
     /// Overlap with `other`: shared cells over cells in either.
     pub fn similarity(&self, other: &Shape) -> f32 {
         let (mut both, mut either) = (0u32, 0u32);

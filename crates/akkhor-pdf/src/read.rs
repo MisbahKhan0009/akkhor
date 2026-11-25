@@ -178,10 +178,25 @@ pub(crate) fn word_pieces<'g>(
                 }
                 // ... or draws the cluster's base before the span and puts
                 // only its marks inside, with the whole cluster's text.
+                // The text spells a reph first (র্ড) though the base was
+                // drawn first: the base's letters follow it.
+                let after_reph: String = {
+                    let mut c = text.chars();
+                    match (c.next(), c.next()) {
+                        (Some(r), Some(v))
+                            if matches!(r, '\u{09B0}' | '\u{0930}')
+                                && matches!(v, '\u{09CD}' | '\u{094D}') =>
+                        {
+                            c.collect()
+                        }
+                        _ => String::new(),
+                    }
+                };
                 if last_span.is_none()
                     && let Some(prev) = out.last_mut()
                     && !prev.text.is_empty()
-                    && text.starts_with(prev.text.as_str())
+                    && (text.starts_with(prev.text.as_str())
+                        || after_reph.starts_with(prev.text.as_str()))
                     && word[i..i + n].iter().all(|x| sits_over(x, prev.rect))
                 {
                     prev.text = text.clone();

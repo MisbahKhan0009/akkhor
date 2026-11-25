@@ -31,7 +31,7 @@ fn main() {
         "{:?}",
         texts
             .iter()
-            .map(|t| t.as_ref().map(|t| t.text.clone()))
+            .map(|t| t.as_ref().map(|t| (t.text.text.clone(), t.bolder)))
             .collect::<Vec<_>>()
     );
 }

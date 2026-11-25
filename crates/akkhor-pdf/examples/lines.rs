@@ -7,6 +7,16 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let path = args.next().expect("file");
     let page: usize = args.next().map(|p| p.parse().unwrap()).unwrap_or(0);
+    // The repository's fonts, as the tests register them.
+    for dir in ["fonts", "tests/fonts"] {
+        for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            if e.path().extension().is_some_and(|x| x == "ttf") {
+                akkhor_pdf::register_reference_font(std::sync::Arc::new(
+                    std::fs::read(e.path()).unwrap(),
+                ));
+            }
+        }
+    }
     let doc = PdfDocument::open(&Source::open(&path).unwrap()).unwrap();
     let t = doc.page_text(page).unwrap();
     for (r, i) in t.lines.iter().zip(&t.line_info) {

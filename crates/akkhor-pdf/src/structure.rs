@@ -18,11 +18,16 @@
 //!    bottom band that repeats on nearby pages or is only a page number),
 //!    footnotes (small text below the body), headings (larger or bold and
 //!    short; levels by size).
+//!
+//! Before all that, [`tables`](crate::tables) finds tables and boxes: each
+//! is one item of the reading order, so a table's cells are never taken for
+//! columns, and a box's lines are read on their own, inside it.
 
 use std::ops::Range;
 
 use hayro::kurbo::Rect;
 
+use crate::tables::{self, Found, Table};
 use crate::text::{LineInfo, PageText};
 
 /// What a block is.
@@ -35,6 +40,8 @@ pub enum BlockKind {
     Image,
     /// Running header or footer, page number: left out of a reflow.
     Furniture,
+    /// A table; [`Block::table`] holds its cells.
+    Table,
 }
 
 /// A block of one page.
@@ -50,6 +57,12 @@ pub struct Block {
     pub region: usize,
     /// The block's first line starts indented from its region's left edge.
     pub indented: bool,
+    /// Inside a box (a card, a shaded or framed note).
+    pub boxed: bool,
+    /// Which box of the page, for a boxed block.
+    pub box_index: usize,
+    /// The cells of a [`BlockKind::Table`].
+    pub table: Option<Table>,
 }
 
 /// The blocks of one page, in reading order.
@@ -60,10 +73,13 @@ pub struct PageLayout {
     pub page: Rect,
 }
 
-/// One page's input: its text, its picture boxes and its size.
+/// One page's input: its text, its picture boxes, its rules and filled
+/// boxes (see [`tables`]) and its size.
 pub struct PageInput<'a> {
     pub text: &'a PageText,
     pub images: &'a [Rect],
+    pub rules: &'a [Rect],
+    pub fills: &'a [Rect],
     pub page: Rect,
 }
 
@@ -71,12 +87,38 @@ pub struct PageInput<'a> {
 enum Item {
     Line(usize),
     Image(usize),
+    Table(usize),
+    Box(usize),
+}
+
+/// A page with its tables and boxes found.
+struct Ctx<'p, 'a> {
+    p: &'p PageInput<'a>,
+    found: Found,
+    /// Line spacing on this page per text size (half points): the
+    /// smallest baseline step between consecutive lines of that size.
+    steps: Vec<(i32, f64)>,
 }
 
 /// Analyses a run of pages (a chapter).
 pub fn analyse(pages: &[PageInput<'_>]) -> Vec<PageLayout> {
     let body = body_size(pages);
-    let mut out: Vec<PageLayout> = pages.iter().map(|p| layout_page(p, body)).collect();
+    let mut out: Vec<PageLayout> = Vec::with_capacity(pages.len());
+    for p in pages {
+        // A one-row grid at the top of a page goes on a table that ended
+        // the page before with as many columns.
+        // (Furniture is not marked yet: the bottom band is skipped.)
+        let continues = out.last().and_then(|l: &PageLayout| {
+            let h = l.page.height().max(1.0);
+            l.blocks
+                .iter()
+                .rev()
+                .find(|b| (b.rect.y0 - l.page.y0) / h < 0.88)
+                .and_then(|b| b.table.as_ref())
+                .map(Table::columns)
+        });
+        out.push(layout_page(p, body, continues));
+    }
     mark_furniture(pages, &mut out, body);
     mark_footnotes(pages, &mut out, body);
     mark_headings(pages, &mut out, body);
@@ -115,20 +157,39 @@ fn info(text: &PageText, line: usize) -> &LineInfo {
 
 // --- 1. reading order -------------------------------------------------------
 
-fn rect_of(p: &PageInput<'_>, item: Item) -> Rect {
+fn rect_of(p: &Ctx<'_, '_>, item: Item) -> Rect {
     match item {
-        Item::Line(i) => info(p.text, i).rect,
-        Item::Image(i) => p.images[i],
+        Item::Line(i) => info(p.p.text, i).rect,
+        Item::Image(i) => p.p.images[i],
+        Item::Table(i) => p.found.tables[i].rect,
+        Item::Box(i) => p.found.boxes[i].0,
     }
 }
 
 /// Items in reading order, each with its region number.
-fn reading_order(p: &PageInput<'_>, body: f32) -> Vec<(usize, Item)> {
-    let mut items: Vec<Item> = (0..p.text.lines.len())
-        .filter(|&i| !line_text(p.text, i).trim().is_empty())
+fn reading_order(p: &Ctx<'_, '_>, body: f32) -> Vec<(usize, Item)> {
+    let mut taken = vec![false; p.p.text.lines.len()];
+    for l in p.found.tables.iter().flat_map(Table::lines) {
+        taken[l] = true;
+    }
+    for (_, ls) in &p.found.boxes {
+        for &l in ls {
+            taken[l] = true;
+        }
+    }
+    // Text over a picture (labels drawn on an illustration) is part of it:
+    // the picture block shows it.
+    let on_picture = |i: usize| {
+        let c = info(p.p.text, i).rect.center();
+        p.p.images.iter().any(|r| r.contains(c))
+    };
+    let mut items: Vec<Item> = (0..p.p.text.lines.len())
+        .filter(|&i| !taken[i] && !line_text(p.p.text, i).trim().is_empty() && !on_picture(i))
         .map(Item::Line)
         .collect();
-    items.extend((0..p.images.len()).map(Item::Image));
+    items.extend((0..p.p.images.len()).map(Item::Image));
+    items.extend((0..p.found.tables.len()).map(Item::Table));
+    items.extend((0..p.found.boxes.len()).map(Item::Box));
     let mut out = Vec::with_capacity(items.len());
     let mut region = 0;
     cut(p, items, body, 0, &mut region, &mut out);
@@ -141,7 +202,7 @@ fn reading_order(p: &PageInput<'_>, body: f32) -> Vec<(usize, Item)> {
 const MAX_CUT_DEPTH: usize = 24;
 
 fn cut(
-    p: &PageInput<'_>,
+    p: &Ctx<'_, '_>,
     mut items: Vec<Item>,
     body: f32,
     depth: usize,
@@ -285,19 +346,19 @@ fn cut(
     flush(&mut plain, region, out);
 }
 
-fn band_top(p: &PageInput<'_>, band: &[Item]) -> f64 {
+fn band_top(p: &Ctx<'_, '_>, band: &[Item]) -> f64 {
     band.iter()
         .map(|&it| rect_of(p, it).y0)
         .fold(f64::INFINITY, f64::min)
 }
 
 /// The middle of the widest gap, at least `min` wide, that no item crosses.
-fn vertical_gap(p: &PageInput<'_>, items: &[Item], min: f64) -> Option<f64> {
+fn vertical_gap(p: &Ctx<'_, '_>, items: &[Item], min: f64) -> Option<f64> {
     gap_interval(p, items, min).map(|(lo, hi)| (lo + hi) / 2.0)
 }
 
 /// The widest gap, at least `min` wide, that no item crosses: (left, right).
-fn gap_interval(p: &PageInput<'_>, items: &[Item], min: f64) -> Option<(f64, f64)> {
+fn gap_interval(p: &Ctx<'_, '_>, items: &[Item], min: f64) -> Option<(f64, f64)> {
     let mut spans: Vec<(f64, f64)> = items
         .iter()
         .map(|&it| {
@@ -319,9 +380,73 @@ fn gap_interval(p: &PageInput<'_>, items: &[Item], min: f64) -> Option<(f64, f64
 
 // --- 2. paragraphs -----------------------------------------------------------
 
-fn layout_page(p: &PageInput<'_>, body: f32) -> PageLayout {
-    let order = reading_order(p, body);
+fn layout_page(p: &PageInput<'_>, body: f32, continues: Option<usize>) -> PageLayout {
+    let lines: Vec<usize> = (0..p.text.lines.len())
+        .filter(|&i| !line_text(p.text, i).trim().is_empty())
+        .collect();
+    let mut found = tables::find(p.text, &lines, p.rules, p.fills, body);
+    if !found.one_row.is_empty() {
+        // The row goes on the table when it comes first on the page (below
+        // the running header) and has that table's columns.
+        let mut taken = vec![false; p.text.lines.len()];
+        for l in found
+            .tables
+            .iter()
+            .chain(&found.one_row)
+            .flat_map(Table::lines)
+        {
+            taken[l] = true;
+        }
+        let h = p.page.height().max(1.0);
+        let first_text = lines
+            .iter()
+            .filter(|&&l| !taken[l])
+            .map(|&l| info(p.text, l).rect.y0)
+            .filter(|y| (y - p.page.y0) / h > 0.12)
+            .fold(f64::INFINITY, f64::min);
+        let first_table = found
+            .tables
+            .iter()
+            .map(|t| t.rect.y0)
+            .fold(f64::INFINITY, f64::min);
+        let row = &found.one_row[0];
+        let on_top = row.rect.y0 < first_text && row.rect.y0 < first_table;
+        if found.one_row.len() == 1 && on_top && continues == Some(row.columns()) {
+            found.one_row_as_tables();
+        } else {
+            found.one_row_as_boxes();
+        }
+    }
+    let mut ctx = Ctx {
+        p,
+        found,
+        steps: Vec::new(),
+    };
+    let order = reading_order(&ctx, body);
+    // Line spacing over the page's running text: consecutive lines of each
+    // region, regions kept apart.
+    let mut regions: std::collections::BTreeMap<usize, Vec<usize>> = Default::default();
+    for (region, it) in &order {
+        if let Item::Line(l) = it {
+            regions.entry(*region).or_default().push(*l);
+        }
+    }
+    let mut flat: Vec<usize> = Vec::new();
+    for ls in regions.values() {
+        flat.extend(ls);
+        flat.push(usize::MAX);
+    }
+    ctx.steps = page_steps(p.text, &flat);
     let mut blocks: Vec<Block> = Vec::new();
+    by_region(&ctx, &order, body, &mut blocks);
+    PageLayout {
+        blocks,
+        page: p.page,
+    }
+}
+
+/// Blocks of items in reading order, region by region.
+fn by_region(ctx: &Ctx<'_, '_>, order: &[(usize, Item)], body: f32, blocks: &mut Vec<Block>) {
     let mut i = 0;
     while i < order.len() {
         let region = order[i].0;
@@ -329,21 +454,48 @@ fn layout_page(p: &PageInput<'_>, body: f32) -> PageLayout {
         while j < order.len() && order[j].0 == region {
             j += 1;
         }
-        paragraphs(p, &order[i..j], region, &mut blocks);
+        paragraphs(ctx, &order[i..j], region, body, blocks);
         i = j;
-    }
-    PageLayout {
-        blocks,
-        page: p.page,
     }
 }
 
-fn paragraphs(p: &PageInput<'_>, items: &[(usize, Item)], region: usize, out: &mut Vec<Block>) {
+/// Line spacing per text size (half points), over lists of lines (each a
+/// region in reading order) separated by `usize::MAX`: the smallest step
+/// between consecutive lines of one size, at least 0.9 of the size.
+/// Paragraph gaps, headings and figures only ever make steps larger.
+fn page_steps(text: &PageText, lines: &[usize]) -> Vec<(i32, f64)> {
+    let mut out: Vec<(i32, f64)> = Vec::new();
+    for w in lines.windows(2) {
+        if w.contains(&usize::MAX) {
+            continue;
+        }
+        let (a, b) = (info(text, w[0]), info(text, w[1]));
+        let step = f64::from(b.baseline - a.baseline);
+        if (a.size - b.size).abs() > a.size.min(b.size) * 0.05 || step < f64::from(a.size) * 0.9 {
+            continue;
+        }
+        let key = (a.size * 2.0).round() as i32;
+        match out.iter_mut().find(|(k, _)| *k == key) {
+            Some((_, s)) => *s = s.min(step),
+            None => out.push((key, step)),
+        }
+    }
+    out
+}
+
+fn paragraphs(
+    ctx: &Ctx<'_, '_>,
+    items: &[(usize, Item)],
+    region: usize,
+    body: f32,
+    out: &mut Vec<Block>,
+) {
+    let p = ctx.p;
     let lines: Vec<usize> = items
         .iter()
         .filter_map(|(_, it)| match it {
             Item::Line(l) => Some(*l),
-            Item::Image(_) => None,
+            _ => None,
         })
         .collect();
     let left = lines
@@ -354,20 +506,32 @@ fn paragraphs(p: &PageInput<'_>, items: &[(usize, Item)], region: usize, out: &m
         .iter()
         .map(|&l| info(p.text, l).rect.x1)
         .fold(f64::NEG_INFINITY, f64::max);
-    // The usual gap between consecutive lines of this region.
-    let mut gaps: Vec<f64> = lines
-        .windows(2)
-        .map(|w| f64::from(info(p.text, w[1]).baseline - info(p.text, w[0]).baseline))
-        .filter(|g| *g > 0.0)
-        .collect();
-    gaps.sort_by(f64::total_cmp);
-    let usual = gaps.get(gaps.len() / 4).copied();
+    // Line spacing for a line's size, from the whole page.
+    let usual_for = |size: f32| {
+        let key = (size * 2.0).round() as i32;
+        ctx.steps.iter().find(|(k, _)| *k == key).map(|(_, s)| *s)
+    };
     // Justified text: most lines reach the right edge.
     let full = lines
         .iter()
         .filter(|&&l| right - info(p.text, l).rect.x1 < f64::from(info(p.text, l).size) * 0.6)
         .count();
     let justified = lines.len() >= 3 && full * 10 >= lines.len() * 6;
+    // Centred text (a card, a title page): lines share their centre, not
+    // their left edge; length and indent say nothing about paragraphs.
+    let centred = lines.len() >= 2 && {
+        let mut mids: Vec<f64> = lines
+            .iter()
+            .map(|&l| info(p.text, l).rect.center().x)
+            .collect();
+        mids.sort_by(f64::total_cmp);
+        let mid = mids[mids.len() / 2];
+        let size = f64::from(body);
+        let lefts_differ = lines
+            .iter()
+            .any(|&l| (info(p.text, l).rect.x0 - left).abs() > size);
+        lefts_differ && mids.iter().all(|m| (m - mid).abs() < size * 0.6)
+    };
 
     let mut current: Option<Block> = None;
     let mut prev: Option<usize> = None;
@@ -384,23 +548,67 @@ fn paragraphs(p: &PageInput<'_>, items: &[(usize, Item)], region: usize, out: &m
                     rect: p.images[k],
                     region,
                     indented: false,
+                    boxed: false,
+                    box_index: 0,
+                    table: None,
                 });
+            }
+            Item::Table(k) => {
+                if let Some(b) = current.take() {
+                    out.push(b);
+                }
+                prev = None;
+                let t = &ctx.found.tables[k];
+                out.push(Block {
+                    kind: BlockKind::Table,
+                    lines: t.lines(),
+                    rect: t.rect,
+                    region,
+                    indented: false,
+                    boxed: false,
+                    box_index: 0,
+                    table: Some(t.clone()),
+                });
+            }
+            Item::Box(k) => {
+                if let Some(b) = current.take() {
+                    out.push(b);
+                }
+                prev = None;
+                // The box's lines, read on their own.
+                let (_, lines) = &ctx.found.boxes[k];
+                let inner = Ctx {
+                    p,
+                    found: Found::default(),
+                    steps: ctx.steps.clone(),
+                };
+                let mut order = Vec::new();
+                let mut r = 0;
+                let items = lines.iter().map(|&l| Item::Line(l)).collect();
+                cut(&inner, items, body, 0, &mut r, &mut order);
+                let start = out.len();
+                by_region(&inner, &order, body, out);
+                for b in &mut out[start..] {
+                    b.boxed = true;
+                    b.region = region;
+                    b.box_index = k;
+                }
             }
             Item::Line(l) => {
                 let li = info(p.text, l);
                 let size = f64::from(li.size.max(1.0));
-                let indented = li.rect.x0 - left > size * 0.8;
+                let indented = !centred && li.rect.x0 - left > size * 0.8;
                 let new_block = match prev {
                     None => true,
                     Some(q) => {
                         let lq = info(p.text, q);
                         let step = f64::from(li.baseline - lq.baseline);
-                        let wide = usual.is_some_and(|u| step > u * 1.18)
+                        let wide = usual_for(li.size).is_some_and(|u| step > u * 1.18)
                             || step > f64::from(lq.size.max(li.size)) * 2.2;
                         let restyled = (li.size - lq.size).abs() > lq.size.min(li.size) * 0.08
                             || li.bold != lq.bold;
                         let indent_starts = indented && lq.rect.x0 - left < size * 0.5;
-                        let short_before = justified && right - lq.rect.x1 > size * 2.0;
+                        let short_before = justified && !centred && right - lq.rect.x1 > size * 2.0;
                         wide || restyled || indent_starts || short_before
                     }
                 };
@@ -419,6 +627,9 @@ fn paragraphs(p: &PageInput<'_>, items: &[(usize, Item)], region: usize, out: &m
                             rect: li.rect,
                             region,
                             indented,
+                            boxed: false,
+                            box_index: 0,
+                            table: None,
                         })
                     }
                 }
@@ -488,7 +699,7 @@ fn mark_furniture(pages: &[PageInput<'_>], out: &mut [PageLayout], body: f32) {
         let page_box = layout.page;
         let rects: Vec<Rect> = layout.blocks.iter().map(|b| b.rect).collect();
         for (bi, b) in layout.blocks.iter_mut().enumerate() {
-            if b.kind == BlockKind::Image {
+            if matches!(b.kind, BlockKind::Image | BlockKind::Table) || b.boxed {
                 continue;
             }
             let tagged = b.lines.iter().all(|&l| info(p.text, l).artifact);
@@ -550,7 +761,7 @@ fn mark_footnotes(pages: &[PageInput<'_>], out: &mut [PageLayout], body: f32) {
             .map(|b| b.rect.y1)
             .fold(f64::NEG_INFINITY, f64::max);
         for b in &mut layout.blocks {
-            if b.kind != BlockKind::Paragraph {
+            if b.kind != BlockKind::Paragraph || b.boxed {
                 continue;
             }
             let small = block_size(p.text, b) < body * 0.88;
@@ -579,22 +790,56 @@ fn mark_headings(pages: &[PageInput<'_>], out: &mut [PageLayout], body: f32) {
     };
     let mut sizes: Vec<f32> = Vec::new();
     let mut found: Vec<(usize, usize, f32)> = Vec::new();
-    for (pi, (layout, p)) in out.iter_mut().zip(pages).enumerate() {
+    // The block after (pi, bi) in the chapter that is not furniture.
+    let next_of = |pi: usize, bi: usize| {
+        out.iter()
+            .zip(pages)
+            .enumerate()
+            .skip(pi)
+            .flat_map(|(qi, (l, p))| {
+                l.blocks
+                    .iter()
+                    .enumerate()
+                    .filter(move |(qb, _)| qi > pi || *qb > bi)
+                    .map(move |(_, b)| (b, p))
+            })
+            .find(|(b, _)| b.kind != BlockKind::Furniture)
+    };
+    for (pi, (layout, p)) in out.iter().zip(pages).enumerate() {
         for (bi, b) in layout.blocks.iter().enumerate() {
             if b.kind != BlockKind::Paragraph {
                 continue;
             }
             let size = block_size(p.text, b);
+            // Inside a box only a much larger line is a heading: a card's
+            // bold title is not one.
+            if b.boxed && size < body * 1.5 {
+                continue;
+            }
             let text = block_text(p.text, b);
             let chars = text.chars().count();
             let bold = b.lines.iter().all(|&l| info(p.text, l).bold);
-            let larger = size >= body * 1.1 && b.lines.len() <= 4;
+            // 1.08: LaTeX's \large over 11 pt text is 12 pt.
+            let larger = size >= body * 1.08 && b.lines.len() <= 4;
+            // A bold short line is a heading when body text follows it; a
+            // lead-in ending in a colon ("Examples:") introduces what
+            // follows and stays a paragraph.
+            let body_follows = next_of(pi, bi).is_some_and(|(n, np)| {
+                n.kind == BlockKind::Paragraph
+                    && !n.boxed
+                    && (block_size(np.text, n) - body).abs() < body * 0.1
+                    && !n.lines.iter().all(|&l| info(np.text, l).bold)
+            });
             let bold_short = bold
                 && !body_bold
                 && b.lines.len() <= 2
                 && chars <= 120
-                && !text.trim_end().ends_with(['.', '।', '॥', ',', ';']);
-            if larger || bold_short {
+                && !text.trim_end().ends_with(['.', '।', '॥', ',', ';', ':'])
+                && body_follows;
+            // A lead-in ("Difficulty level:") or a number is never one.
+            let lead_in = text.trim_end().ends_with(':');
+            let no_letters = !text.chars().any(char::is_alphabetic);
+            if (larger || bold_short) && !lead_in && !no_letters {
                 let key = (size * 2.0).round() / 2.0;
                 if !sizes.contains(&key) {
                     sizes.push(key);
@@ -603,6 +848,43 @@ fn mark_headings(pages: &[PageInput<'_>], out: &mut [PageLayout], body: f32) {
             }
         }
     }
+    // Three or more in a row, of one size, with nothing between them, are
+    // labels (around a picture, in a word list), not headings.
+    let order: Vec<(usize, usize)> = out
+        .iter()
+        .enumerate()
+        .flat_map(|(pi, l)| {
+            l.blocks
+                .iter()
+                .enumerate()
+                .filter(|(_, b)| b.kind != BlockKind::Furniture)
+                .map(move |(bi, _)| (pi, bi))
+        })
+        .collect();
+    let key_of = |pb: (usize, usize)| found.iter().find(|f| (f.0, f.1) == pb).map(|f| f.2);
+    let mut labels: std::collections::HashSet<(usize, usize)> = Default::default();
+    let mut run: Vec<(usize, usize)> = Vec::new();
+    let mut run_key: Option<f32> = None;
+    for &pb in order
+        .iter()
+        .chain(std::iter::once(&(usize::MAX, usize::MAX)))
+    {
+        let k = if pb.0 == usize::MAX { None } else { key_of(pb) };
+        if k.is_some() && k == run_key {
+            run.push(pb);
+            continue;
+        }
+        if run.len() >= 3 {
+            labels.extend(run.iter().copied());
+        }
+        run.clear();
+        run_key = k;
+        if k.is_some() {
+            run.push(pb);
+        }
+    }
+    found.retain(|f| !labels.contains(&(f.0, f.1)));
+    sizes.retain(|s| found.iter().any(|f| f.2 == *s));
     sizes.sort_by(|a, b| b.total_cmp(a));
     for (pi, bi, key) in found {
         let level = sizes
@@ -677,6 +959,8 @@ mod tests {
         let pages = [PageInput {
             text: &t,
             images: &[],
+            rules: &[],
+            fills: &[],
             page: A5,
         }];
         let l = &analyse(&pages)[0];
@@ -696,6 +980,8 @@ mod tests {
         let pages = [PageInput {
             text: &t,
             images: &[],
+            rules: &[],
+            fills: &[],
             page: A5,
         }];
         let l = &analyse(&pages)[0];
@@ -724,6 +1010,8 @@ mod tests {
         let pages = [PageInput {
             text: &t,
             images: &[],
+            rules: &[],
+            fills: &[],
             page: A5,
         }];
         let l = &analyse(&pages)[0];
@@ -756,6 +1044,8 @@ mod tests {
             .map(|t| PageInput {
                 text: t,
                 images: &[],
+                rules: &[],
+                fills: &[],
                 page: A5,
             })
             .collect();
@@ -778,6 +1068,8 @@ mod tests {
         let pages = [PageInput {
             text: &t,
             images: &[],
+            rules: &[],
+            fills: &[],
             page: A5,
         }];
         let l = &analyse(&pages)[0];
@@ -804,11 +1096,102 @@ mod tests {
         let pages = [PageInput {
             text: &t,
             images: &[],
+            rules: &[],
+            fills: &[],
             page: Rect::new(0.0, 0.0, 400_000.0, 595.0),
         }];
         let l = &analyse(&pages)[0];
         let n: usize = l.blocks.iter().map(|b| b.lines.len()).sum();
         assert_eq!(n, 20_000);
+    }
+
+    #[test]
+    fn centred_lines_stay_one_paragraph() {
+        // A centred note: lines of different length share their centre;
+        // a shorter line is not an indent, nor the end of a paragraph.
+        let t = page(&[
+            (
+                40.0,
+                100.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (
+                40.0,
+                112.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (
+                90.0,
+                136.0,
+                330.0,
+                10.0,
+                false,
+                "a centred sentence that runs",
+            ),
+            (150.0, 148.0, 270.0, 10.0, false, "onto a line"),
+            (70.0, 160.0, 350.0, 10.0, false, "and a third, longer line."),
+        ]);
+        let pages = [PageInput {
+            text: &t,
+            images: &[],
+            rules: &[],
+            fills: &[],
+            page: A5,
+        }];
+        let l = &analyse(&pages)[0];
+        let texts: Vec<String> = l.blocks.iter().map(|b| block_text(&t, b)).collect();
+        assert_eq!(texts.len(), 2, "{texts:?}");
+    }
+
+    #[test]
+    fn bold_lead_in_ending_in_a_colon_is_not_a_heading() {
+        let t = page(&[
+            (
+                40.0,
+                100.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (40.0, 112.0, 200.0, 10.0, false, "more body text."),
+            (40.0, 130.0, 160.0, 10.0, true, "Remember these words:"),
+            (
+                40.0,
+                148.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (40.0, 160.0, 200.0, 10.0, false, "more body text."),
+            (40.0, 178.0, 160.0, 10.0, true, "A short bold heading"),
+            (
+                40.0,
+                196.0,
+                380.0,
+                10.0,
+                false,
+                "body text body text body text",
+            ),
+            (40.0, 208.0, 200.0, 10.0, false, "more body text."),
+        ]);
+        let pages = [PageInput {
+            text: &t,
+            images: &[],
+            rules: &[],
+            fills: &[],
+            page: A5,
+        }];
+        let k = kinds(&analyse(&pages)[0], &t);
+        assert_eq!(k[1], (BlockKind::Paragraph, "Remember these words:".into()));
+        assert_eq!(k[3], (BlockKind::Heading(1), "A short bold heading".into()));
     }
 
     #[test]
@@ -829,6 +1212,8 @@ mod tests {
             let pages = [PageInput {
                 text: t,
                 images: &[],
+                rules: &[],
+                fills: &[],
                 page: A5,
             }];
             let l = &analyse(&pages)[0];

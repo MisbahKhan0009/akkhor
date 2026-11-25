@@ -177,14 +177,18 @@ impl OutlinePen for PathPen {
 /// same advance (synthetic bold keeps it) as a bolder copy of them, and the
 /// best match is taken when it is near certain and clearly ahead of the
 /// next glyph. Shapes are `(shape, advance)` in 1000-unit ems.
-pub fn recognise(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
+///
+/// Each answer also says whether the shape is drawn bolder than the glyph
+/// it matched (more ink): Chrome draws synthetic bold this way, and the
+/// PDF says nothing else about it.
+pub fn recognise(shapes: &[(Shape, f32)]) -> Vec<Option<Recognised>> {
     // A book draws the same bold glyphs on page after page: answers are
     // kept (up to a few thousand shapes) so each is matched once.
-    type Seen = HashMap<(Shape, u32), Option<GlyphText>>;
+    type Seen = HashMap<(Shape, u32), Option<Recognised>>;
     static SEEN: OnceLock<Mutex<Seen>> = OnceLock::new();
     let seen = SEEN.get_or_init(|| Mutex::new(HashMap::new()));
     let key = |(s, a): &(Shape, f32)| (*s, a.round() as u32);
-    let known: Vec<Option<Option<GlyphText>>> = {
+    let known: Vec<Option<Option<Recognised>>> = {
         let seen = seen.lock().unwrap_or_else(|e| e.into_inner());
         shapes.iter().map(|k| seen.get(&key(k)).cloned()).collect()
     };
@@ -225,13 +229,21 @@ pub fn recognise(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
 /// tens of milliseconds, once.
 const MAX_PICTURED: usize = 24;
 
-fn match_shapes(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
+/// A Type 3 glyph read by its shape.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Recognised {
+    pub text: GlyphText,
+    /// Drawn with more ink than the font's own glyph: synthetic bold.
+    pub bolder: bool,
+}
+
+fn match_shapes(shapes: &[(Shape, f32)]) -> Vec<Option<Recognised>> {
     const MIN: f32 = 0.9;
     const MARGIN: f32 = 0.03;
     // Per shape: (score, text) of the best glyph, and the best score of a
     // glyph that reads differently (fonts hold look-alike variants of the
     // same letters, which must not count against each other).
-    let mut best: Vec<Option<(f32, GlyphText)>> = vec![None; shapes.len()];
+    let mut best: Vec<Option<(f32, GlyphText, u32)>> = vec![None; shapes.len()];
     let mut other: Vec<f32> = vec![0.0; shapes.len()];
     for font in references().into_iter().take(MAX_PICTURED) {
         let pictures = font.pictures();
@@ -256,18 +268,18 @@ fn match_shapes(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
                 };
                 let s = pic.bold_match(shape, &pic.dilated());
                 match &best[i] {
-                    Some((f, t)) if s <= *f => {
+                    Some((f, t, _)) if s <= *f => {
                         if t.text != text.text {
                             other[i] = other[i].max(s);
                         }
                     }
                     _ => {
-                        if let Some((f, t)) = &best[i]
+                        if let Some((f, t, _)) = &best[i]
                             && t.text != text.text
                         {
                             other[i] = other[i].max(*f);
                         }
-                        best[i] = Some((s, text.clone()));
+                        best[i] = Some((s, text.clone(), pic.ink()));
                     }
                 }
             }
@@ -275,9 +287,15 @@ fn match_shapes(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
     }
     best.into_iter()
         .zip(other)
-        .map(|(b, second)| {
-            let (score, text) = b?;
-            (score >= MIN && score - second >= MARGIN).then_some(text)
+        .zip(shapes)
+        .map(|((b, second), (shape, _))| {
+            let (score, text, ink) = b?;
+            (score >= MIN && score - second >= MARGIN).then(|| Recognised {
+                text,
+                // Emboldening grows every stroke by a fraction of the em:
+                // a few percent more ink at this resolution.
+                bolder: shape.ink() * 100 > ink * 106,
+            })
         })
         .collect()
 }

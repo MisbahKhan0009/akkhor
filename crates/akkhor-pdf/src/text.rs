@@ -249,7 +249,10 @@ impl<'g> GlyphPiece<'g> {
 /// it open. A loose justified line has wide word gaps too, but other lines
 /// of its paragraph run across them. Producers that draw
 /// a page row by row put both columns on one baseline.
-fn split_at_gutters(lines: Vec<Vec<&PdfGlyph>>) -> Vec<Vec<&PdfGlyph>> {
+///
+/// A gap a vertical rule runs through (a table's cell border) is always a
+/// split, however narrow.
+fn split_at_gutters<'g>(lines: Vec<Vec<&'g PdfGlyph>>, rules: &[Rect]) -> Vec<Vec<&'g PdfGlyph>> {
     // Gaps per line: (line, index of the glyph after the gap, x0, x1, size).
     let mut gaps: Vec<(usize, usize, f32, f32, f32)> = Vec::new();
     for (li, line) in lines.iter().enumerate() {
@@ -262,28 +265,95 @@ fn split_at_gutters(lines: Vec<Vec<&PdfGlyph>>) -> Vec<Vec<&PdfGlyph>> {
             end = end.max(g.origin.0 + g.advance);
         }
     }
-    if gaps.is_empty() {
+    let mut cuts: Vec<Vec<usize>> = vec![Vec::new(); lines.len()];
+    if !rules.is_empty() {
+        for (li, line) in lines.iter().enumerate() {
+            let mut end = f32::MIN;
+            for (i, g) in line.iter().enumerate() {
+                let (x0, x1) = (f64::from(end), f64::from(g.origin.0));
+                let y = f64::from(g.origin.1 - g.size * 0.3);
+                if i > 0
+                    && x1 - x0 > 1.0
+                    && rules
+                        .iter()
+                        .any(|r| r.center().x > x0 && r.center().x < x1 && r.y0 <= y && y <= r.y1)
+                {
+                    cuts[li].push(i);
+                }
+                end = end.max(g.origin.0 + g.advance);
+            }
+        }
+    }
+    if gaps.is_empty() && cuts.iter().all(Vec::is_empty) {
         return lines;
     }
-    let mut cuts: Vec<Vec<usize>> = vec![Vec::new(); lines.len()];
-    for &(li, i, x0, x1, _) in &gaps {
-        let lined_up = gaps
+    let baseline = |l: &[&PdfGlyph]| l.first().map_or(0.0, |g| g.origin.1);
+    let crosses = |l: &[&PdfGlyph], mid: f32| {
+        l.iter()
+            .any(|g| g.origin.0 < mid && mid < g.origin.0 + g.advance)
+    };
+    for &(li, i, x0, x1, size) in &gaps {
+        let partners: std::collections::HashSet<usize> = gaps
             .iter()
             .filter(|&&(lj, _, y0, y1, _)| lj != li && y0 < x1 && x0 < y1)
             .map(|&(lj, ..)| lj)
-            .collect::<std::collections::HashSet<_>>()
-            .len();
+            .collect();
         // Lines whose glyphs run across the middle of the gap: in a column
         // layout only full-width lines do; in a loose paragraph most do.
         let mid = (x0 + x1) / 2.0;
-        let crossing = lines
-            .iter()
-            .filter(|l| {
-                l.iter()
-                    .any(|g| g.origin.0 < mid && mid < g.origin.0 + g.advance)
-            })
-            .count();
-        if lined_up >= 4 && crossing < lined_up {
+        let crossing = lines.iter().filter(|l| crosses(l, mid)).count();
+        let columns = partners.len() >= 4 && crossing < partners.len();
+        // Table cells: a wide gap shared by at least two nearby rows (each
+        // at most six ems from the next), with no line of that stretch
+        // of the page running across the part of the gap they all leave
+        // open. Rows of a table are far fewer than a page's lines, so the
+        // page-wide count above misses them.
+        let table = x1 - x0 > size * 0.7 && {
+            // Per nearby line, its gap overlapping this one.
+            let mut near: Vec<(f32, f32, f32)> = gaps
+                .iter()
+                .filter(|&&(lj, _, y0, y1, s)| lj != li && y0 < x1 && x0 < y1 && y1 - y0 > s * 0.5)
+                .map(|&(lj, _, y0, y1, _)| (baseline(&lines[lj]), y0, y1))
+                .collect();
+            near.sort_by(|a, b| a.0.total_cmp(&b.0));
+            near.dedup_by(|a, b| a.0 == b.0);
+            let own = baseline(&lines[li]);
+            let reach = size * 6.0;
+            let (mut lo, mut hi) = (own, own);
+            let (mut open0, mut open1) = (x0, x1);
+            let mut rows = 0;
+            for &(b, y0, y1) in near.iter().filter(|n| n.0 > own) {
+                if b - hi > reach || y1.min(open1) - y0.max(open0) < size * 0.3 {
+                    break;
+                }
+                (hi, open0, open1, rows) = (b, open0.max(y0), open1.min(y1), rows + 1);
+            }
+            for &(b, y0, y1) in near.iter().rev().filter(|n| n.0 < own) {
+                if lo - b > reach || y1.min(open1) - y0.max(open0) < size * 0.3 {
+                    break;
+                }
+                (lo, open0, open1, rows) = (b, open0.max(y0), open1.min(y1), rows + 1);
+            }
+            // Some of the shared open part must stay free of every glyph of
+            // the stretch (a short cell's text may reach into it).
+            let mut ink: Vec<(f32, f32)> = lines
+                .iter()
+                .filter(|l| (lo..=hi).contains(&baseline(l)))
+                .flatten()
+                .map(|g| (g.origin.0, g.origin.0 + g.advance))
+                .filter(|&(a, b)| a < open1 && b > open0)
+                .collect();
+            ink.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let mut free = 0.0f32;
+            let mut at = open0;
+            for (a, b) in ink {
+                free = free.max(a - at);
+                at = at.max(b);
+            }
+            free = free.max(open1 - at);
+            rows >= 2 && free >= size * 0.25
+        };
+        if (columns || table) && !cuts[li].contains(&i) {
             cuts[li].push(i);
         }
     }
@@ -293,6 +363,8 @@ fn split_at_gutters(lines: Vec<Vec<&PdfGlyph>>) -> Vec<Vec<&PdfGlyph>> {
             out.push(line);
             continue;
         }
+        let mut cut = cut;
+        cut.sort_unstable();
         let mut start = 0;
         for c in cut {
             out.push(line[start..c].to_vec());
@@ -352,7 +424,7 @@ pub(crate) fn assemble(
         }
         lines.last_mut().expect("pushed").push(g);
     }
-    let lines = split_at_gutters(lines);
+    let lines = split_at_gutters(lines, &page.vertical_rules);
 
     let mut out = PageText::default();
     let mut prev_line: Option<(f32, f32, f32)> = None; // baseline, size, left

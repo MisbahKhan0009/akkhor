@@ -12,7 +12,7 @@
 use hayro::hayro_interpret::font::GlyphRun;
 use hayro::hayro_interpret::{
     BlendMode, ClipPath, Context, Device, DrawMode, DrawProps, Image, ImageDrawProps,
-    InterpreterCache, SoftMask, interpret_page,
+    InterpreterCache, Paint, SoftMask, interpret_page,
 };
 use hayro::hayro_syntax::object::{Array, Name, Object};
 use hayro::hayro_syntax::page::Page;
@@ -26,12 +26,98 @@ pub struct ImageBoxes(pub Vec<Rect>);
 
 struct Collector {
     boxes: Vec<Rect>,
-    /// Greyscale and 1-bit pictures too (for reflow), not only colour ones.
+    /// Greyscale and 1-bit pictures too (for reflow), not only colour ones,
+    /// and the vector shapes page structure looks at.
     all: bool,
+    rules: Vec<Rect>,
+    fills: Vec<Rect>,
+}
+
+/// The vector shapes of a page that page structure uses: thin lines
+/// (table rules, frames) and filled rectangles (shaded boxes, cells), in
+/// points from the top left. Glyphs are not paths here.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct VectorShapes {
+    pub rules: Vec<Rect>,
+    pub fills: Vec<Rect>,
+}
+
+/// Thinner than this (points) is a line, not an area.
+const RULE: f64 = 2.5;
+
+impl Collector {
+    fn rule(&mut self, r: Rect) {
+        let long = r.width().max(r.height());
+        if long >= 4.0 && r.width().min(r.height()) <= RULE {
+            self.rules.push(r);
+        }
+    }
+}
+
+/// The colour as painted over white, and whether it shows there.
+pub(crate) fn shows_on_white(paint: &Paint<'_>) -> bool {
+    match paint {
+        Paint::Color(c) => {
+            let [r, g, b, a] = c.to_rgba().premultiplied();
+            let over = |ch: f32| ch + (1.0 - a);
+            a > 0.05 && [r, g, b].into_iter().map(over).any(|ch| ch < 0.985)
+        }
+        // Shadings and patterns: drawn, but not a plain rule or box.
+        Paint::Pattern(_) => false,
+    }
 }
 
 impl<'a> Device<'a> for Collector {
-    fn draw_path(&mut self, _: &BezPath, _: DrawProps<'a>, _: &DrawMode) {}
+    fn draw_path(&mut self, path: &BezPath, props: DrawProps<'a>, mode: &DrawMode) {
+        if !self.all || !shows_on_white(&props.paint) {
+            return;
+        }
+        let path = props.transform * path.clone();
+        let (fill, stroke) = match mode {
+            DrawMode::Fill(_) => (true, None),
+            DrawMode::Stroke(s) => (false, Some(s)),
+            DrawMode::FillAndStroke(_, s) => (true, Some(s)),
+            DrawMode::Invisible => return,
+        };
+        if fill {
+            use hayro::kurbo::Shape;
+            let bb = path.bounding_box();
+            if bb.width().min(bb.height()) <= RULE {
+                self.rule(bb);
+            } else if bb.width() >= 12.0
+                && bb.height() >= 6.0
+                && path.area().abs() >= bb.area() * 0.85
+            {
+                // A rectangle, rounded corners allowed: not a glyph-like
+                // shape, a chart or a curve.
+                self.fills.push(bb);
+            }
+        }
+        if let Some(s) = stroke {
+            let scale = props.transform.determinant().abs().sqrt();
+            let half = (f64::from(s.line_width) * scale).max(0.3) / 2.0;
+            for seg in path.segments() {
+                if let hayro::kurbo::PathSeg::Line(l) = seg {
+                    let (a, b) = (l.p0, l.p1);
+                    if (a.y - b.y).abs() < 0.5 {
+                        self.rule(Rect::new(
+                            a.x.min(b.x),
+                            a.y - half,
+                            a.x.max(b.x),
+                            a.y + half,
+                        ));
+                    } else if (a.x - b.x).abs() < 0.5 {
+                        self.rule(Rect::new(
+                            a.x - half,
+                            a.y.min(b.y),
+                            a.x + half,
+                            a.y.max(b.y),
+                        ));
+                    }
+                }
+            }
+        }
+    }
     fn push_clip_path(&mut self, _: &ClipPath) {}
     fn push_transparency_group(&mut self, _: f32, _: Option<SoftMask<'a>>, _: BlendMode) {}
     fn draw_glyph_run(&mut self, _: &GlyphRun<'_, 'a>, _: DrawProps<'a>, _: &DrawMode) {}
@@ -102,11 +188,24 @@ pub(crate) fn image_boxes(page: &Page<'_>) -> ImageBoxes {
 
 /// Every raster picture on `page`, greyscale ones included (stencil masks
 /// are not pictures: they paint like text).
-pub(crate) fn picture_boxes(page: &Page<'_>) -> Vec<Rect> {
-    boxes(page, true).0
+/// All pictures of a page and its vector rules and filled boxes, for
+/// reflow, in one pass.
+pub(crate) fn page_shapes(page: &Page<'_>) -> (Vec<Rect>, VectorShapes) {
+    let c = collect(page, true);
+    (
+        c.boxes,
+        VectorShapes {
+            rules: c.rules,
+            fills: c.fills,
+        },
+    )
 }
 
 fn boxes(page: &Page<'_>, all: bool) -> ImageBoxes {
+    ImageBoxes(collect(page, all).boxes)
+}
+
+fn collect(page: &Page<'_>, all: bool) -> Collector {
     let (w, h) = page.render_dimensions();
     let cache = InterpreterCache::new();
     let transform: Affine = {
@@ -123,9 +222,11 @@ fn boxes(page: &Page<'_>, all: bool) -> ImageBoxes {
     let mut collector = Collector {
         boxes: Vec::new(),
         all,
+        rules: Vec::new(),
+        fills: Vec::new(),
     };
     interpret_page(page, &mut ctx, &mut collector);
-    ImageBoxes(collector.boxes)
+    collector
 }
 
 /// Whether a theme changes the page at all: black on white is the PDF as

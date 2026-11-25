@@ -21,6 +21,7 @@ pub mod reference;
 pub mod reflow;
 pub mod shape;
 pub mod structure;
+pub mod tables;
 pub mod text;
 mod theme;
 
@@ -278,10 +279,7 @@ impl PdfDocument {
         let mut sizes = Vec::with_capacity(around.len());
         for i in around.clone() {
             texts.push(self.page_text_cached(i)?);
-            let page = self.pdf.pages().get(i).ok_or(Error::OutOfRange)?;
-            shapes.push(reflow::PageShapes {
-                pictures: contain(|| theme::picture_boxes(page))?,
-            });
+            shapes.push(self.page_shapes(i)?);
             sizes.push(self.page_size(i)?);
         }
         let input: Vec<reflow::ReflowPage<'_>> = texts
@@ -296,6 +294,18 @@ impl PdfDocument {
             .collect();
         let own = pages.start - around.start..end - around.start;
         contain(|| reflow::reflow(around.start, &input, own))
+    }
+
+    /// The pictures, rules and filled boxes of a page, as page structure
+    /// sees them (points from the top left).
+    pub fn page_shapes(&self, index: usize) -> Result<reflow::PageShapes> {
+        let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
+        let (pictures, vector) = contain(|| theme::page_shapes(page))?;
+        Ok(reflow::PageShapes {
+            pictures,
+            rules: vector.rules,
+            fills: vector.fills,
+        })
     }
 
     /// The pictures of a reflow ([`reflow::image_source`] names), drawn
@@ -384,8 +394,9 @@ impl PdfDocument {
             .filter(|g| g.actual.is_none())
             .filter_map(|g| g.type3)
             .collect();
-        if !needed.is_empty() {
-            let wanted: Vec<(shape::Shape, f32)> = glyphs
+        let probes = glyphs.type3_probes.len();
+        if !needed.is_empty() || probes > 0 {
+            let mut wanted: Vec<(shape::Shape, f32)> = glyphs
                 .type3_shapes
                 .iter()
                 .enumerate()
@@ -397,19 +408,36 @@ impl PdfDocument {
                     }
                 })
                 .collect();
-            let texts = contain(|| reference::recognise(&wanted)).unwrap_or_default();
+            // Glyphs that carry text are matched only to see whether the
+            // page's Type 3 fonts are synthetic bold (Chrome's).
+            wanted.extend(glyphs.type3_probes.iter().copied());
+            let mut found = contain(|| reference::recognise(&wanted)).unwrap_or_default();
+            let probed = found.split_off(found.len().min(glyphs.type3_shapes.len()));
+            let votes: Vec<bool> = found
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| needed.contains(&(*i as u32)))
+                .chain(probed.iter().enumerate())
+                .filter_map(|(_, r)| r.as_ref().map(|r| r.bolder))
+                .collect();
+            if votes.iter().filter(|b| **b).count() * 2 > votes.len() {
+                for g in glyphs.glyphs.iter_mut().filter(|g| g.drawn_type3) {
+                    g.bold = true;
+                }
+            }
             let mut table = recover::Recovery::default();
-            for (i, t) in texts.into_iter().enumerate() {
+            for (i, t) in found.iter().enumerate() {
                 // A Type 3 glyph that draws nothing is a space.
                 if glyphs.type3_shapes[i].0.is_empty() {
                     table.blank.insert(TYPE3_IDS + i as u32);
                 }
-                if let Some(t) = t {
+                if let Some(t) = t.as_ref().filter(|_| needed.contains(&(i as u32))) {
                     table.indic |= t
+                        .text
                         .text
                         .chars()
                         .any(|c| akkhor_flow::script::indic_cat(c).is_some());
-                    table.map.insert(TYPE3_IDS + i as u32, t);
+                    table.map.insert(TYPE3_IDS + i as u32, t.text.clone());
                 }
             }
             if !table.map.is_empty() {
