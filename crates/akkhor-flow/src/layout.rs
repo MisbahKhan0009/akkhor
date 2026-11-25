@@ -9,6 +9,7 @@
 use std::ops::Range;
 
 use crate::fonts::{FontId, FontSet};
+use crate::hyphen::hyphenate;
 use crate::model::{BlockKind, Document};
 use crate::script::syllable_starts;
 use crate::shape::{ShapedGlyph, shape_paragraph};
@@ -142,12 +143,14 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
             let seg_range = seg_start..seg_start + segment.len();
             seg_start = seg_range.end + 1;
             let glyphs = shape_paragraph(segment, size, fonts);
+            let hyphen = shape_paragraph("-", size, fonts).first().copied();
             for (range, placed) in break_lines(
                 segment,
                 &glyphs,
                 avail - indent,
                 justify,
                 opts.margin_x + indent,
+                hyphen,
             ) {
                 if y + lh > bottom && !pages.last().is_some_and(|p| p.lines.is_empty()) {
                     pages.push(Page::default());
@@ -188,21 +191,52 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
     pages
 }
 
+/// Characters a line must not start with.
+fn no_line_start(c: char) -> bool {
+    matches!(
+        c,
+        '।' | '॥'
+            | ','
+            | '.'
+            | ';'
+            | ':'
+            | '!'
+            | '?'
+            | ')'
+            | ']'
+            | '}'
+            | '»'
+            | '”'
+            | '’'
+            | '—'
+            | '–'
+    )
+}
+
+/// Characters a line must not end with.
+fn no_line_end(c: char) -> bool {
+    matches!(c, '(' | '[' | '{' | '«' | '“' | '‘')
+}
+
 /// Breaks one shaped segment into lines. Returns each line's byte range and
-/// its glyphs with `x` set and `y` relative to the baseline.
+/// its glyphs with `x` set and `y` relative to the baseline. `hyphen` is the
+/// shaped hyphen glyph used when an English word is hyphenated.
 fn break_lines(
     text: &str,
     glyphs: &[ShapedGlyph],
     avail: f32,
     justify: bool,
     left: f32,
+    hyphen: Option<ShapedGlyph>,
 ) -> Vec<(Range<usize>, Vec<PlacedGlyph>)> {
     if text.trim().is_empty() {
         return Vec::new();
     }
     let bytes = text.as_bytes();
     // Break opportunities: after a run of spaces, or after a dash when both
-    // sides are real words (so বই-ই or e-mail stay together).
+    // sides are real words (so বই-ই or e-mail stay together). Never before
+    // closing punctuation (a line never starts with ।) or after opening
+    // punctuation.
     let mut breaks: Vec<usize> = Vec::new();
     for (i, c) in text.char_indices().skip(1) {
         let prev = text[..i].chars().next_back().unwrap_or(' ');
@@ -210,9 +244,14 @@ fn break_lines(
         let after_dash = matches!(prev, '-' | '\u{2013}' | '\u{2014}')
             && c != ' '
             && syllables_around(text, i) >= (2, 2);
-        if after_space || after_dash {
-            breaks.push(i);
+        if !(after_space || after_dash) || no_line_start(c) {
+            continue;
         }
+        let last_word_char = text[..i].trim_end().chars().next_back();
+        if last_word_char.is_some_and(no_line_end) {
+            continue;
+        }
+        breaks.push(i);
     }
     breaks.push(text.len());
 
@@ -225,6 +264,21 @@ fn break_lines(
             end -= 1;
         }
         glyphs[gi(a)..gi(end)].iter().map(|g| g.advance).sum()
+    };
+    let size = glyphs.first().map_or(16.0, |g| g.size);
+
+    // Where the English word starting at `from` may be hyphenated so that the
+    // line from `start` still fits (with the hyphen). Picks the latest point.
+    let hyphen_point = |start: usize, from: usize| -> Option<usize> {
+        let hy = hyphen?;
+        let word_end = text[from..]
+            .find(|c: char| !c.is_ascii_alphabetic())
+            .map_or(text.len(), |e| from + e);
+        hyphenate(&text[from..word_end])
+            .into_iter()
+            .rev()
+            .map(|p| from + p)
+            .find(|&p| width(start, p) + hy.advance <= avail)
     };
 
     let mut lines = Vec::new();
@@ -239,44 +293,76 @@ fn break_lines(
                 break;
             }
         }
+        let mut hyphenated = false;
         let end = match end {
+            // Lots of room left and an English word next: hyphenate it.
+            Some(e) if e < text.len() && avail - width(start, e) > size * 2.0 => {
+                match hyphen_point(start, e) {
+                    Some(p) => {
+                        hyphenated = true;
+                        p
+                    }
+                    None => e,
+                }
+            }
             Some(e) => e,
             None => {
-                // The next word alone is too long: break it between syllables.
-                let word_end = breaks
-                    .iter()
-                    .copied()
-                    .find(|&b| b > start)
-                    .unwrap_or(text.len());
-                let syl: Vec<usize> = syllable_starts(&text[start..word_end])
-                    .into_iter()
-                    .map(|s| s + start)
-                    .filter(|&s| s > start)
-                    .collect();
-                let mut cut = syl.first().copied().unwrap_or(word_end);
-                for s in syl {
-                    if width(start, s) <= avail {
-                        cut = s;
-                    } else {
-                        break;
+                if let Some(p) = hyphen_point(start, start) {
+                    hyphenated = true;
+                    p
+                } else {
+                    // The next word alone is too long: break it between syllables.
+                    let word_end = breaks
+                        .iter()
+                        .copied()
+                        .find(|&b| b > start)
+                        .unwrap_or(text.len());
+                    let syl: Vec<usize> = syllable_starts(&text[start..word_end])
+                        .into_iter()
+                        .map(|s| s + start)
+                        .filter(|&s| s > start)
+                        .collect();
+                    let mut cut = syl.first().copied().unwrap_or(word_end);
+                    for s in syl {
+                        if width(start, s) <= avail {
+                            cut = s;
+                        } else {
+                            break;
+                        }
                     }
+                    cut
                 }
-                cut
             }
         };
         let is_last = end >= text.len();
-        lines.push((
-            start..end,
-            place(
-                text,
-                glyphs,
-                gi(start),
-                gi(end),
-                avail,
-                justify && !is_last,
-                left,
-            ),
-        ));
+        let mut placed = place(
+            text,
+            glyphs,
+            gi(start),
+            gi(end),
+            avail
+                - if hyphenated {
+                    hyphen.map_or(0.0, |h| h.advance)
+                } else {
+                    0.0
+                },
+            justify && !is_last,
+            left,
+        );
+        if hyphenated && let Some(h) = hyphen {
+            let pen = placed.last().map_or(left, |g| g.pen + g.advance);
+            placed.push(PlacedGlyph {
+                font: h.font,
+                glyph: h.glyph,
+                x: pen + h.x_offset,
+                y: -h.y_offset,
+                size: h.size,
+                cluster: end,
+                pen,
+                advance: h.advance,
+            });
+        }
+        lines.push((start..end, placed));
         start = end;
     }
     lines
@@ -319,7 +405,7 @@ fn place(
         let per = (avail - natural) / spaces as f32;
         // Very loose lines look worse justified than ragged.
         let size = line.first().map_or(16.0, |g| g.size);
-        if per > 0.0 && per < size * 0.45 {
+        if per > 0.0 && per < size * 0.6 {
             extra = per;
         }
     }
@@ -370,6 +456,43 @@ mod tests {
                 "line starts mid-syllable: {:?}",
                 &word[l.range.clone()]
             );
+        }
+    }
+
+    #[test]
+    fn lines_never_start_with_closing_punctuation() {
+        let fonts = FontSet::bundled();
+        let text = "আমি বাংলায় গান গাই । ".repeat(30);
+        let doc = Document::from_plain_text(&text);
+        let pages = paginate(&doc, &LayoutOptions::default(), &fonts);
+        for l in &pages[0].lines {
+            let t = &doc.blocks[0].text[l.range.clone()];
+            assert!(!t.starts_with('।'), "line starts with danda: {t}");
+        }
+    }
+
+    #[test]
+    fn english_words_get_hyphenated() {
+        let fonts = FontSet::bundled();
+        let text = "Internationalization considerations notwithstanding, hyphenation substantially improves justification. ".repeat(8);
+        let doc = Document::from_plain_text(&text);
+        let opts = LayoutOptions {
+            width: 700.0,
+            ..Default::default()
+        };
+        let pages = paginate(&doc, &opts, &fonts);
+        let lines = &pages[0].lines;
+        let hyphenated = lines
+            .iter()
+            .filter(|l| {
+                let t = &doc.blocks[0].text;
+                l.range.end < t.len() && t.as_bytes()[l.range.end - 1].is_ascii_alphabetic()
+            })
+            .count();
+        assert!(hyphenated > 0, "expected at least one hyphenated line");
+        // Text is preserved: lines cover the block without gaps.
+        for w in lines.windows(2) {
+            assert_eq!(w[0].range.end, w[1].range.start);
         }
     }
 

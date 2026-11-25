@@ -9,7 +9,9 @@ repository.workspace = true
 authors.workspace = true
 
 [features]
-default = []
+default = ["hyphenation"]
+# English hyphenation patterns (31 KB).
+hyphenation = []
 # Compiles Noto Serif (Latin), Noto Serif Bengali and Noto Serif Devanagari
 # into the binary. Handy for tests and the CLI; apps should instead point the
 # engine at font files on disk, which are memory-mapped on first use.

@@ -1,0 +1,8 @@
+hyph-en-us.pat.txt and hyph-en-us.hyp.txt: hyphenation patterns for American English,
+from the hyph-utf8 package (https://www.hyphenation.org/tex), version 2005-05-30.
+
+Copyright (C) 1990, 2004, 2005 Gerard D.C. Kuiken
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.

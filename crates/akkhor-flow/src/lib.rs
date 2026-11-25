@@ -14,6 +14,7 @@
 //! 5. [`paint`]: drawing a page into a pixel buffer.
 
 pub mod fonts;
+pub mod hyphen;
 pub mod layout;
 pub mod markup;
 pub mod model;
