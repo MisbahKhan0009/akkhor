@@ -93,14 +93,18 @@ struct Collector {
 pub(crate) fn text_string(bytes: &[u8]) -> String {
     match bytes {
         [0xFE, 0xFF, rest @ ..] => char::decode_utf16(
-            rest.chunks_exact(2)
-                .map(|p| u16::from_be_bytes([p[0], p[1]])),
+            rest.as_chunks::<2>()
+                .0
+                .iter()
+                .map(|&p| u16::from_be_bytes(p)),
         )
         .map(|c| c.unwrap_or('\u{FFFD}'))
         .collect(),
         [0xFF, 0xFE, rest @ ..] => char::decode_utf16(
-            rest.chunks_exact(2)
-                .map(|p| u16::from_le_bytes([p[0], p[1]])),
+            rest.as_chunks::<2>()
+                .0
+                .iter()
+                .map(|&p| u16::from_le_bytes(p)),
         )
         .map(|c| c.unwrap_or('\u{FFFD}'))
         .collect(),
