@@ -358,6 +358,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_rectsOfRange(
                     offset: o1,
                 },
             ) => {
+                #[allow(irrefutable_let_patterns)]
                 let Book::Pdf(pdf) = &hd.book else {
                     return Err("not a PDF".into());
                 };
