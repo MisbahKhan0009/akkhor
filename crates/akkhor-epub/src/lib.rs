@@ -9,6 +9,7 @@ pub mod zip;
 use akkhor_core::{Error, Result, Source};
 use akkhor_flow::Document;
 use akkhor_flow::markup::{Token, Tokenizer};
+use akkhor_flow::search::{Match, find_all};
 
 use crate::zip::ZipArchive;
 
@@ -157,6 +158,19 @@ impl EpubBook {
             doc.lang = self.metadata.language.clone();
         }
         Ok(doc)
+    }
+
+    /// Searches the whole book chapter by chapter, lazily: each chapter is
+    /// only inflated and parsed when the iterator reaches it, so the caller
+    /// can show the first hits at once and stop at any time.
+    pub fn search<'a>(&'a self, query: &'a str) -> impl Iterator<Item = (usize, Match)> + 'a {
+        (0..self.chapter_count()).flat_map(move |i| {
+            self.chapter(i)
+                .map(|doc| find_all(&doc, query))
+                .unwrap_or_default()
+                .into_iter()
+                .map(move |m| (i, m))
+        })
     }
 
     /// Raw bytes of any file in the book (images, CSS, fonts).
@@ -333,5 +347,10 @@ mod tests {
         assert!(!book.toc.is_empty());
         let ch = book.chapter(0).unwrap();
         assert!(ch.blocks.iter().any(|b| b.text.contains("ক্ষ")));
+        // ক্ষ is in the Bangla chapter (several times) and in the English one.
+        let hits: Vec<_> = book.search("ক্ষ").collect();
+        assert!(hits.iter().any(|(c, _)| *c == 0));
+        assert!(hits.iter().any(|(c, _)| *c == 2));
+        assert!(book.search("उज्ज्वल").any(|(c, _)| c == 1));
     }
 }

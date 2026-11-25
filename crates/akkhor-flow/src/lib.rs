@@ -19,6 +19,7 @@ pub mod markup;
 pub mod model;
 pub mod paint;
 pub mod script;
+pub mod search;
 pub mod select;
 pub mod shape;
 
@@ -27,4 +28,5 @@ pub use layout::{LayoutOptions, Line, Page, PlacedGlyph, paginate};
 pub use model::{Block, BlockKind, Document, Position, Style, StyleSpan};
 pub use paint::{GlyphCache, render_page};
 pub use script::Script;
+pub use search::{Match, find_all, snippet};
 pub use select::{Rect, hit_test, selection_rects, text_between, word_at};
