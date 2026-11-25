@@ -35,5 +35,6 @@ fn text_quality_says_when_fonts_are_missing() {
     ] {
         assert_eq!(q(good), 1.0, "{good}");
     }
-    assert_eq!(q("pdf/bn.chrome.raw.pdf"), 0.0);
+    // No text layer, in a font neither bundled nor registered.
+    assert_eq!(q("pdf/bn.hind.chrome.raw.pdf"), 0.0);
 }
