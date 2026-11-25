@@ -124,7 +124,10 @@ pub fn recover(data: &Data) -> Option<Recovery> {
     let own = build(data, false);
     let bytes = (**data).as_ref();
     if has_shaping_rules(bytes) {
-        return own;
+        return own.map(|mut r| {
+            r.complete = true;
+            r
+        });
     }
     let (embedded, blank) = outline_hashes(bytes);
     if embedded.is_empty() {
@@ -203,6 +206,7 @@ pub fn recover(data: &Data) -> Option<Recovery> {
     }
     out.max_sequence = out.sequences.keys().map(Vec::len).max().unwrap_or(0);
     out.blank = blank;
+    out.complete = true;
     (!out.map.is_empty()).then_some(out)
 }
 

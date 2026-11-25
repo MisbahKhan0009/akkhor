@@ -25,6 +25,19 @@ jobs:
       - run: cargo test --workspace --features akkhor-flow/bundled-fonts
       - name: Robustness (damaged and hostile files, release build)
         run: cargo test --release -p akkhor --test robustness
+      - name: PDF text accuracy (character error rate per corpus PDF)
+        run: |
+          status=0
+          cargo test --release -q -p akkhor-pdf --test accuracy --test accuracy_no_names --test accuracy_unknown_font -- --nocapture > accuracy.log 2>&1 || status=$?
+          {
+            echo "### PDF text accuracy"
+            echo '```'
+            grep -E "pdf/|file |test result|panicked" accuracy.log
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          exit $status
+      - name: Bijoy round trip
+        run: cargo test --release -q -p akkhor-flow --test bijoy_roundtrip -- --nocapture
 
   switches:
     name: Format switch ${{ matrix.features }}
@@ -126,8 +139,15 @@ jobs:
             echo "== Search the long Bangla text"
             $B tests/fixtures/big-bn.txt --search "যুক্তবর্ণ" | tail -1
             echo
-            echo "== Bijoy-encoded text is detected"
+            echo "== Bijoy-encoded text is detected and converted"
             $B tests/fixtures/bijoy-sample.txt | grep encoding
+            echo
+            echo "== PDF text layer: first page (builds recovery tables) and again"
+            $B tests/corpus/pdf/bn.libreoffice.pdf --text | sed -n 5p
+            $B tests/corpus/pdf/hi.chrome.raw.pdf --text | sed -n 5,7p
+            echo
+            echo "== Search a Bangla PDF whose own text layer breaks the word"
+            $B tests/corpus/pdf/bn.chrome.pdf --search "যুক্তাক্ষরের" | tail -2
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4

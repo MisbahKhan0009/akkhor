@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 2: recovery and Bijoy done; PDF search and selection next)
+Last updated: 2026-11-25 (Phase 2 built; review next)
 
 ---
 
@@ -145,8 +145,8 @@ Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point
 3. ✅ Visual-to-logical reordering (pre-base vowel signs, split vowels, reph, fused reph forms).
 4. ✅ Lines, words and reading order, with every character mapped to its box. Result: 0.0% character errors on all 32 corpus PDFs (two producers, two designs per script, with and without `ToUnicode`); the PDFs' own text layers are 2 to 45% wrong.
 5. ✅ Legacy encodings: Bijoy (table from the MIT `poriborton` crate, inverted) for PDFs and `.txt`. Kruti Dev moved later: no open table or corpus to verify one against.
-6. Search, selection and copy on PDFs (CLI and Android).
-7. Accuracy corpus from several PDF producers, with and without `ToUnicode`; character error rate targets.
+6. ✅ Search, selection and copy on PDFs (CLI and Android).
+7. ✅ Accuracy corpus: 36 PDFs from two producers, two designs per script, Bijoy, with and without `ToUnicode`; character error rate checked in CI.
 
 ### Phase 3: PDF speed and memory ⬜
 

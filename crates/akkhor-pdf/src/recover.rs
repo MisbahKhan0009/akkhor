@@ -51,6 +51,10 @@ pub struct Recovery {
     pub weak: HashSet<u32>,
     /// Glyphs that draw nothing (filled in for embedded subsets).
     pub blank: HashSet<u32>,
+    /// Whether the letters come from a complete font (the embedded one with
+    /// its shaping rules, or a matched reference), not just a subset's
+    /// character map, which some producers fill with their own codes.
+    pub complete: bool,
     /// Whether the font covers an Indic script (then recovered text is
     /// preferred over the PDF's own text layer).
     pub indic: bool,
@@ -208,6 +212,29 @@ pub fn build_with(
         chars.dedup();
     }
 
+    // Glyph names hint at clusters worth shaping (ঙ্ক্ষ, জ্জ্ব): shaping
+    // the hinted text verifies it, where the name alone may be wrong (Noto
+    // names the half form of त्र "uni0924094D094D0930").
+    let mut hints: Vec<String> = Vec::new();
+    if use_names && let Ok(f) = skrifa::FontRef::new((**data).as_ref()) {
+        use skrifa::raw::TableProvider;
+        if let Ok(post) = f.post() {
+            let count = f.maxp().map(|m| m.num_glyphs()).unwrap_or(0);
+            for gid in 1..count {
+                if rec.map.contains_key(&(gid as u32)) {
+                    continue;
+                }
+                if let Some(t) = post
+                    .glyph_name(skrifa::raw::types::GlyphId16::new(gid))
+                    .and_then(text_of_glyph_name)
+                    .filter(|t| t.chars().count() >= 3)
+                {
+                    hints.push(t);
+                }
+            }
+        }
+    }
+
     // 2. Shape candidate syllables per script and learn new glyphs.
     let shaper = ShaperFont::new(&font);
     let mut buffer = Buffer::new();
@@ -319,6 +346,43 @@ pub fn build_with(
         let phala = |c: char| {
             matches!(c as u32 & 0x7F, 0x2F | 0x30 | 0x35 | 0x2E | 0x32 | 0x28) // য র ব ম ল ন
         };
+        // The hinted clusters, in shapes the shaper accepts.
+        let is_virama = |c: char| c == v;
+        for hint in hints
+            .iter()
+            .filter(|h| h.chars().any(|c| script_of(c) == *script))
+        {
+            let mut t = String::new();
+            for c in hint.chars() {
+                if !(is_virama(c) && t.ends_with(v)) {
+                    t.push(c);
+                }
+            }
+            // য / य: joins after nearly every half form without a ligature.
+            let base = consonants
+                .iter()
+                .copied()
+                .find(|c| *c as u32 & 0x7F == 0x2F)
+                .unwrap_or('\0');
+            let mut variants = vec![t.clone()];
+            if base != '\0' {
+                // The cluster's half form, also when the name garbles it.
+                if t.ends_with(v) {
+                    variants.push(format!("{t}{base}"));
+                } else {
+                    variants.push(format!("{t}{v}{base}"));
+                }
+            }
+            if t.starts_with(v)
+                && let Some(&k) = consonants.first()
+            {
+                variants.push(format!("{k}{t}"));
+            }
+            for variant in variants {
+                let mut free = 1;
+                shape_one(variant, &mut rec, &mut free);
+            }
+        }
         let mut seen: HashSet<String> = HashSet::new();
         for lig in &ligatures {
             for &m in &matras {

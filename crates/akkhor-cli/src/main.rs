@@ -3,7 +3,11 @@
 //! ```text
 //! akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH]
 //!               [--theme paper|sepia|dusk|night] [--out page.png] [--search TEXT]
+//!               [--text]
 //! ```
+//!
+//! `--text` prints the page's text (for PDFs: the repaired text layer, next
+//! to how long extracting it took). `--search` lists hits with snippets.
 //!
 //! For PDFs `--page` is the page index; for EPUBs it is the chapter index and
 //! the first page of that chapter is rendered.
@@ -22,6 +26,7 @@ struct Args {
     theme: Theme,
     out: Option<String>,
     search: Option<String>,
+    text: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -35,6 +40,7 @@ fn parse_args() -> Result<Args, String> {
         theme: Theme::PAPER,
         out: None,
         search: None,
+        text: false,
     };
     while let Some(a) = it.next() {
         let mut val = || it.next().ok_or(format!("{a} needs a value"));
@@ -43,6 +49,7 @@ fn parse_args() -> Result<Args, String> {
             "--scale" => args.scale = val()?.parse().map_err(|_| "bad --scale")?,
             "--out" => args.out = Some(val()?),
             "--search" => args.search = Some(val()?),
+            "--text" => args.text = true,
             "--size" => {
                 let v = val()?;
                 let (w, h) = v.split_once('x').ok_or("--size is WxH")?;
@@ -151,6 +158,9 @@ fn run(args: Args) -> Result<(), String> {
 
     if let Some(q) = &args.search {
         return search(&book, q);
+    }
+    if args.text {
+        return print_text(&book, args.page);
     }
 
     let (w, h, pixels) = match &book {
@@ -305,9 +315,74 @@ fn search(book: &Book, q: &str) -> Result<(), String> {
                 print(None, &text.document, &m);
             }
         }
-        Book::Pdf(_) => return Err("searching PDFs arrives in Phase 2".into()),
+        Book::Pdf(pdf) => {
+            for m in pdf.search(q, 0) {
+                if shown < 20 {
+                    let text = pdf.page_text_cached(m.page).map_err(|e| e.to_string())?;
+                    let (a, b) = (m.range.start, m.range.end);
+                    let before = tail(&text.text[..a], 25);
+                    let after = head(&text.text[b..], 25);
+                    println!(
+                        "  p {:>4} …{}[{}]{}…",
+                        m.page + 1,
+                        before.replace('\n', " "),
+                        &text.text[a..b],
+                        after.replace('\n', " ")
+                    );
+                }
+                shown += 1;
+            }
+        }
     }
     println!("search    {shown} hits for {q:?} in {:.2} ms", ms(t));
+    Ok(())
+}
+
+/// The last `n` characters of `s`.
+fn tail(s: &str, n: usize) -> &str {
+    let at = s
+        .char_indices()
+        .rev()
+        .nth(n.saturating_sub(1))
+        .map_or(0, |(i, _)| i);
+    &s[at..]
+}
+
+/// The first `n` characters of `s`.
+fn head(s: &str, n: usize) -> &str {
+    let at = s.char_indices().nth(n).map_or(s.len(), |(i, _)| i);
+    &s[..at]
+}
+
+/// Prints a page's text: a PDF page's repaired text layer, or an EPUB
+/// chapter's / text file's paragraphs.
+fn print_text(book: &Book, page: usize) -> Result<(), String> {
+    match book {
+        Book::Pdf(pdf) => {
+            let t = Instant::now();
+            let text = pdf.page_text(page).map_err(|e| e.to_string())?;
+            let first = ms(t);
+            let t = Instant::now();
+            pdf.page_text(page).map_err(|e| e.to_string())?;
+            println!(
+                "text      page {} in {first:.2} ms (again: {:.2} ms)\n",
+                page + 1,
+                ms(t)
+            );
+            println!("{}", text.text);
+        }
+        Book::Epub(epub) => {
+            let doc = epub.chapter(page).map_err(|e| e.to_string())?;
+            for b in &doc.blocks {
+                println!("{}\n", b.text);
+            }
+        }
+        Book::Text(text) => {
+            for b in &text.document.blocks {
+                println!("{}\n", b.text);
+            }
+        }
+    }
     Ok(())
 }
 
@@ -319,7 +394,7 @@ fn main() -> ExitCode {
                 eprintln!("error: {e}");
             }
             eprintln!(
-                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night] [--out page.png] [--search TEXT]"
+                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night] [--out page.png] [--search TEXT] [--text]"
             );
             ExitCode::FAILURE
         }

@@ -52,7 +52,17 @@ fn exercise(bytes: Vec<u8>, name: &str, fonts: &FontSet) {
             for i in 0..pdf.page_count().min(2) {
                 let _ = pdf.page_size(i);
                 let _ = pdf.render_page(i, 0.3, &Theme::PAPER);
+                // The text layer: recovery from damaged fonts, reordering,
+                // search, selection.
+                if let Ok(text) = pdf.page_text(i) {
+                    let _ = text.find("ক্ষ");
+                    let _ = text.offset_at(100.0, 100.0);
+                    let _ = text.word_at(text.text.len() / 2);
+                    let _ = text.snap(text.text.len() / 3);
+                    let _ = text.rects(0..text.text.len());
+                }
             }
+            let _ = pdf.search("কর", 0).take(3).count();
         }
         Book::Epub(epub) => {
             let _ = epub.toc.len();
@@ -135,6 +145,13 @@ fn damaged_files_never_panic() {
     );
     run("small.pdf", &fixture("small.pdf"), &mut rng, 200, &fonts);
     run("indic.pdf", &fixture("indic.pdf"), &mut rng, 120, &fonts);
+    // LibreOffice output: renumbered subsets, symbol character maps.
+    let lo = std::fs::read(format!(
+        "{}/../../tests/corpus/pdf/hi.libreoffice.pdf",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    run("hi.libreoffice.pdf", &lo, &mut rng, 40, &fonts);
     run(
         "bijoy.txt",
         &fixture("bijoy-sample.txt"),

@@ -39,6 +39,21 @@ pub struct PdfDocument {
     interpreter: InterpreterSettings,
     /// Glyph-to-letter tables per embedded font (see [`recover`]).
     recoveries: Mutex<HashMap<u128, Option<Arc<recover::Recovery>>>>,
+    /// Text of recently used pages, most recent last.
+    texts: Mutex<Vec<(usize, Arc<PageText>)>>,
+}
+
+/// Pages whose text [`PdfDocument::page_text_cached`] keeps.
+const TEXT_CACHE_PAGES: usize = 4;
+
+/// A search hit in a PDF.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PdfMatch {
+    pub page: usize,
+    /// Byte range in that page's [`PageText::text`].
+    pub range: std::ops::Range<usize>,
+    /// Highlight boxes, in points (top-left origin), one per line.
+    pub rects: Vec<hayro::kurbo::Rect>,
 }
 
 impl PdfDocument {
@@ -54,6 +69,7 @@ impl PdfDocument {
             pdf,
             interpreter: InterpreterSettings::default(),
             recoveries: Mutex::new(HashMap::new()),
+            texts: Mutex::new(Vec::new()),
         })
     }
 
@@ -127,10 +143,20 @@ impl PdfDocument {
                 v.0 += usize::from(recover::canonical(own) == r.text);
             }
         }
-        let trusted: Vec<bool> = votes
-            .iter()
-            .map(|(agree, n)| *n == 0 || agree * 2 >= *n)
-            .collect();
+        // When the two disagree, a complete font wins over the text layer,
+        // and the text layer wins over a subset's bare character map.
+        let mut tables = tables;
+        let mut trusted = vec![true; glyphs.fonts.len()];
+        for (font, (agree, n)) in votes.iter().enumerate() {
+            if *n > 0 && agree * 2 < *n {
+                if tables[font].as_ref().is_some_and(|t| t.complete) {
+                    trusted[font] = false;
+                } else {
+                    tables[font] = None;
+                }
+            }
+        }
+        let tables = tables;
         let bijoy: Vec<bool> = glyphs
             .fonts
             .iter()
@@ -245,6 +271,53 @@ impl PdfDocument {
                 },
                 text::reorder,
             )
+        })
+    }
+
+    /// [`page_text`](Self::page_text), kept for the last few pages: hit
+    /// testing, selection and copy on one page reuse one extraction.
+    pub fn page_text_cached(&self, index: usize) -> Result<Arc<PageText>> {
+        {
+            let cache = self.texts.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some((_, t)) = cache.iter().find(|(i, _)| *i == index) {
+                return Ok(t.clone());
+            }
+        }
+        let text = Arc::new(self.page_text(index)?);
+        let mut cache = self.texts.lock().unwrap_or_else(|e| e.into_inner());
+        if cache.len() >= TEXT_CACHE_PAGES {
+            cache.remove(0);
+        }
+        cache.push((index, text.clone()));
+        Ok(text)
+    }
+
+    /// Searches the document page by page from `first_page`, wrapping
+    /// around. Lazy: a page's text is only extracted when the iterator
+    /// reaches it, so the caller stops whenever it has enough hits. Pages
+    /// that fail to load are skipped.
+    pub fn search<'a>(
+        &'a self,
+        query: &str,
+        first_page: usize,
+    ) -> impl Iterator<Item = PdfMatch> + 'a {
+        let query = query.to_string();
+        let n = self.page_count();
+        (0..n).flat_map(move |k| {
+            let page = (first_page + k) % n;
+            let hits: Vec<PdfMatch> = match self.page_text(page) {
+                Ok(text) => text
+                    .find(&query)
+                    .into_iter()
+                    .map(|range| PdfMatch {
+                        page,
+                        rects: text.rects(range.clone()),
+                        range,
+                    })
+                    .collect(),
+                Err(_) => Vec::new(),
+            };
+            hits
         })
     }
 
@@ -414,8 +487,52 @@ mod tests {
     use super::*;
 
     fn open(name: &str) -> PdfDocument {
+        // Reference fonts, whether or not `bundled-fonts` is on.
+        static FONTS: std::sync::Once = std::sync::Once::new();
+        FONTS.call_once(|| {
+            for f in [
+                "NotoSerifBengali-Regular.ttf",
+                "NotoSerifDevanagari-Regular.ttf",
+            ] {
+                let path = format!("{}/../../fonts/{f}", env!("CARGO_MANIFEST_DIR"));
+                register_reference_font(Arc::new(std::fs::read(path).unwrap()));
+            }
+        });
         let path = format!("{}/../../tests/{name}", env!("CARGO_MANIFEST_DIR"));
         PdfDocument::open(&Source::open(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn search_finds_words_the_text_layer_breaks() {
+        let pdf = open("corpus/pdf/bn.chrome.raw.pdf");
+        let raw = pdf.page_text_raw(0).unwrap();
+        assert!(raw.find("যুক্তাক্ষরের").is_empty());
+        let hits: Vec<PdfMatch> = pdf.search("যুক্তাক্ষরের", 0).collect();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].page, 0);
+        assert!(!hits[0].rects.is_empty());
+        // Lazy: taking one hit does not need the rest of the document.
+        assert_eq!(pdf.search("কর", 0).take(1).count(), 1);
+    }
+
+    #[test]
+    fn selection_snaps_to_syllables_and_words() {
+        let pdf = open("corpus/pdf/bn.chrome.pdf");
+        let text = pdf.page_text_cached(0).unwrap();
+        let at = text.text.find("যুক্তাক্ষরের").unwrap();
+        // Inside the conjunct ক্ত: snaps back to its start.
+        let inside = at + "যুক্".len();
+        assert_eq!(text.snap(inside), at + "যু".len());
+        let word = text.word_at(inside);
+        assert_eq!(&text.text[word], "যুক্তাক্ষরের");
+        // Hit-testing the word's box lands in the word.
+        let r = text.rects(at..at + "যুক্তাক্ষরের".len())[0];
+        let hit = text
+            .offset_at((r.x0 + r.x1) / 2.0, (r.y0 + r.y1) / 2.0)
+            .unwrap();
+        assert!(hit >= at && hit <= at + "যুক্তাক্ষরের".len());
+        // The cache returns the same extraction.
+        assert!(Arc::ptr_eq(&text, &pdf.page_text_cached(0).unwrap()));
     }
 
     #[test]

@@ -112,10 +112,22 @@ every character of `text` points back to a box on the page.
 
 ## 2.6 Search, selection and copy on PDFs
 
-`PdfDocument::page_text(i)`, a lazy whole-document search (page by page,
-stops when the caller stops), hit-testing and selection rectangles from
-character boxes, all reusing the Phase 1 folding and syllable rules.
-Exposed in the CLI (`--text`, `--search` on PDFs) and the Android bridge.
+Done. `PdfDocument::search(query, first_page)` is a lazy iterator over
+pages (wrapping around), each hit with its page, byte range and highlight
+boxes. `PageText` has `find`, `offset_at` (hit test, snapped to a syllable
+start so a selection never splits a conjunct), `snap`, `word_at` and
+`rects`; `page_text_cached` keeps the last four pages for selection.
+CLI: `--text` (with extraction time) and `--search` on PDFs. Android:
+`pdfPageText`, `pdfHitTest`, `pdfWordAt`, `pdfSelectionRects`,
+`pdfTextBetween` (across pages) and `pdfSearch` (one page at a time, the
+app walks pages and stops). `registerFont` also registers the font as a
+PDF reference font, memory-mapped.
+
+When the font is unknown (not bundled, not registered), there is nothing
+to recover from: the text layer is used, reordered. Measured on the
+second designs with only Noto registered: Chrome PDFs improve (Bangla 27%
+to 14% errors), LibreOffice PDFs stay at their text layer's 42 to 45%. A
+test keeps this from ever getting worse than the text layer.
 
 ## 2.7 Accuracy corpus and measurement
 
@@ -148,9 +160,12 @@ Bijoy conversion is also checked by round trip: Unicode → Bijoy (with
 - [x] Bijoy round trip: at least 98% of words exact (99.7% of 3,842 words;
   the rest are words `poriborton` itself cannot encode). Bijoy PDFs: 0.0%
   character errors, also without `ToUnicode`.
-- [ ] Text layer for one page under 30 ms; recovery table under 50 ms per font
-- [ ] Search finds words in PDFs that the raw text layer misses
-- [ ] Robustness test covers the text layer; CI green; PLAN.md updated
+- [x] Text layer for one page under 30 ms (about 1 ms once tables exist);
+  recovery table under 50 ms per font (25 to 31 ms quick build for the Noto
+  fonts; glyph names steer the quick build to the clusters a font has, so
+  the 130 ms deep build only runs for fonts without names)
+- [x] Search finds words in PDFs that the raw text layer misses
+- [x] Robustness test covers the text layer; CI green; PLAN.md updated
 - [ ] Review of Phase 2 written and its findings fixed
 
 ## Known limits (stated up front)

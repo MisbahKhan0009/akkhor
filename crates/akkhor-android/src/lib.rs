@@ -24,6 +24,14 @@
 //!     external fun selectionRects(handle: Long, page: Int, start: Long, end: Long): FloatArray
 //!     external fun textBetween(handle: Long, start: Long, end: Long): String
 //!     external fun search(handle: Long, chapter: Int, query: String): LongArray // [start, end, ...]
+//!     // PDF text (copy, search, selection, read-aloud). Positions are Longs:
+//!     // (page shl 32) or byteOffset, snapped to syllables; boxes in PDF points.
+//!     external fun pdfPageText(handle: Long, page: Int): String?
+//!     external fun pdfHitTest(handle: Long, page: Int, x: Float, y: Float): Long // -1 if none
+//!     external fun pdfWordAt(handle: Long, pos: Long): LongArray               // [start, end]
+//!     external fun pdfSelectionRects(handle: Long, start: Long, end: Long): FloatArray
+//!     external fun pdfTextBetween(handle: Long, start: Long, end: Long): String?
+//!     external fun pdfSearch(handle: Long, page: Int, query: String): LongArray // one page
 //!     external fun lastError(): String?
 //! }
 //! ```
@@ -218,6 +226,12 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_registerFont(
     guard((), || {
         let script = unsafe { jstr(env, script) }.ok_or("script is null")?;
         let path = unsafe { jstr(env, path) }.ok_or("path is null")?;
+        // Also a reference for PDF text recovery: PDFs embed stripped copies
+        // of the same fonts. Memory-mapped, read only when a PDF needs it.
+        #[cfg(feature = "pdf")]
+        if let Ok(src) = Source::open(&path) {
+            akkhor::pdf::register_reference_font(src.shared());
+        }
         FONTS
             .lock()
             .map_err(|_| "font registry poisoned")?
@@ -587,7 +601,7 @@ fn unpack(v: jlong) -> akkhor::flow::Position {
     akkhor::flow::Position::new((v >> 32) as usize, (v & 0xFFFF_FFFF) as usize)
 }
 
-#[cfg(feature = "flow")]
+#[cfg(any(feature = "flow", feature = "pdf"))]
 unsafe fn long_array(env: *mut JNIEnv, values: &[jlong]) -> Result<jni_sys::jlongArray, String> {
     unsafe {
         let new = (**env).NewLongArray.ok_or("JNI")?;
@@ -720,6 +734,195 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_search(
     })
 }
 
+/// Runs `f` on a PDF page's text (cached for the last few pages).
+#[cfg(feature = "pdf")]
+fn with_pdf_text<T>(
+    h: jlong,
+    page: usize,
+    f: impl FnOnce(&akkhor::pdf::PageText) -> Result<T, String>,
+) -> Result<T, String> {
+    let text = with_handle(h, |hd| match &hd.book {
+        Book::Pdf(p) => p.page_text_cached(page).map_err(|e| e.to_string()),
+        #[allow(unreachable_patterns)]
+        _ => Err("not a PDF".into()),
+    })?;
+    f(&text)
+}
+
+#[cfg(feature = "pdf")]
+fn pdf_pos(page: usize, offset: usize) -> jlong {
+    ((page as i64) << 32) | (offset as u32 as i64)
+}
+
+#[cfg(feature = "pdf")]
+fn pdf_unpos(v: jlong) -> (usize, usize) {
+    ((v >> 32) as usize, (v & 0xFFFF_FFFF) as usize)
+}
+
+/// A PDF page's text, repaired (Indic conjuncts, reph, vowel order, Bijoy).
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfPageText(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    page: jint,
+) -> jstring {
+    guard(std::ptr::null_mut(), || {
+        let text = with_pdf_text(h, page.max(0) as usize, |t| Ok(t.text.clone()))?;
+        unsafe { new_jstring(env, &text) }
+    })
+}
+
+/// The text position under page point (x, y), in PDF points from the top
+/// left; -1 if the page has no text.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfHitTest(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    page: jint,
+    x: jfloat,
+    y: jfloat,
+) -> jlong {
+    guard(-1, || {
+        let page = page.max(0) as usize;
+        with_pdf_text(h, page, |t| {
+            Ok(t.offset_at(x as f64, y as f64)
+                .map_or(-1, |o| pdf_pos(page, o)))
+        })
+    })
+}
+
+/// The word around a PDF position (long-press): `[start, end]`.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfWordAt(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    pos: jlong,
+) -> jni_sys::jlongArray {
+    guard(std::ptr::null_mut(), || {
+        let (page, offset) = pdf_unpos(pos);
+        let r = with_pdf_text(h, page, |t| Ok(t.word_at(offset)))?;
+        unsafe { long_array(env, &[pdf_pos(page, r.start), pdf_pos(page, r.end)]) }
+    })
+}
+
+/// Highlight boxes for a PDF selection on one page: `[x, y, width, height,
+/// ...]` in PDF points. `end` on a later page selects to the page's end.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfSelectionRects(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    start: jlong,
+    end: jlong,
+) -> jni_sys::jfloatArray {
+    guard(std::ptr::null_mut(), || {
+        let ((page, a), (end_page, b)) = (pdf_unpos(start), pdf_unpos(end));
+        let rects = with_pdf_text(h, page, |t| {
+            let b = if end_page > page {
+                t.text.len()
+            } else {
+                b.min(t.text.len())
+            };
+            Ok(t.rects(a.min(b)..b))
+        })?;
+        let flat: Vec<jfloat> = rects
+            .iter()
+            .flat_map(|r| {
+                [
+                    r.x0 as f32,
+                    r.y0 as f32,
+                    r.width() as f32,
+                    r.height() as f32,
+                ]
+            })
+            .collect();
+        unsafe {
+            let new = (**env).NewFloatArray.ok_or("JNI")?;
+            let set = (**env).SetFloatArrayRegion.ok_or("JNI")?;
+            let arr = new(env, flat.len() as jint);
+            if arr.is_null() {
+                return Err("out of memory".into());
+            }
+            set(env, arr, 0, flat.len() as jint, flat.as_ptr());
+            Ok(arr)
+        }
+    })
+}
+
+/// The text between two PDF positions (copy), across pages if needed.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfTextBetween(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    start: jlong,
+    end: jlong,
+) -> jstring {
+    guard(std::ptr::null_mut(), || {
+        let ((p0, a), (p1, b)) = (pdf_unpos(start), pdf_unpos(end));
+        if p1 < p0 || p1 - p0 > 500 {
+            return Err("bad range".into());
+        }
+        let mut out = String::new();
+        for page in p0..=p1 {
+            with_pdf_text(h, page, |t| {
+                let from = if page == p0 { a.min(t.text.len()) } else { 0 };
+                let to = if page == p1 {
+                    b.min(t.text.len())
+                } else {
+                    t.text.len()
+                };
+                if from < to && t.text.is_char_boundary(from) && t.text.is_char_boundary(to) {
+                    if !out.is_empty() {
+                        out.push('\n');
+                    }
+                    out.push_str(&t.text[from..to]);
+                }
+                Ok(())
+            })?;
+        }
+        unsafe { new_jstring(env, &out) }
+    })
+}
+
+/// Searches one PDF page: `[start, end, ...]` positions. The app walks the
+/// pages itself and stops when it has enough.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfSearch(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    page: jint,
+    query: jstring,
+) -> jni_sys::jlongArray {
+    guard(std::ptr::null_mut(), || {
+        let query = unsafe { jstr(env, query) }.ok_or("query is null")?;
+        let page = page.max(0) as usize;
+        // Not through the page cache: a search sweep would evict the pages
+        // the reader is looking at.
+        let text = with_handle(h, |hd| match &hd.book {
+            Book::Pdf(p) => p.page_text(page).map_err(|e| e.to_string()),
+            #[allow(unreachable_patterns)]
+            _ => Err("not a PDF".into()),
+        })?;
+        let hits: Vec<jlong> = text
+            .find(&query)
+            .into_iter()
+            .flat_map(|r| [pdf_pos(page, r.start), pdf_pos(page, r.end)])
+            .collect();
+        unsafe { long_array(env, &hits) }
+    })
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_dev_akkhor_Native_lastError(
     env: *mut JNIEnv,
@@ -764,6 +967,30 @@ mod tests {
         // A second close and a made-up id are harmless.
         unsafe { Java_dev_akkhor_Native_close(std::ptr::null_mut(), std::ptr::null_mut(), id) };
         assert!(with_handle(123_456_789, |_| Ok(())).is_err());
+    }
+
+    #[cfg(feature = "pdf")]
+    #[test]
+    fn pdf_text_through_the_handle() {
+        let path = format!(
+            "{}/../../tests/corpus/pdf/bn.chrome.pdf",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let font = format!(
+            "{}/../../fonts/NotoSerifBengali-Regular.ttf",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        akkhor::pdf::register_reference_font(Source::open(font).unwrap().shared());
+        let id = into_handle(akkhor::open(path).unwrap());
+        let text = with_pdf_text(id, 0, |t| Ok(t.text.clone())).unwrap();
+        assert!(text.contains("যুক্তাক্ষরের"), "{text}");
+        let at = text.find("যুক্তাক্ষরের").unwrap();
+        let word = with_pdf_text(id, 0, |t| Ok(t.word_at(at + 3))).unwrap();
+        assert_eq!(&text[word], "যুক্তাক্ষরের");
+        assert_eq!(pdf_unpos(pdf_pos(7, 1234)), (7, 1234));
+        assert!(pdf_pos(1, 0) > pdf_pos(0, 99_999));
+        assert!(with_pdf_text(id, 99, |_| Ok(())).is_err());
+        unsafe { Java_dev_akkhor_Native_close(std::ptr::null_mut(), std::ptr::null_mut(), id) };
     }
 
     #[test]

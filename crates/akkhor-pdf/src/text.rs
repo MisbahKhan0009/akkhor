@@ -50,7 +50,8 @@ impl PageText {
     }
 
     /// The byte offset of the text nearest to page point (x, y), for
-    /// hit-testing. `None` on an empty page.
+    /// hit-testing, on a syllable boundary (a selection never splits a
+    /// conjunct). `None` on an empty page.
     pub fn offset_at(&self, x: f64, y: f64) -> Option<usize> {
         let dist = |r: &Rect| {
             let dx = if x < r.x0 {
@@ -74,11 +75,67 @@ impl PageText {
             .iter()
             .min_by(|a, b| dist(&a.rect).total_cmp(&dist(&b.rect)))?;
         // Before or after the span, by which half was hit.
-        Some(if x < (s.rect.x0 + s.rect.x1) / 2.0 {
+        let at = if x < (s.rect.x0 + s.rect.x1) / 2.0 {
             s.range.start
         } else {
             s.range.end
-        })
+        };
+        Some(self.snap(at))
+    }
+    /// `offset` moved back to the start of its syllable.
+    pub fn snap(&self, offset: usize) -> usize {
+        let offset = offset.min(self.text.len());
+        let line = self
+            .lines
+            .iter()
+            .find(|l| l.start <= offset && offset <= l.end)
+            .cloned()
+            .unwrap_or(0..self.text.len());
+        if offset == line.end {
+            return offset;
+        }
+        let starts = akkhor_flow::script::syllable_starts(&self.text[line.clone()]);
+        let rel = offset - line.start;
+        line.start
+            + starts
+                .iter()
+                .rev()
+                .find(|&&s| s <= rel)
+                .copied()
+                .unwrap_or(0)
+    }
+
+    /// The word around `offset`: the run of text between spaces and
+    /// punctuation that contains it.
+    pub fn word_at(&self, offset: usize) -> Range<usize> {
+        let mut offset = offset.min(self.text.len());
+        while !self.text.is_char_boundary(offset) {
+            offset -= 1;
+        }
+        let is_break = |c: char| {
+            c.is_whitespace()
+                || matches!(c, '।' | '॥' | ',' | ';' | ':' | '!' | '?' | '"' | '(' | ')')
+        };
+        let start = self.text[..offset]
+            .char_indices()
+            .rev()
+            .find(|&(_, c)| is_break(c))
+            .map_or(0, |(i, c)| i + c.len_utf8());
+        let end = self.text[offset..]
+            .char_indices()
+            .find(|&(_, c)| is_break(c))
+            .map_or(self.text.len(), |(i, _)| offset + i);
+        start..end.max(start)
+    }
+
+    /// Every occurrence of `query` on the page (Indic-aware folding, whole
+    /// syllables only), as byte ranges.
+    pub fn find(&self, query: &str) -> Vec<Range<usize>> {
+        let q = akkhor_flow::search::fold(query);
+        akkhor_flow::search::find_in_text(&self.text, &q)
+            .into_iter()
+            .map(|(s, e)| s..e)
+            .collect()
     }
 }
 
