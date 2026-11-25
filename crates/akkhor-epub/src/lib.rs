@@ -8,6 +8,7 @@ pub mod zip;
 
 use akkhor_core::{Error, Result, Source};
 use akkhor_flow::Document;
+use akkhor_flow::image::ImageProvider;
 use akkhor_flow::markup::{Token, Tokenizer};
 use akkhor_flow::model::linked_stylesheets;
 use akkhor_flow::search::{Match, find_all};
@@ -184,9 +185,40 @@ impl EpubBook {
         })
     }
 
+    /// The images of one chapter, resolved relative to that chapter's
+    /// location in the book. Pass this to layout and painting.
+    pub fn chapter_images(&self, index: usize) -> ChapterImages<'_> {
+        ChapterImages {
+            book: self,
+            dir: self
+                .spine
+                .get(index)
+                .map(|p| parent_dir(p))
+                .unwrap_or_default(),
+        }
+    }
+
     /// Raw bytes of any file in the book (images, CSS, fonts).
     pub fn resource(&self, path: &str) -> Result<Vec<u8>> {
         self.zip.read(path)
+    }
+}
+
+/// Image access for one chapter; see [`EpubBook::chapter_images`].
+pub struct ChapterImages<'a> {
+    book: &'a EpubBook,
+    dir: String,
+}
+
+impl ImageProvider for ChapterImages<'_> {
+    fn bytes(&self, src: &str) -> Option<Vec<u8>> {
+        if src.starts_with("data:") || src.contains("://") {
+            return None;
+        }
+        self.book
+            .zip
+            .read(&join_path(&self.dir, &percent_decode(src)))
+            .ok()
     }
 }
 
@@ -366,5 +398,12 @@ mod tests {
         assert!(hits.iter().any(|(c, _)| *c == 0));
         assert!(hits.iter().any(|(c, _)| *c == 2));
         assert!(book.search("उज्ज्वल").any(|(c, _)| c == 1));
+        // The English chapter has a picture, resolved relative to the chapter.
+        let ch3 = book.chapter(2).unwrap();
+        let img = ch3.blocks.iter().find(|b| b.image.is_some()).unwrap();
+        assert_eq!(
+            book.chapter_images(2).size(img.image.as_deref().unwrap()),
+            Some((600, 300))
+        );
     }
 }

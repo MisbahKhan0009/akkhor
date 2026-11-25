@@ -11,6 +11,7 @@ use std::ops::Range;
 use crate::css::Align;
 use crate::fonts::{FontId, FontSet, FontStyle, Synthetic};
 use crate::hyphen::hyphenate;
+use crate::image::ImageProvider;
 use crate::model::StyleSpan;
 use crate::model::{BlockKind, Document};
 use crate::script::syllable_starts;
@@ -99,15 +100,37 @@ impl Line {
     }
 }
 
+/// An image placed on a page, in page pixels.
+#[derive(Clone, Debug)]
+pub struct PlacedImage {
+    pub block: usize,
+    /// Source as written in the book; resolved by the [`ImageProvider`].
+    pub src: String,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Page {
     pub lines: Vec<Line>,
+    pub images: Vec<PlacedImage>,
 }
 
 impl Page {
     /// Reading position where this page starts: (block, byte offset).
     pub fn start(&self) -> Option<(usize, usize)> {
-        self.lines.first().map(|l| (l.block, l.range.start))
+        let line = self.lines.first().map(|l| (l.block, l.range.start));
+        let image = self.images.first().map(|i| (i.block, 0));
+        match (line, image) {
+            (Some(l), Some(i)) => Some(l.min(i)),
+            (l, i) => l.or(i),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty() && self.images.is_empty()
     }
 }
 
@@ -121,8 +144,20 @@ fn heading_scale(kind: BlockKind) -> f32 {
     }
 }
 
-/// Lays out a whole document into pages.
+/// Lays out a whole document into pages. Image blocks are skipped; use
+/// [`paginate_with_images`] to place them.
 pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Page> {
+    paginate_with_images(doc, opts, fonts, None)
+}
+
+/// Lays out a whole document into pages, placing images whose size
+/// `images` can tell.
+pub fn paginate_with_images(
+    doc: &Document,
+    opts: &LayoutOptions,
+    fonts: &FontSet,
+    images: Option<&dyn ImageProvider>,
+) -> Vec<Page> {
     let mut pages = vec![Page::default()];
     let bottom = opts.height - opts.margin_bottom;
     let avail = (opts.width - 2.0 * opts.margin_x).max(1.0);
@@ -131,7 +166,41 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
     let mut prev_margin_bottom = 0.0f32;
     for (block_idx, block) in doc.blocks.iter().enumerate() {
         if block.kind == BlockKind::Image {
-            continue; // images are laid out from Phase 1.6
+            let Some((iw, ih)) = block
+                .image
+                .as_deref()
+                .and_then(|src| images.and_then(|p| p.size(src)))
+            else {
+                continue;
+            };
+            // Book pixels are CSS pixels: 16 of them to the body em.
+            let scale = opts.font_size / 16.0;
+            let max_h = bottom - opts.margin_top;
+            let fit = (avail / (iw as f32 * scale))
+                .min(max_h / (ih as f32 * scale))
+                .min(1.0);
+            let (w, h) = (iw as f32 * scale * fit, ih as f32 * scale * fit);
+            let page_empty = pages.last().is_some_and(|p| p.is_empty());
+            if !page_empty {
+                y += opts.paragraph_gap * opts.font_size;
+            }
+            if (y + h > bottom || block.style.page_break_before) && !page_empty {
+                pages.push(Page::default());
+                y = opts.margin_top;
+            }
+            pages.last_mut().expect("page").images.push(PlacedImage {
+                block: block_idx,
+                src: block.image.clone().unwrap_or_default(),
+                x: opts.margin_x + (avail - w) / 2.0,
+                y,
+                width: w,
+                height: h,
+            });
+            y += h;
+            // Keep a little air below a picture even when the CSS sets
+            // paragraph margins to zero.
+            prev_margin_bottom = opts.paragraph_gap;
+            continue;
         }
         let style = &block.style;
         let size = opts.font_size
@@ -154,7 +223,7 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
         };
         let first_indent = style.indent.unwrap_or(0.0) * opts.font_size;
 
-        let page_empty = pages.last().is_some_and(|p| p.lines.is_empty());
+        let page_empty = pages.last().is_some_and(|p| p.is_empty());
         if style.page_break_before && !page_empty {
             pages.push(Page::default());
             y = opts.margin_top;
@@ -196,7 +265,7 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
                 align,
             };
             for (range, placed) in break_lines(segment, &glyphs, &shape, hyphen) {
-                if y + lh > bottom && !pages.last().is_some_and(|p| p.lines.is_empty()) {
+                if y + lh > bottom && !pages.last().is_some_and(|p| p.is_empty()) {
                     pages.push(Page::default());
                     y = opts.margin_top;
                 }
@@ -229,7 +298,7 @@ pub fn paginate(doc: &Document, opts: &LayoutOptions, fonts: &FontSet) -> Vec<Pa
             }
         }
     }
-    if pages.len() > 1 && pages.last().is_some_and(|p| p.lines.is_empty()) {
+    if pages.len() > 1 && pages.last().is_some_and(|p| p.is_empty()) {
         pages.pop();
     }
     pages

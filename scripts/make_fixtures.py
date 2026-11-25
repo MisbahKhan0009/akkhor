@@ -30,6 +30,7 @@ HINDI = [
 
 ENGLISH = [
     ("h1", "Chapter Three: Why Akkhor"),
+    ("img", "../Images/sample.png|নমুনা ছবি"),
     ("p", "Akkhor (অক্ষর, अक्षर) means letter. It is a small reading engine that keeps every conjunct whole, opens large files instantly and stays light on memory."),
     ("p", "This chapter mixes scripts on purpose: English, বাংলা and हिन्दी on one line should share a baseline and break cleanly."),
 ]
@@ -42,8 +43,31 @@ h1 + p, p.first { text-indent: 0; }
 """
 
 
+def png(width, height):
+    """A small gradient PNG, made with the standard library only."""
+    import struct
+
+    def chunk(kind, data):
+        c = kind + data
+        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+
+    rows = b"".join(
+        b"\x00" + bytes(v for x in range(width) for v in (40 + x * 180 // width, 90 + y * 120 // height, 160, 255))
+        for y in range(height)
+    )
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+def block(tag, content):
+    if tag == "img":
+        src, alt = content.split("|")
+        return f'<div class="figure"><img src="{src}" alt="{alt}"/></div>'
+    return f"<{tag}>{content}</{tag}>"
+
+
 def xhtml(title, blocks, lang):
-    body = "\n".join(f"<{t}>{x}</{t}>" for t, x in blocks)
+    body = "\n".join(block(t, x) for t, x in blocks)
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}" xml:lang="{lang}">
@@ -79,6 +103,7 @@ def make_epub(path):
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
     <item id="css" href="Styles/book.css" media-type="text/css"/>
+    <item id="img" href="Images/sample.png" media-type="image/png"/>
 {manifest}
   </manifest>
   <spine toc="ncx">
@@ -112,6 +137,7 @@ def make_epub(path):
         z.writestr("OEBPS/nav.xhtml", nav, compress_type=zipfile.ZIP_DEFLATED)
         z.writestr("OEBPS/toc.ncx", ncx, compress_type=zipfile.ZIP_DEFLATED)
         z.writestr("OEBPS/Styles/book.css", CSS, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr("OEBPS/Images/sample.png", png(600, 300), compress_type=zipfile.ZIP_STORED)
         for name, lang, blocks in chapters:
             z.writestr(f"OEBPS/Text/{name}", xhtml(blocks[0][1], blocks, lang), compress_type=zipfile.ZIP_DEFLATED)
 

@@ -189,9 +189,10 @@ fn run(args: Args) -> Result<(), String> {
                 doc.blocks.len(),
                 doc.char_count()
             );
-            render_flow(&doc, &args)?
+            let images = epub.chapter_images(args.page);
+            render_flow(&doc, Some(&images), &args)?
         }
-        Book::Text(doc) => render_flow(doc, &args)?,
+        Book::Text(doc) => render_flow(doc, None, &args)?,
     };
 
     if let Some((peak, now)) = memory_kb() {
@@ -215,8 +216,12 @@ fn run(args: Args) -> Result<(), String> {
     Ok(())
 }
 
-fn render_flow(doc: &akkhor::flow::Document, args: &Args) -> Result<(u32, u32, Vec<u8>), String> {
-    use akkhor::flow::{FontSet, GlyphCache, LayoutOptions, paginate, render_page};
+fn render_flow(
+    doc: &akkhor::flow::Document,
+    images: Option<&dyn akkhor::flow::ImageProvider>,
+    args: &Args,
+) -> Result<(u32, u32, Vec<u8>), String> {
+    use akkhor::flow::{FontSet, GlyphCache, LayoutOptions, paginate_with_images, render_page};
     let fonts = FontSet::bundled();
     let (w, h) = args.size;
     let opts = LayoutOptions {
@@ -225,7 +230,7 @@ fn render_flow(doc: &akkhor::flow::Document, args: &Args) -> Result<(u32, u32, V
         ..Default::default()
     };
     let t = Instant::now();
-    let pages = paginate(doc, &opts, &fonts);
+    let pages = paginate_with_images(doc, &opts, &fonts, images);
     println!(
         "layout    {:.2} ms  ({} pages, {} of {} fonts loaded)",
         ms(t),
@@ -236,8 +241,17 @@ fn render_flow(doc: &akkhor::flow::Document, args: &Args) -> Result<(u32, u32, V
     let mut cache = GlyphCache::default();
     let mut px = vec![0u8; w as usize * h as usize * 4];
     let t = Instant::now();
-    render_page(&pages[0], &fonts, &mut cache, &args.theme, w, h, &mut px)
-        .map_err(|e| e.to_string())?;
+    render_page(
+        &pages[0],
+        &fonts,
+        images,
+        &mut cache,
+        &args.theme,
+        w,
+        h,
+        &mut px,
+    )
+    .map_err(|e| e.to_string())?;
     println!("render    {:.2} ms  ({w}x{h} px)", ms(t));
     Ok((w, h, px))
 }

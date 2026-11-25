@@ -63,7 +63,9 @@ dependencies = [
  "akkhor-core",
  "harfrust",
  "kurbo",
+ "png",
  "vello_cpu",
+ "zune-jpeg",
 ]
 
 [[package]]

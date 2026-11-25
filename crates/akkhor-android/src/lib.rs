@@ -65,6 +65,8 @@ struct FlowState {
     pages: Vec<Page>,
     width: u32,
     height: u32,
+    /// EPUB chapter the pages belong to (for resolving its images).
+    chapter: usize,
 }
 
 #[cfg(feature = "flow")]
@@ -452,6 +454,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
             pages: Vec::new(),
             width: 0,
             height: 0,
+            chapter: 0,
         });
         let opts = LayoutOptions {
             width: width as f32,
@@ -460,7 +463,15 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
             margin_x: width as f32 * 0.067,
             ..Default::default()
         };
-        flow.pages = akkhor::flow::paginate(&doc, &opts, &flow.fonts);
+        let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
+            #[cfg(feature = "epub")]
+            Book::Epub(e) => Some(Box::new(e.chapter_images(chapter as usize))),
+            #[allow(unreachable_patterns)]
+            _ => None,
+        };
+        flow.pages =
+            akkhor::flow::paginate_with_images(&doc, &opts, &flow.fonts, images.as_deref());
+        flow.chapter = chapter.max(0) as usize;
         flow.width = width.max(0) as u32;
         flow.height = height.max(0) as u32;
         Ok(flow.pages.len() as jint)
@@ -480,6 +491,12 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderFlowPage(
     guard(-1, || {
         let h = unsafe { handle(h) }?;
         let flow = h.flow.as_mut().ok_or("call layoutChapter first")?;
+        let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
+            #[cfg(feature = "epub")]
+            Book::Epub(e) => Some(Box::new(e.chapter_images(flow.chapter))),
+            #[allow(unreachable_patterns)]
+            _ => None,
+        };
         let p = flow.pages.get(page as usize).ok_or("page out of range")?;
         let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
         if bmp.width != flow.width || bmp.height != flow.height {
@@ -490,6 +507,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderFlowPage(
         akkhor::flow::render_page(
             p,
             &flow.fonts,
+            images.as_deref(),
             &mut flow.glyphs,
             &theme(theme_code),
             w,

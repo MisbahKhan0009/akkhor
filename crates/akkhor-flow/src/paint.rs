@@ -11,22 +11,63 @@ use harfrust::GlyphId;
 use harfrust::font::glyph::outline::{DrawMemory, DrawOptions, PathSink};
 use kurbo::{Affine, BezPath, Stroke};
 use vello_cpu::color::{AlphaColor, Srgb};
-use vello_cpu::{PixmapMut, RasterizerSettings, RenderContext, Resources, TargetInit};
+use vello_cpu::peniko::ImageSampler;
+use vello_cpu::{
+    Image, ImageSource, PixelMetadata, Pixmap, PixmapMut, RasterizerSettings, RenderContext,
+    Resources, TargetInit,
+};
 
 use crate::fonts::{FontId, FontSet};
+use crate::image::{ImageProvider, decode, resize};
 use crate::layout::Page;
 
-/// Outline cache shared across pages of a book.
+/// Drawing caches shared across the pages of a book: glyph outlines and
+/// decoded images, each under its own byte budget.
 pub struct GlyphCache {
     outlines: LruCache<(FontId, u32), Option<Arc<BezPath>>>,
+    images: LruCache<(String, u32, u32), Option<Arc<Pixmap>>>,
 }
 
 impl GlyphCache {
-    /// A cache holding at most `budget` bytes of outlines.
+    /// A cache holding at most `budget` bytes of outlines and four times that
+    /// of decoded images.
     pub fn new(budget: usize) -> Self {
         Self {
             outlines: LruCache::new(budget),
+            images: LruCache::new(budget * 4),
         }
+    }
+
+    /// Decodes `src` scaled to `w` x `h`, or returns it from the cache.
+    fn image(
+        &mut self,
+        provider: &dyn ImageProvider,
+        src: &str,
+        w: u32,
+        h: u32,
+    ) -> Option<Arc<Pixmap>> {
+        self.images
+            .get_or_insert_with((src.to_string(), w, h), || {
+                let pixmap = provider
+                    .bytes(src)
+                    .and_then(|b| decode(&b))
+                    .and_then(|img| {
+                        let (pw, ph) = (u16::try_from(w).ok()?, u16::try_from(h).ok()?);
+                        let rgba = resize(&img, w, h);
+                        Some(Arc::new(Pixmap::from_parts(
+                            rgba,
+                            pw,
+                            ph,
+                            PixelMetadata {
+                                may_have_transparency: true,
+                                ..Default::default()
+                            },
+                        )))
+                    });
+                let cost = (w as usize * h as usize * 4).max(16);
+                (pixmap, cost)
+            })
+            .clone()
     }
 
     fn outline(&mut self, fonts: &FontSet, font: FontId, glyph: u32) -> Option<Arc<BezPath>> {
@@ -88,9 +129,13 @@ fn color(c: akkhor_core::Rgba) -> AlphaColor<Srgb> {
 
 /// Draws `page` into `out`: RGBA8 premultiplied, `width * height * 4` bytes,
 /// rows tightly packed (the layout of an Android `ARGB_8888` bitmap).
+/// `images` supplies the pictures of image blocks; without it they are left
+/// blank.
+#[allow(clippy::too_many_arguments)]
 pub fn render_page(
     page: &Page,
     fonts: &FontSet,
+    images: Option<&dyn ImageProvider>,
     cache: &mut GlyphCache,
     theme: &Theme,
     width: u32,
@@ -109,6 +154,26 @@ pub fn render_page(
         u16::try_from(height).map_err(|_| Error::malformed("page too tall"))?,
     );
     let mut ctx = RenderContext::new(w, h);
+    if let Some(provider) = images {
+        for img in &page.images {
+            let (iw, ih) = (
+                img.width.round().max(1.0) as u32,
+                img.height.round().max(1.0) as u32,
+            );
+            let Some(pixmap) = cache.image(provider, &img.src, iw, ih) else {
+                continue;
+            };
+            ctx.set_transform(Affine::translate((
+                img.x.round() as f64,
+                img.y.round() as f64,
+            )));
+            ctx.set_paint(Image {
+                image: ImageSource::Pixmap(pixmap),
+                sampler: ImageSampler::default(),
+            });
+            ctx.fill_rect(&kurbo::Rect::new(0.0, 0.0, iw as f64, ih as f64));
+        }
+    }
     ctx.set_paint(color(theme.text));
     for line in &page.lines {
         for g in &line.glyphs {
