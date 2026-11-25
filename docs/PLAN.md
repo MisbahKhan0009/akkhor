@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 4 done)
+Last updated: 2026-11-25 (Phase 4b planned)
 
 ---
 
@@ -185,6 +185,20 @@ Moved out: the downloadable Bangla and Hindi font pack (app side, licence checks
 Results: reflow on 22 book PDFs from four producers with 0.0% wrong characters, every paragraph and heading break, footnotes and no running headers or page numbers, under 1 ms per chapter; positions map both ways. Text layer: XeLaTeX word gaps, Typst ActualText spans, Chrome's clipped next-page glyphs and Type 3 synthetic bold (read by shape when there is no text). A real 204-page Bangla book (measured locally) found fake bold drawn twice and Ghostscript-rewritten fonts: 100% of its words whole with its free fonts registered, against about 26% for MuPDF, PDFium and Poppler. Standard PDF fonts can come from the app; arm64 library 5.73 MB.
 
 Review: [reviews/phase-4.md](reviews/phase-4.md), 21 findings; the four wrong-output or crash ones fixed (stack overflow on hostile pages, doubled letters from fake bold and from Typst, Type 3 advances). Two of the Phase 3 comparison's claims were corrected (damaged files, memory). Carried: library size (0.23 MB over), tables and cards in reflow, Mukta's two glyphs, hyphen-aware page search, a downloadable font pack for the app.
+
+### Phase 4b: tables, cards and open items 🔄
+
+Detailed design: [phases/phase-4b.md](phases/phase-4b.md). From the Phase 4 review: tables are read column by column, cards and boxes are not seen, bold lead-ins become headings, Mukta's two glyphs, page search misses hyphenated words, 2 damaged files, one-page furniture.
+
+1. Table and card corpus (Chrome, Word via LibreOffice, XeLaTeX, Typst; Bangla and Hindi) with truth.
+2. Rules and boxes collected from the page's vector shapes.
+3. Tables (ruled, horizontal rules only, unruled) found before the column cut; reflow as text when up to 3 columns, as a picture with alt text when wider or irregular.
+4. Cards read box by box.
+5. Centred text and bold lead-in rules.
+6. Mukta candrabindu and nukta conjuncts.
+7. Hyphen-aware page search.
+8. Damaged files, one-page furniture.
+9. Scoring, case study and review.
 
 ### Phase 5: More formats ⬜
 
