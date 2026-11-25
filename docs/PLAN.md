@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 2 done and reviewed)
+Last updated: 2026-11-25 (Phase 3 planned)
 
 ---
 
@@ -150,15 +150,17 @@ Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point
 
 Review: [reviews/phase-2.md](reviews/phase-2.md), 16 findings; the wrong-output ones fixed (Unicode "OMJ" fonts treated as Bijoy, learning from malformed candidates, Assamese spellings claiming Bangla glyphs). Carried forward: Chrome's synthetic bold (Type 3 fonts), fonts the engine does not know, no real-world PDFs in the corpus yet, UTF-16 positions for read-aloud.
 
-### Phase 3: PDF speed and memory ⬜
+### Phase 3: PDF speed, memory and size 🔄
 
-1. Lazy page tree: find page N without visiting every page (target: cold open of the 2,000-page file under 30 ms).
-2. Keep the render cache (fonts, images) alive per document instead of per tile.
-3. Tile cache with a global byte budget; render cancellation when the user scrolls past.
-4. Progressive rendering: low-resolution preview first, then sharp.
-5. Smart night mode: draw text and lines in theme colours while images keep their real colours (our own drawing device, not whole-page inversion).
-6. Thumbnails and table of contents (outlines).
-7. Library size: measure what each dependency adds (`cargo bloat`), load the standard PDF fonts from disk instead of embedding them, put rarely used codecs (JPEG 2000, JBIG2, CCITT) behind switches, try `opt-level = "s"` for cold code. Target: under 3 MB for arm64-v8a with all formats.
+Detailed design: [phases/phase-3.md](phases/phase-3.md). Measured starting point: night and dusk themes make PDF text invisible (dark text drawn on the dark background); cold open of a 2,000-page PDF takes 333 ms because every page dictionary is read at open; each zoomed tile re-interprets the whole page; the arm64 library is 6.27 MB.
+
+1. Themes on PDFs: remap page colours by lightness (text in the theme's colour, hue kept), images keep their colours.
+2. Lazy page tree (vendored `hayro-syntax`, small documented patch): page count from `/Count`, page N found by descending the tree. Target: cold open under 30 ms.
+3. Batch tile rendering with one shared render cache per page. Target: later tiles under half the first's cost.
+4. Cancellation between tiles; a stated byte budget for every engine cache.
+5. Thumbnails and table of contents (PDF outlines), in the CLI and on Android.
+6. Library size: packed relocations, size-optimised cold code, JBIG2/JPEG 2000/CCITT as switches, standard fonts from a file. Target revised to 3.5 MB for all formats (the PDF text recovery needs the shaper), under 3 MB for PDF-only without rare codecs.
+7. CI benchmarks and the review.
 
 ### Phase 4: Indic PDF reflow ⬜
 
