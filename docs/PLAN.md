@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 3 done)
+Last updated: 2026-11-25 (Phase 4 planned)
 
 ---
 
@@ -167,25 +167,20 @@ Results: night, dusk and sepia work on PDFs with photos kept in colour; cold ope
 
 Review: [reviews/phase-3.md](reviews/phase-3.md), 13 findings. Fixed: night-theme cost growing with the number of images on a page, the hayro version the render cache's `unsafe` relies on now pinned, benchmark load check. Carried forward: library size, redraw speed against MuPDF, memory on Indic pages, damaged-file recovery.
 
-### Phase 4: Indic PDF reflow ⬜
+### Phase 4: Indic PDF reflow 🔄
 
-Turn a PDF page's text layer (Phase 2) into a `Document` (reading order, paragraphs, headings by size) and lay it out with the flow pipeline. Images kept as blocks.
+Detailed design: [phases/phase-4.md](phases/phase-4.md). Measured starting point: no reflow; on a two-column XeLaTeX book page 8.7% of words run together (XeLaTeX draws no spaces and justifies tightly; MuPDF finds 17% of words there); running headers and page numbers are read as text lines; line-end hyphens are kept.
 
-Carried from the Phase 2 review:
+1. A book-like corpus with ground truth: Chrome, LibreOffice Writer (.docx, .odt), XeLaTeX, LuaLaTeX (and Typst); one and two columns, headers, page numbers, footnotes, hyphenation, headings, figures. A `tests/real/` folder for real PDFs used with permission.
+2. Word gaps from the font's space width and per-line gap clusters. Target: 100% of words found on XeLaTeX and LuaLaTeX PDFs.
+3. Page structure (`akkhor-pdf::structure`): columns, running headers and page numbers, paragraphs, headings, line-end hyphens, footnotes, bold and italic, images.
+4. Reflow: chapters from the outline (or 16-page runs), a `Document` per chapter laid out by the EPUB pipeline, a two-way position map between reflow and page positions. Targets: reflow error under 0.5%, block boundaries over 95%, no headers or page numbers leaked.
+5. Interfaces: CLI `--reflow`, the `akkhor` crate, Android (reflow chapters, position conversion, UTF-16 offsets for read-aloud).
+6. Type 3 synthetic-bold headings recovered by outline matching.
+7. Carried from Phase 3: library size (target under 5.5 MB), damaged-file recovery (rebuild the cross-reference table), memory on Indic pages (share parsed fonts), a redraw study.
+8. Benchmarks, case study (reflow section and book corpus for every engine) and the review.
 
-1. Column detection (the text layer reads in drawing order today).
-2. Type 3 fonts: match glyph procedure paths against reference outlines, for Chrome's synthetic bold.
-3. A real-world corpus: Bangla and Hindi PDFs from Word, InDesign, XeLaTeX and publishers, measured in CI.
-4. Reference fonts beyond Noto: a downloadable pack of freely licensed Bangla and Hindi fonts (SolaimanLipi, Kalpurush, Nikosh, ...), registered like the phone's own.
-5. UTF-16 positions in the Android API, for read-aloud highlighting.
-6. Kruti Dev / Chanakya, once a table can be verified against a corpus.
-
-Carried from the Phase 3 review:
-
-7. Library size: standard PDF fonts from a file, a `cargo bloat` pass on arm64, unused HarfRust tables. Target under 5.5 MB all formats, under 4.5 MB PDF only.
-8. Redraw speed: study recording a page once and replaying it per tile.
-9. Memory on Indic pages: share parsed fonts between text recovery and rendering.
-10. Damaged files: rebuild a broken cross-reference table by scanning for objects.
+Moved out: the downloadable Bangla and Hindi font pack (app side, licence checks), Kruti Dev (no verifiable table).
 
 ### Phase 5: More formats ⬜
 
