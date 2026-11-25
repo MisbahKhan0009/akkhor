@@ -12,8 +12,12 @@
                       outlines move sideways and exact outline matching
                       fails.
 
-Both start from the .raw.pdf files (no ToUnicode, no ActualText), so the
-text can only come from recovering the glyphs. Run from the repository
+  indic.raw.pdf       tests/fixtures/indic.pdf without its text layer: its
+                      bold headings are Chrome's synthetic bold, Type 3
+                      glyphs with nothing but drawing procedures.
+
+All start without ToUnicode or ActualText, so the text can only come from
+recovering the glyphs. Run from the repository
 root:  python3 scripts/make_producer_quirks.py
 """
 
@@ -68,6 +72,12 @@ def rewritten_fonts(src, dst):
 
 
 def main():
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from make_corpus import strip_tounicode
+
+    n = strip_tounicode(os.path.join(ROOT, "tests", "fixtures", "indic.pdf"), os.path.join(PDF, "indic.raw.pdf"))
+    print(f"indic.raw.pdf ({n} maps and spans removed)")
     for name in SOURCES:
         src = os.path.join(PDF, name)
         stem = name[: -len(".raw.pdf")]

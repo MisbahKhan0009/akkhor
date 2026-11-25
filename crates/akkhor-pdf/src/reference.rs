@@ -22,7 +22,8 @@ use skrifa::outline::{DrawSettings, OutlinePen};
 use skrifa::raw::TableProvider;
 use skrifa::{FontRef, GlyphId, MetadataProvider};
 
-use crate::recover::{self, Recovery};
+use crate::recover::{self, GlyphText, Recovery};
+use crate::shape::Shape;
 
 type Data = Arc<dyn AsRef<[u8]> + Send + Sync>;
 
@@ -47,6 +48,9 @@ struct ReferenceFont {
     deep: OnceLock<Option<Arc<Recovery>>>,
     /// Outline hash → glyph id.
     shapes: OnceLock<HashMap<u64, u32>>,
+    /// Coarse pictures of every glyph, for Type 3 matching: (glyph id,
+    /// advance in 1000-unit ems, shape, shape grown by a cell).
+    pictures: OnceLock<Vec<(u32, f32, Shape, Shape)>>,
     name: OnceLock<Option<String>>,
 }
 
@@ -99,6 +103,137 @@ impl ReferenceFont {
     }
 }
 
+impl ReferenceFont {
+    fn pictures(&self) -> &[(u32, f32, Shape, Shape)] {
+        self.pictures.get_or_init(|| {
+            let mut out = Vec::new();
+            let Ok(font) = FontRef::new((*self.data).as_ref()) else {
+                return out;
+            };
+            let upem = font.head().map(|h| h.units_per_em()).unwrap_or(1000).max(1) as f64;
+            let scale = 1000.0 / upem;
+            let count = font.maxp().map(|m| m.num_glyphs() as u32).unwrap_or(0);
+            let outlines = font.outline_glyphs();
+            let metrics = font.glyph_metrics(Size::unscaled(), LocationRef::default());
+            for gid in 1..count {
+                let id = GlyphId::new(gid);
+                let Some(glyph) = outlines.get(id) else {
+                    continue;
+                };
+                let mut pen = PathPen {
+                    path: hayro::kurbo::BezPath::new(),
+                    scale,
+                };
+                let settings = DrawSettings::unhinted(Size::unscaled(), LocationRef::default());
+                if glyph.draw(settings, &mut pen).is_err() || pen.path.elements().is_empty() {
+                    continue;
+                }
+                let shape = Shape::of(&pen.path);
+                if shape.is_empty() {
+                    continue;
+                }
+                let advance = metrics.advance_width(id).unwrap_or(0.0) * scale as f32;
+                out.push((gid, advance, shape, shape.dilated()));
+            }
+            out
+        })
+    }
+}
+
+struct PathPen {
+    path: hayro::kurbo::BezPath,
+    scale: f64,
+}
+
+impl OutlinePen for PathPen {
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.path
+            .move_to((x as f64 * self.scale, y as f64 * self.scale));
+    }
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.path
+            .line_to((x as f64 * self.scale, y as f64 * self.scale));
+    }
+    fn quad_to(&mut self, cx: f32, cy: f32, x: f32, y: f32) {
+        let s = self.scale;
+        self.path
+            .quad_to((cx as f64 * s, cy as f64 * s), (x as f64 * s, y as f64 * s));
+    }
+    fn curve_to(&mut self, c0x: f32, c0y: f32, c1x: f32, c1y: f32, x: f32, y: f32) {
+        let s = self.scale;
+        self.path.curve_to(
+            (c0x as f64 * s, c0y as f64 * s),
+            (c1x as f64 * s, c1y as f64 * s),
+            (x as f64 * s, y as f64 * s),
+        );
+    }
+    fn close(&mut self) {
+        self.path.close_path();
+    }
+}
+
+/// The letters of glyphs known only by their look (Type 3 synthetic bold):
+/// each shape is compared with every registered font's glyphs of about the
+/// same advance (synthetic bold keeps it) as a bolder copy of them, and the
+/// best match is taken when it is near certain and clearly ahead of the
+/// next glyph. Shapes are `(shape, advance)` in 1000-unit ems.
+pub fn recognise(shapes: &[(Shape, f32)]) -> Vec<Option<GlyphText>> {
+    const MIN: f32 = 0.9;
+    const MARGIN: f32 = 0.03;
+    // Per shape: (score, text) of the best glyph, and the best score of a
+    // glyph that reads differently (fonts hold look-alike variants of the
+    // same letters, which must not count against each other).
+    let mut best: Vec<Option<(f32, GlyphText)>> = vec![None; shapes.len()];
+    let mut other: Vec<f32> = vec![0.0; shapes.len()];
+    for font in references() {
+        let pictures = font.pictures();
+        if pictures.is_empty() {
+            continue;
+        }
+        // The quick table: the deep one costs too much for a heading, and
+        // the glyphs of headings are common ones.
+        let Some(table) = font.recovery().cloned() else {
+            continue;
+        };
+        for (i, (shape, advance)) in shapes.iter().enumerate() {
+            if shape.is_empty() {
+                continue;
+            }
+            for (gid, adv, pic, grown) in pictures {
+                if (adv - advance).abs() > advance.max(100.0) * 0.12 {
+                    continue;
+                }
+                let Some(text) = table.map.get(gid) else {
+                    continue;
+                };
+                let s = pic.bold_match(shape, grown);
+                match &best[i] {
+                    Some((f, t)) if s <= *f => {
+                        if t.text != text.text {
+                            other[i] = other[i].max(s);
+                        }
+                    }
+                    _ => {
+                        if let Some((f, t)) = &best[i]
+                            && t.text != text.text
+                        {
+                            other[i] = other[i].max(*f);
+                        }
+                        best[i] = Some((s, text.clone()));
+                    }
+                }
+            }
+        }
+    }
+    best.into_iter()
+        .zip(other)
+        .map(|(b, second)| {
+            let (score, text) = b?;
+            (score >= MIN && score - second >= MARGIN).then_some(text)
+        })
+        .collect()
+}
+
 fn registry() -> &'static Mutex<Vec<Arc<ReferenceFont>>> {
     static REGISTRY: OnceLock<Mutex<Vec<Arc<ReferenceFont>>>> = OnceLock::new();
     REGISTRY.get_or_init(|| {
@@ -112,6 +247,7 @@ fn registry() -> &'static Mutex<Vec<Arc<ReferenceFont>>> {
                 recovery: OnceLock::new(),
                 deep: OnceLock::new(),
                 shapes: OnceLock::new(),
+                pictures: OnceLock::new(),
                 name: OnceLock::new(),
             }));
         }
@@ -128,6 +264,7 @@ pub fn register_reference_font(data: Arc<dyn AsRef<[u8]> + Send + Sync>) {
         recovery: OnceLock::new(),
         deep: OnceLock::new(),
         shapes: OnceLock::new(),
+        pictures: OnceLock::new(),
         name: OnceLock::new(),
     });
     registry()

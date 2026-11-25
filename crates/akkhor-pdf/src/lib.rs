@@ -19,6 +19,7 @@ mod read;
 pub mod recover;
 pub mod reference;
 pub mod reflow;
+pub mod shape;
 pub mod structure;
 pub mod text;
 mod theme;
@@ -98,6 +99,10 @@ impl akkhor_flow::ImageProvider for ReflowImages<'_> {
         })
     }
 }
+
+/// Recognised Type 3 glyphs get ids from here up (Type 3 glyphs otherwise
+/// all have id 0), so they never meet a real glyph id.
+const TYPE3_IDS: u32 = 0x4000_0000;
 
 /// Pages per reflow chapter when the outline gives none (or a long one).
 pub const REFLOW_PAGES: usize = 16;
@@ -284,8 +289,8 @@ impl PdfDocument {
     /// reading order: vowel signs drawn before their consonant, rephs drawn
     /// after their syllable and two-part vowels.
     pub fn page_text(&self, index: usize) -> Result<PageText> {
-        let glyphs = self.glyphs(index)?;
-        let tables = glyphs
+        let mut glyphs = self.glyphs(index)?;
+        let mut tables: Vec<Option<Arc<recover::Recovery>>> = glyphs
             .fonts
             .iter()
             .enumerate()
@@ -297,6 +302,59 @@ impl PdfDocument {
                 }
             })
             .collect();
+        // Type 3 glyphs with no text (Chrome's synthetic bold) are known by
+        // their look: matched against the reference fonts' glyphs, they get
+        // a table of their own, keyed by shape.
+        // Only shapes that nothing else names (no ActualText span either)
+        // are worth recognising.
+        let needed: std::collections::HashSet<u32> = glyphs
+            .glyphs
+            .iter()
+            .filter(|g| g.actual.is_none())
+            .filter_map(|g| g.type3)
+            .collect();
+        if !needed.is_empty() {
+            let wanted: Vec<(shape::Shape, f32)> = glyphs
+                .type3_shapes
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    if needed.contains(&(i as u32)) {
+                        *s
+                    } else {
+                        (shape::Shape::default(), s.1)
+                    }
+                })
+                .collect();
+            let texts = contain(|| reference::recognise(&wanted)).unwrap_or_default();
+            let mut table = recover::Recovery::default();
+            for (i, t) in texts.into_iter().enumerate() {
+                // A Type 3 glyph that draws nothing is a space.
+                if glyphs.type3_shapes[i].0.is_empty() {
+                    table.blank.insert(TYPE3_IDS + i as u32);
+                }
+                if let Some(t) = t {
+                    table.indic |= t
+                        .text
+                        .chars()
+                        .any(|c| akkhor_flow::script::indic_cat(c).is_some());
+                    table.map.insert(TYPE3_IDS + i as u32, t);
+                }
+            }
+            if !table.map.is_empty() {
+                table.complete = true;
+                table.indic = false; // the PDF's own text, where there is any, comes first
+                let table = Arc::new(table);
+                for g in &mut glyphs.glyphs {
+                    if let Some(i) = g.type3 {
+                        g.glyph_id = TYPE3_IDS + i;
+                        if let Some(slot) = tables.get_mut(g.font) {
+                            *slot = Some(table.clone());
+                        }
+                    }
+                }
+            }
+        }
         let fonts = read::readings(&glyphs, tables);
         let actual = read::ActualTexts::new(&glyphs);
         contain(|| {

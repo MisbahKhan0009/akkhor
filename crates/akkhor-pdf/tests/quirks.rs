@@ -38,3 +38,12 @@ fn fake_bold_is_reported_as_bold() {
     assert!(!glyphs.glyphs.is_empty());
     assert!(glyphs.glyphs.iter().all(|g| g.bold));
 }
+
+#[test]
+fn synthetic_bold_type3_headings_are_recognised() {
+    register_test_fonts();
+    let pdf = PdfDocument::open(&Source::open(corpus("pdf/indic.raw.pdf")).unwrap()).unwrap();
+    let text = pdf.page_text(0).unwrap().text;
+    assert!(text.contains("অক্ষর পরীক্ষা"), "{text}");
+    assert!(text.contains("अक्षर परीक्षण"), "{text}");
+}

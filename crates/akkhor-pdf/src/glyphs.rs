@@ -64,6 +64,9 @@ pub struct PdfGlyph {
     pub artifact: bool,
     /// Drawn with a stroke, or drawn again over itself: synthetic bold.
     pub bold: bool,
+    /// For a Type 3 glyph without text: index into
+    /// [`PageGlyphs::type3_shapes`].
+    pub type3: Option<u32>,
 }
 
 /// The glyphs of one page and the fonts they use.
@@ -73,6 +76,9 @@ pub struct PageGlyphs {
     pub fonts: Vec<Arc<PdfFont>>,
     /// Text of each `/ActualText` span on the page.
     pub actual_texts: Vec<String>,
+    /// Shapes of the page's Type 3 glyphs that carry no text, with their
+    /// advance (1000-unit ems), for recognition against reference fonts.
+    pub type3_shapes: Vec<(crate::shape::Shape, f32)>,
 }
 
 fn strip_subset_prefix(name: &str) -> String {
@@ -97,6 +103,8 @@ struct Collector {
     /// a glyph drawn outside is not on the page (Chrome draws the start of
     /// the next page's lines and clips them away).
     clips: Vec<Rect>,
+    /// Type 3 glyphs already pictured: glyph cache key to shape index.
+    type3_seen: std::collections::HashMap<u128, u32>,
     /// Where each glyph was drawn: (font, glyph id, char code, x and y in
     /// half points) to its index, to drop copies drawn on top.
     placed: std::collections::HashMap<(usize, u32, u32, i64, i64), usize>,
@@ -216,6 +224,24 @@ impl<'a> Device<'a> for Collector {
                 BfString::Char(c) => c.to_string(),
                 BfString::String(s) => s,
             });
+            // A Type 3 glyph with no text is only known by its look.
+            let type3 = match &**g {
+                Glyph::Type3(t3) if unicode.as_deref().is_none_or(|u| !crate::text::usable(u)) => {
+                    let key = hayro::hayro_interpret::CacheKey::cache_key(&**t3)
+                        ^ u128::from(g.char_code()).rotate_left(64);
+                    match self.type3_seen.get(&key) {
+                        Some(&i) => Some(i),
+                        None => {
+                            let shape = type3_shape(t3, &props.paint);
+                            let i = self.out.type3_shapes.len() as u32;
+                            self.out.type3_shapes.push((shape, advance_units));
+                            self.type3_seen.insert(key, i);
+                            Some(i)
+                        }
+                    }
+                }
+                _ => None,
+            };
             // Clipped away: its middle is outside the clip.
             let middle = Point::new((origin.x + end.x) / 2.0, origin.y - 0.3 * size as f64);
             if self
@@ -265,9 +291,46 @@ impl<'a> Device<'a> for Collector {
                 actual: self.marked.iter().flatten().next().copied(),
                 artifact,
                 bold: stroked,
+                type3,
             });
         }
     }
+}
+
+/// The filled outline of a Type 3 glyph, in 1000-unit ems with y up.
+fn type3_shape<'a>(
+    glyph: &hayro::hayro_interpret::font::Type3Glyph<'a>,
+    paint: &hayro::hayro_interpret::Paint<'a>,
+) -> crate::shape::Shape {
+    struct Outline {
+        path: BezPath,
+    }
+    impl<'a> Device<'a> for Outline {
+        fn draw_path(&mut self, path: &BezPath, props: DrawProps<'a>, mode: &DrawMode) {
+            // The fill is the glyph; a stroke on top only makes it bolder.
+            if matches!(mode, DrawMode::Fill(_) | DrawMode::FillAndStroke(..)) {
+                self.path.extend(props.transform * path.clone());
+            }
+        }
+        fn push_clip_path(&mut self, _: &ClipPath) {}
+        fn push_transparency_group(&mut self, _: f32, _: Option<SoftMask<'a>>, _: BlendMode) {}
+        fn draw_glyph_run(&mut self, _: &GlyphRun<'_, 'a>, _: DrawProps<'a>, _: &DrawMode) {}
+        fn draw_image(&mut self, _: hayro::hayro_interpret::Image<'a, '_>, _: ImageDrawProps<'a>) {}
+        fn pop_clip(&mut self) {}
+        fn pop_transparency_group(&mut self) {}
+        fn begin_marked_content(
+            &mut self,
+            _: &[u8],
+            _: Option<&hayro::hayro_syntax::object::Dict<'_>>,
+        ) {
+        }
+        fn end_marked_content(&mut self) {}
+    }
+    let mut d = Outline {
+        path: BezPath::new(),
+    };
+    glyph.interpret(&mut d, Affine::IDENTITY, Affine::IDENTITY, paint);
+    crate::shape::Shape::of(&d.path)
 }
 
 /// Collects the glyphs drawn on `page`.
@@ -287,6 +350,7 @@ pub(crate) fn collect(page: &Page<'_>) -> PageGlyphs {
         artifacts: Vec::new(),
         placed: Default::default(),
         clips: Vec::new(),
+        type3_seen: Default::default(),
     };
     interpret_page(page, &mut ctx, &mut collector);
     collector.out
