@@ -160,7 +160,8 @@ Detailed design: [phases/phase-3.md](phases/phase-3.md). Measured starting point
 4. Cancellation between tiles; a stated byte budget for every engine cache.
 5. Thumbnails and table of contents (PDF outlines), in the CLI and on Android.
 6. Library size: packed relocations, size-optimised cold code, JBIG2/JPEG 2000/CCITT as switches, standard fonts from a file. Target revised to 3.5 MB for all formats (the PDF text recovery needs the shaper), under 3 MB for PDF-only without rare codecs.
-7. CI benchmarks and the review.
+7. Case study material (`docs/case-study/`): reproducible comparison with MuPDF, PDFium and Poppler (Indic text accuracy, search, open time, render time, memory, size, robustness), charts, a long-form draft and a LinkedIn post draft. From now on every phase adds its numbers to `docs/case-study/data/history.csv`.
+8. CI benchmarks and the review.
 
 ### Phase 4: Indic PDF reflow ⬜
 
