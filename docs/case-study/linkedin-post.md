@@ -6,6 +6,7 @@
 2. `reflow-showcase.png`: a two-column PDF page reflowed for a phone
 3. `text-accuracy.png`
 4. `books-words-intact.png` or `real-world-book.png`
+   (or `tables-showcase.png` for the table and card reflow)
 5. `speed-big-pdf.png` (or `cold-open.png`)
 
 ---
@@ -28,7 +29,8 @@ into reading order (ি, the reph, split vowels).
 🔹 Bijoy text is converted to Unicode automatically, in PDFs and text files.
 
 🔹 It reflows PDFs: a two-column book page becomes paragraphs on a phone
-screen, without running headers or page numbers, in any theme.
+screen, without running headers or page numbers, in any theme. Tables come
+out row by row, wide ones as a picture, and cards stay whole.
 
 🔹 It's built for phones: files are memory-mapped and only the pages you
 open are read.

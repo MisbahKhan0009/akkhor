@@ -252,6 +252,9 @@ impl<'g> GlyphPiece<'g> {
 ///
 /// A gap a vertical rule runs through (a table's cell border) is always a
 /// split, however narrow.
+/// More gaps than this on a page are not looked at for columns or cells.
+const MAX_GAPS: usize = 3000;
+
 fn split_at_gutters<'g>(lines: Vec<Vec<&'g PdfGlyph>>, rules: &[Rect]) -> Vec<Vec<&'g PdfGlyph>> {
     // Gaps per line: (line, index of the glyph after the gap, x0, x1, size).
     let mut gaps: Vec<(usize, usize, f32, f32, f32)> = Vec::new();
@@ -283,6 +286,12 @@ fn split_at_gutters<'g>(lines: Vec<Vec<&'g PdfGlyph>>, rules: &[Rect]) -> Vec<Ve
                 end = end.max(g.origin.0 + g.advance);
             }
         }
+    }
+    // Every gap is compared with every other: a page with thousands of
+    // them (a hostile file, or a chart's tick labels) keeps only the rule
+    // cuts.
+    if gaps.len() > MAX_GAPS {
+        gaps.clear();
     }
     if gaps.is_empty() && cuts.iter().all(Vec::is_empty) {
         return lines;

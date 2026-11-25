@@ -48,8 +48,8 @@ pub enum BlockKind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Block {
     pub kind: BlockKind,
-    /// Indices into the page's [`PageText::lines`], top to bottom. Empty
-    /// for an image.
+    /// Indices into the page's [`PageText::lines`], top to bottom. For an
+    /// image, the text drawn over it (labels), which the picture shows.
     pub lines: Vec<usize>,
     /// Box on the page, in points (top-left origin).
     pub rect: Rect,
@@ -61,6 +61,8 @@ pub struct Block {
     pub boxed: bool,
     /// Which box of the page, for a boxed block.
     pub box_index: usize,
+    /// Its lines share a centre, not a left edge.
+    pub centred: bool,
     /// The cells of a [`BlockKind::Table`].
     pub table: Option<Table>,
 }
@@ -542,14 +544,27 @@ fn paragraphs(
                     out.push(b);
                 }
                 prev = None;
+                let picture = p.images[k];
+                let in_box = |l: usize| {
+                    ctx.found.tables.iter().any(|t| t.lines().contains(&l))
+                        || ctx.found.boxes.iter().any(|(_, ls)| ls.contains(&l))
+                };
+                let over: Vec<usize> = (0..p.text.lines.len())
+                    .filter(|&l| {
+                        picture.contains(info(p.text, l).rect.center())
+                            && !line_text(p.text, l).trim().is_empty()
+                            && !in_box(l)
+                    })
+                    .collect();
                 out.push(Block {
                     kind: BlockKind::Image,
-                    lines: Vec::new(),
-                    rect: p.images[k],
+                    lines: over,
+                    rect: picture,
                     region,
                     indented: false,
                     boxed: false,
                     box_index: 0,
+                    centred: false,
                     table: None,
                 });
             }
@@ -567,6 +582,7 @@ fn paragraphs(
                     indented: false,
                     boxed: false,
                     box_index: 0,
+                    centred: false,
                     table: Some(t.clone()),
                 });
             }
@@ -629,6 +645,7 @@ fn paragraphs(
                             indented,
                             boxed: false,
                             box_index: 0,
+                            centred,
                             table: None,
                         })
                     }

@@ -11,6 +11,7 @@
 use std::collections::HashSet;
 use std::ops::Range;
 
+use akkhor_flow::css::Align;
 use akkhor_flow::model::{Block, BlockKind as FlowKind, BlockStyle, Document, Style, StyleSpan};
 use hayro::kurbo::Rect;
 
@@ -244,7 +245,12 @@ impl Building {
         let columns = t.columns() - numbering.iter().filter(|n| **n).count();
         if t.regular && columns <= TEXT_COLUMNS {
             for (r, row) in t.rows.iter().enumerate() {
-                let k = self.new_block(FlowKind::Paragraph, BlockStyle::default());
+                // Ragged: justifying a row would spread its separators.
+                let style = BlockStyle {
+                    align: Some(Align::Start),
+                    ..BlockStyle::default()
+                };
+                let k = self.new_block(FlowKind::Paragraph, style);
                 let cells: Vec<(usize, &Vec<usize>)> = row
                     .iter()
                     .enumerate()
@@ -403,6 +409,11 @@ pub fn reflow(first: usize, pages: &[ReflowPage<'_>], own: Range<usize>) -> Refl
                 box_start = Some(b.box_index);
                 let style = BlockStyle {
                     margin_top: first.then_some(BOX_SPACE),
+                    align: Some(if b.centred {
+                        Align::Center
+                    } else {
+                        Align::Start
+                    }),
                     ..BlockStyle::default()
                 };
                 let k = out.new_block(kind, style);
@@ -424,11 +435,17 @@ pub fn reflow(first: usize, pages: &[ReflowPage<'_>], own: Range<usize>) -> Refl
                 BlockKind::Image => {
                     let k = out.new_block(FlowKind::Image, BlockStyle::default());
                     out.blocks[k].image = Some(image_source(page, b.rect));
-                    out.segments[k].push(Segment {
-                        at: 0,
-                        page,
-                        range: 0..0,
-                    });
+                    // Labels drawn over the picture: its alt text.
+                    for &l in &b.lines {
+                        out.push_line(k, page, text, l, &compounds);
+                    }
+                    if out.segments[k].is_empty() {
+                        out.segments[k].push(Segment {
+                            at: 0,
+                            page,
+                            range: 0..0,
+                        });
+                    }
                 }
                 BlockKind::Heading(level) => {
                     out.open = None;

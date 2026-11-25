@@ -1,0 +1,6 @@
+book,pages,measure,phase_4,phase_4b,note
+"Real Bangla book (not committed)",204,headings in the reflow,1221,356,"Phase 4 took row numbers, picture labels and lead-ins ending in a colon for headings"
+"Real Bangla book (not committed)",204,table rows reflowed as one row each,0,585,"Phase 4 read tables down their columns (every word, then every pronunciation)"
+"Real Bangla book (not committed)",204,pages whose tables read row by row,0,53,spot-checked on page images
+"Real Bangla book (not committed)",204,boxes read as cards,0,16,"coloured labels and numbered squares are text, not cards"
+"Real Bangla book (not committed)",204,reflow of the whole book (ms),1253,1468,"akkhor-bench reflow, page text and shapes included"

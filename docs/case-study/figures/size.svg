@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-11-25T18:58:39.007452</dc:date>
+    <dc:date>2026-11-26T03:21:34.040542</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -42,16 +42,16 @@ z
      <g id="line2d_1">
       <path d="M 73.44 252.833016 
 L 73.44 92.057016 
-" clip-path="url(#p90401eef04)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#p0e5e637727)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_2">
       <defs>
-       <path id="me90ce097ed" d="M 0 0 
+       <path id="mf3fad2b36d" d="M 0 0 
 L 0 3.5 
 " style="stroke: #666666; stroke-width: 0.8"/>
       </defs>
       <g>
-       <use xlink:href="#me90ce097ed" x="73.44" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+       <use xlink:href="#mf3fad2b36d" x="73.44" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_1">
@@ -62,11 +62,11 @@ L 0 3.5
      <g id="line2d_3">
       <path d="M 171.808805 252.833016 
 L 171.808805 92.057016 
-" clip-path="url(#p90401eef04)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#p0e5e637727)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_4">
       <g>
-       <use xlink:href="#me90ce097ed" x="171.808805" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+       <use xlink:href="#mf3fad2b36d" x="171.808805" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_2">
@@ -77,11 +77,11 @@ L 171.808805 92.057016
      <g id="line2d_5">
       <path d="M 270.177611 252.833016 
 L 270.177611 92.057016 
-" clip-path="url(#p90401eef04)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#p0e5e637727)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_6">
       <g>
-       <use xlink:href="#me90ce097ed" x="270.177611" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+       <use xlink:href="#mf3fad2b36d" x="270.177611" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_3">
@@ -92,11 +92,11 @@ L 270.177611 92.057016
      <g id="line2d_7">
       <path d="M 368.546416 252.833016 
 L 368.546416 92.057016 
-" clip-path="url(#p90401eef04)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#p0e5e637727)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_8">
       <g>
-       <use xlink:href="#me90ce097ed" x="368.546416" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+       <use xlink:href="#mf3fad2b36d" x="368.546416" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_4">
@@ -107,11 +107,11 @@ L 368.546416 92.057016
      <g id="line2d_9">
       <path d="M 466.915222 252.833016 
 L 466.915222 92.057016 
-" clip-path="url(#p90401eef04)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#p0e5e637727)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_10">
       <g>
-       <use xlink:href="#me90ce097ed" x="466.915222" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
+       <use xlink:href="#mf3fad2b36d" x="466.915222" y="252.833016" style="fill: #666666; stroke: #666666; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_5">
@@ -154,7 +154,7 @@ L 130.166221 122.009523
 L 130.166221 99.365016 
 L 73.44 99.365016 
 z
-" clip-path="url(#p90401eef04)" style="fill: #257de0; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#p0e5e637727)" style="fill: #257de0; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
     <path d="M 73.44 163.181354 
@@ -162,7 +162,7 @@ L 430.56 163.181354
 L 430.56 140.536847 
 L 73.44 140.536847 
 z
-" clip-path="url(#p90401eef04)" style="fill: #f47230; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#p0e5e637727)" style="fill: #f47230; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
     <path d="M 73.44 204.353185 
@@ -170,7 +170,7 @@ L 139.244481 204.353185
 L 139.244481 181.708678 
 L 73.44 181.708678 
 z
-" clip-path="url(#p90401eef04)" style="fill: #f47230; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#p0e5e637727)" style="fill: #f47230; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
     <path d="M 73.44 245.525016 
@@ -178,7 +178,7 @@ L 109.027001 245.525016
 L 109.027001 222.880509 
 L 73.44 222.880509 
 z
-" clip-path="url(#p90401eef04)" style="fill: #f47230; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
+" clip-path="url(#p0e5e637727)" style="fill: #f47230; stroke: #ffffff; stroke-width: 2; stroke-linejoin: miter"/>
    </g>
    <g id="patch_7">
     <path d="M 73.44 252.833016 
@@ -206,11 +206,11 @@ L 519.84 252.833016
    <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; fill: #666666" transform="translate(7.2 46.108193)">PDFium: PDF only. Poppler: PDF only; FreeType, cairo and fontconfig not counted.</text>
   </g>
   <g id="text_17">
-   <text style="font-size: 7px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #666666" x="7.2" y="342.319922" transform="rotate(-0 7.2 342.319922)">Intel(R) Xeon(R) Processor @ 2.10GHz, 2 cores · MuPDF 1.28.6 · PDFium 156.0.8076.0 · Poppler 24.02.0 · Akkhor 2a8f4d6 · 2026-11-25</text>
+   <text style="font-size: 7px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #666666" x="7.2" y="342.319922" transform="rotate(-0 7.2 342.319922)">Intel(R) Xeon(R) Processor @ 2.10GHz, 2 cores · MuPDF 1.28.6 · PDFium 156.0.8076.0 · Poppler 24.02.0 · Akkhor 758f6d3 · 2026-11-26</text>
   </g>
  </g>
  <defs>
-  <clipPath id="p90401eef04">
+  <clipPath id="p0e5e637727">
    <rect x="73.44" y="92.057016" width="446.4" height="160.776"/>
   </clipPath>
  </defs>

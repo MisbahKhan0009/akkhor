@@ -438,6 +438,78 @@ def real_world():
     save(fig, "real-world-book")
 
 
+def tables():
+    """Table rows read across and cards kept whole, per engine, on the
+    table and card corpus (Akkhor: its reflow)."""
+    rows = read("tables.csv")
+    if not rows:
+        return
+    def mean(engine, key):
+        vs = [float(r[key]) for r in rows if r["engine"] == engine and r.get(key) not in (None, "")]
+        return sum(vs) / len(vs) * 100 if vs else None
+    fig, axes = plt.subplots(1, 3, figsize=(14, 3.0), sharey=True)
+    for ax, (key, ours, title) in zip(axes, [
+            ("rows_in_order", "reflow_rows_in_order", "Table rows read across, cells in order"),
+            ("cards_whole", "reflow_cards_whole", "Cards kept whole"),
+            ("words_intact", "reflow_words_intact", "Words intact")]):
+        d = {}
+        for e in ("Akkhor", "MuPDF", "PDFium", "Poppler"):
+            v = mean(e, ours if e == "Akkhor" else key)
+            if v is not None:
+                d[e] = v
+        labels, vals = ordered(d)
+        bars(ax, labels, vals, lambda v: f"{v:.0f}%", title, "% (higher is better)", xmax=118)
+    header(fig, "Tables and cards in Bangla and Hindi PDFs",
+           "8 PDFs from Chrome, Word (LibreOffice), XeLaTeX and Typst: ruled, booktabs and borderless tables, "
+           "shaded cards side by side. Akkhor: its reflow; the others: their text, in reading order.")
+    save(fig, "tables")
+
+
+def tables_showcase():
+    """A page with tables and a card next to three phone screens of its
+    reflow: rows as text, the card centred, the wide table as a picture."""
+    from PIL import Image, ImageDraw, ImageFont
+    cli = os.path.join(ROOT, "target", "release", "akkhor")
+    pdf = os.path.join(ROOT, "tests", "corpus", "tables", "pdf", "bn.chrome.pdf")
+    if not (os.path.exists(cli) and os.path.exists(pdf)):
+        return
+    with tempfile.TemporaryDirectory() as d:
+        page = os.path.join(d, "page.png")
+        subprocess.run([cli, pdf, "--page", "1", "--scale", "1.6", "--out", page], capture_output=True)
+        screens = []
+        for n in (2, 3, 4):
+            out = os.path.join(d, f"s{n}.png")
+            subprocess.run([cli, pdf, "--reflow", "--size", "720x1280", "--theme", "sepia", "--screen", str(n),
+                            "--out", out], capture_output=True)
+            if os.path.exists(out):
+                screens.append(Image.open(out).convert("RGB"))
+        if not os.path.exists(page) or not screens:
+            return
+        orig = Image.open(page).convert("RGB")
+    h = 960
+    orig = orig.resize((int(orig.width * h / orig.height), h))
+    screens = [s.resize((540, h)) for s in screens]
+    pad, head = 28, 56
+    w = orig.width + sum(s.width for s in screens) + pad * (3 + len(screens))
+    sheet = Image.new("RGB", (w, h + head + pad), "white")
+    draw = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
+    except OSError:
+        font = ImageFont.load_default()
+    x = pad
+    sheet.paste(orig, (x, head))
+    draw.rectangle([x - 1, head - 1, x + orig.width, head + h], outline=GRID)
+    draw.text((x, 16), "The PDF: tables and a card", fill=TEXT, font=font)
+    x += orig.width + pad * 2
+    draw.text((x, 16), "Reflowed for a phone (sepia theme)", fill=TEXT, font=font)
+    for s in screens:
+        sheet.paste(s, (x, head))
+        x += s.width + pad
+    sheet.save(os.path.join(FIG, "tables-showcase.png"))
+    print("wrote tables-showcase")
+
+
 def reflow_showcase():
     """The two-column XeLaTeX page next to three phone screens of its reflow
     in the night theme."""
@@ -483,7 +555,7 @@ def reflow_showcase():
 def main():
     os.makedirs(FIG, exist_ok=True)
     for f in (text_accuracy, search, speed, cold_open, memory, size, robustness, progress, samples, themes,
-              books, real_world, reflow_showcase):
+              books, real_world, reflow_showcase, tables, tables_showcase):
         f()
     if shutil.which("google-chrome") is None:
         print("note: google-chrome not found; the text sample needs it")

@@ -180,8 +180,11 @@ colours. Scanned pages (greyscale images) follow the theme like text.
 ![200 damaged PDFs](figures/robustness.png)
 
 200 damaged PDFs, the same files for every engine: **no engine crashed or
-hung**. Akkhor shows page 1 of the most damaged files (143), then MuPDF
+hung**. Akkhor shows page 1 of the most damaged files (145), then MuPDF
 (130), Poppler (117) and PDFium (109); the rest are refused with an error.
+Two of those 145 came in Phase 4b: a single flipped byte inside a number of
+a page's `/MediaBox` used to make the whole page dictionary unreadable;
+the parser now skips the bad token, as MuPDF does.
 "Opened" means a page was shown: my first run also counted files that
 MuPDF and PDFium opened with zero pages, which gave MuPDF 180. With the
 same rule for everyone, that lead was an artefact.
@@ -239,6 +242,45 @@ With Kalpurush registered (it is free, under the OFL), 100% of the book's
 Bangla words come out whole; with only the bundled fonts, 68%; MuPDF, PDFium
 and Poppler about 26%.
 
+### Tables and cards
+
+![A page with tables and a card, and its reflow](figures/tables-showcase.png)
+
+Textbooks, word lists and exam papers are full of tables and boxes, and a
+reflow that reads them line by line, or down their columns, is useless.
+Phase 4b finds them before deciding the reading order:
+
+- **Tables** with ruled grids (Word's "Table Grid", HTML borders), with
+  horizontal rules only (LaTeX's booktabs), or with no rules at all, where
+  the cells line up. Their cells are never mistaken for columns.
+- **Small tables (up to three columns) become text**, one paragraph per
+  row with the cells in order (শব্দ · অর্থ · উদাহরণ), so they read aloud
+  and search like any sentence, and every word still maps back to its cell
+  on the page. **Wider ones become a picture** of that part of the page,
+  with their text kept for read-aloud.
+- **Cards and shaded boxes** are read box by box: three cards side by side
+  are three cards, not three columns read line by line across.
+- A bold line ending in a colon introduces what follows and is not a
+  heading; centred lines of different lengths are not taken for new
+  paragraphs.
+
+![Tables and cards per engine](figures/tables.png)
+
+On 8 new test PDFs (Chrome, Word through LibreOffice, XeLaTeX, Typst;
+Bangla and Hindi; [`data/tables.csv`](data/tables.csv)) every table row
+comes out whole and in order and every card stays together. The other
+engines have no reflow, so they are scored on their page text, the order a
+screen reader gets: MuPDF keeps 65% of table rows in order, PDFium 76%,
+Poppler 48%. The test files are mine and made for this; the real book
+below is the check that the rules are not just fitted to them.
+
+On the real Bangla book (not published,
+[`data/real_world_tables.csv`](data/real_world_tables.csv)) its tables now
+reflow as 585 rows on 53 pages, cells in order, where Phase 4 read each
+table down its columns; and the reflow has 356 headings instead of 1,221,
+because row numbers, labels around pictures and lead-ins ending in a colon
+no longer count.
+
 ## Where Akkhor is behind (and what is next)
 
 Being honest about this is part of the point:
@@ -254,6 +296,10 @@ Being honest about this is part of the point:
   page.
 - **Unknown fonts with no text layer:** if neither the PDF nor the phone
   has the font, there is nothing to recover from.
+- **Tables:** a header row whose labels sit in coloured boxes is read as
+  one line above the table, not as its header; merged cells send a table to
+  a picture rather than text; a table in a font with no bold has a plain
+  header row.
 - **Library size:** 5.8 MB on Linux and on Android (arm64) with all
   formats and Indic shaping: smaller than PDFium (6.7 MB, PDF only) and far
   below MuPDF (36 MB), but I missed my 3.5 MB target. Most of what is left
@@ -285,6 +331,10 @@ Being honest about this is part of the point:
 - The review of the night theme found a page that draws 100,000 small
   images made it 450 ms slower, because every pixel was checked against
   every image. A row-by-row sweep brought that to 40 ms.
+
+- My Phase 4 reflow numbers were all from generated books with no tables.
+  The first time I counted headings in the real book's reflow (1,221 for
+  204 pages) was in Phase 4b; most were row numbers and labels.
 
 ## How it was built
 

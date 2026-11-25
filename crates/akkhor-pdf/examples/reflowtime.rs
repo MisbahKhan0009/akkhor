@@ -1,5 +1,5 @@
-//! Times page structure and reflow alone, with the page text already
-//! built, for every 16-page chapter of a PDF.
+//! Times page structure and reflow alone, with the page text and shapes
+//! already built, for every chapter of a PDF; and the two passes before.
 //! cargo run --release -p akkhor-pdf --example reflowtime -- file.pdf
 use akkhor_core::Source;
 use akkhor_pdf::PdfDocument;
@@ -24,15 +24,23 @@ fn main() {
         texts.len(),
         t.elapsed().as_secs_f64() * 1e3
     );
+    let t = Instant::now();
+    let shapes: Vec<_> = (0..doc.page_count())
+        .map(|i| doc.page_shapes(i).unwrap())
+        .collect();
+    println!(
+        "pictures, rules and boxes, {} pages: {:.1} ms",
+        shapes.len(),
+        t.elapsed().as_secs_f64() * 1e3
+    );
     let mut worst: f64 = 0.0;
     let mut total = 0.0;
     for range in doc.reflow_chapters() {
-        let shapes = akkhor_pdf::reflow::PageShapes::default();
         let pages: Vec<_> = range
             .clone()
             .map(|i| akkhor_pdf::reflow::ReflowPage {
                 text: &texts[i],
-                shapes: &shapes,
+                shapes: &shapes[i],
                 size: doc.page_size(i).unwrap(),
             })
             .collect();

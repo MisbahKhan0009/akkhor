@@ -1,0 +1,9 @@
+fix,file_or_case,metric,before,after,unit,source
+Tables found before reading order (ruled; rules only; unruled),tests/corpus/tables (8 PDFs),table rows reflowed as one row with cells in order,0,100,%,scripts/bench/score_tables.py
+Cards and boxes read box by box,tests/corpus/tables (8 PDFs),cards kept whole in the reflow,not measured,100,%,scripts/bench/score_tables.py
+Wide tables as a picture with alt text,tests/corpus/tables (8 PDFs),six-column tables shown as a picture,0,100,%,scripts/bench/score_tables.py
+Hyphen-aware page search,tests/corpus/books (20 PDFs without Mukta),PDFs where page search misses a truth word,9,0,files,crates/akkhor-pdf/tests/books.rs
+Lenient array parsing (vendored hayro-syntax),200 damaged PDFs,files whose page 1 is shown,143,145,files,scripts/bench/compare_engines.py
+Candrabindu before candra E + anusvara in recovery,hi.xelatex.two.mukta.pdf,words intact,99.5,99.8,%,scripts/bench/score_books.py
+Typst base glyph drawn before its reph span,bn.typst.pdf (tables corpus),wrong words (কাডর্ড for কার্ড),3,0,words,crates/akkhor-pdf/tests/reflow.rs
+Type 3 synthetic bold detected by ink,bn.chrome.pdf (tables corpus),bold lines detected,0,all,lines,crates/akkhor-pdf/examples/lines.rs

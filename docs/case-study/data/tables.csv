@@ -1,0 +1,41 @@
+engine,file,cards_whole,pictures,reflow_cards_whole,reflow_rows_in_order,reflow_words_intact,rows_in_order,text_rows,words_intact
+Akkhor,bn.chrome.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.chrome.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,bn.chrome.pdf,1.0,,,,,0.625,,0.9453125
+PDFium,bn.chrome.pdf,1.0,,,,,1.0,,0.390625
+Poppler,bn.chrome.pdf,0.25,,,,,0.875,,0.96484375
+Akkhor,bn.typst.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.typst.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,bn.typst.pdf,0.5,,,,,0.6875,,0.88671875
+PDFium,bn.typst.pdf,0.75,,,,,0.75,,0.90234375
+Poppler,bn.typst.pdf,0.0,,,,,0.1875,,0.91015625
+Akkhor,bn.writer.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.writer.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,bn.writer.pdf,1.0,,,,,1.0,,0.9765625
+PDFium,bn.writer.pdf,1.0,,,,,1.0,,1.0
+Poppler,bn.writer.pdf,0.25,,,,,0.5,,0.96484375
+Akkhor,bn.xelatex.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),bn.xelatex.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,bn.xelatex.pdf,0.0,,,,,0.125,,0.16796875
+PDFium,bn.xelatex.pdf,0.0,,,,,0.125,,0.390625
+Poppler,bn.xelatex.pdf,0.0,,,,,0.0,,0.37109375
+Akkhor,hi.chrome.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.chrome.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,hi.chrome.pdf,0.75,,,,,0.5625,,0.9658385093167702
+PDFium,hi.chrome.pdf,1.0,,,,,1.0,,0.6335403726708074
+Poppler,hi.chrome.pdf,0.25,,,,,0.875,,0.937888198757764
+Akkhor,hi.typst.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.typst.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,hi.typst.pdf,0.75,,,,,0.8125,,0.953416149068323
+PDFium,hi.typst.pdf,0.75,,,,,0.8125,,0.7950310559006211
+Poppler,hi.typst.pdf,0.0,,,,,0.8125,,0.8913043478260869
+Akkhor,hi.writer.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.writer.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,hi.writer.pdf,1.0,,,,,1.0,,1.0
+PDFium,hi.writer.pdf,1.0,,,,,1.0,,0.860248447204969
+Poppler,hi.writer.pdf,1.0,,,,,0.5625,,0.937888198757764
+Akkhor,hi.xelatex.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Akkhor (+ device fonts),hi.xelatex.pdf,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+MuPDF,hi.xelatex.pdf,0.5,,,,,0.375,,0.22981366459627328
+PDFium,hi.xelatex.pdf,0.5,,,,,0.375,,0.7857142857142857
+Poppler,hi.xelatex.pdf,0.5,,,,,0.0,,0.8012422360248447

@@ -88,6 +88,9 @@ struct Seg {
     hi: f64,
 }
 
+/// Rules of one direction looked at per page.
+const MAX_RULES: usize = 1500;
+
 /// Joining tolerance, in points.
 const NEAR: f64 = 2.5;
 
@@ -156,7 +159,11 @@ pub fn find(text: &PageText, lines: &[usize], rules: &[Rect], fills: &[Rect], bo
             });
         }
     }
-    let (hs, vs) = (merge(hs), merge(vs));
+    let (mut hs, mut vs) = (merge(hs), merge(vs));
+    // Every horizontal rule is tested against every vertical one: a page
+    // drawing thousands (a chart, a hostile file) keeps the first few.
+    hs.truncate(MAX_RULES);
+    vs.truncate(MAX_RULES);
     // Grids: horizontal and vertical rules that cross.
     let n = hs.len() + vs.len();
     let mut parent: Vec<usize> = (0..n).collect();
@@ -227,22 +234,18 @@ pub fn find(text: &PageText, lines: &[usize], rules: &[Rect], fills: &[Rect], bo
                     regular &= covered(&gh, y, xs[c], xs[c + 1]);
                 }
             }
-            let grid: Vec<Vec<Vec<usize>>> = (0..rows)
-                .map(|r| {
-                    (0..cols)
-                        .map(|c| {
-                            let mut ls: Vec<usize> = within
-                                .iter()
-                                .copied()
-                                .filter(|&l| inside(&cell(r, c), l))
-                                .collect();
-                            ls.sort_by(|&a, &b| rect(a).y0.total_cmp(&rect(b).y0));
-                            ls
-                        })
-                        .collect()
-                })
-                .filter(|row: &Vec<Vec<usize>>| row.iter().any(|c| !c.is_empty()))
-                .collect();
+            // Each line to the cell its centre is in.
+            let mut grid: Vec<Vec<Vec<usize>>> = vec![vec![Vec::new(); cols]; rows];
+            for &l in &within {
+                let c = rect(l).center();
+                let col = xs.partition_point(|&x| x <= c.x).clamp(1, cols) - 1;
+                let row = ys.partition_point(|&y| y <= c.y).clamp(1, rows) - 1;
+                grid[row][col].push(l);
+            }
+            for cell in grid.iter_mut().flatten() {
+                cell.sort_by(|&a, &b| rect(a).y0.total_cmp(&rect(b).y0));
+            }
+            grid.retain(|row| row.iter().any(|c| !c.is_empty()));
             for &l in &within {
                 taken[l] = true;
             }
@@ -522,7 +525,9 @@ fn unruled(text: &PageText, lines: &[usize], body: f64) -> Vec<Table> {
         };
         let mut j = i + 1;
         let mut prev = info(head[0]).baseline;
-        while j < bands.len() {
+        // No page has a table of hundreds of rows; the bound keeps a
+        // hostile page from scanning every band from every start.
+        while j < bands.len() && j - i < 300 {
             let b = &bands[j];
             let step = f64::from(info(b[0]).baseline - prev);
             if step > body * 3.5 || !b.iter().all(|&l| fits(l)) {
@@ -728,6 +733,29 @@ mod tests {
         let t = page(&lines);
         let f = find(&t, &all(&t), &[], &[], 10.0);
         assert!(f.tables.is_empty());
+    }
+
+    #[test]
+    fn thousands_of_rules_and_aligned_lines_stay_quick() {
+        // A hostile page: 10,000 crossing rules and 20,000 short lines in
+        // two aligned columns.
+        let mut lines = Vec::new();
+        for k in 0..10_000 {
+            let base = 10.0 + 12.0 * k as f32;
+            lines.push((40.0, base, 60.0, "a"));
+            lines.push((100.0, base, 120.0, "b"));
+        }
+        let t = page(&lines);
+        let mut rules = Vec::new();
+        for k in 0..5_000 {
+            let x = 30.0 + f64::from(k) * 0.1;
+            rules.push(Rect::new(x, 0.0, x + 0.3, 120_000.0));
+            let y = f64::from(k) * 24.0;
+            rules.push(Rect::new(0.0, y, 400.0, y + 0.3));
+        }
+        let start = std::time::Instant::now();
+        let _ = find(&t, &all(&t), &rules, &[], 10.0);
+        assert!(start.elapsed().as_secs_f64() < 1.0);
     }
 
     #[test]

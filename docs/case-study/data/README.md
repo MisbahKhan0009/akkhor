@@ -18,7 +18,11 @@ run: `environment.json`.
 | `real_world_book.csv` | a real 204-page Bangla book (copyrighted: measured locally, not committed), Bangla words intact per engine | `scripts/bench/score_local.py`; reference = Akkhor with the book's fonts (Kalpurush, Hind Siliguri, both OFL) registered, spot-checked on 3 page images; bag of words, so reading order does not count |
 | `real_world_findings.csv` | defects that book exposed, before and after the fix, and the corpus file that now reproduces each | `crates/akkhor-pdf/tests/quirks.rs` |
 | `phase4_fixes.csv` | each Phase 4 text-layer fix, before and after | named per row |
-| `reflow_timing.csv` | page structure and reflow time alone (page text already built), per document | `crates/akkhor-pdf/examples/reflowtime.rs` |
+| `reflow_timing.csv` | page structure and reflow time alone (page text and shapes already built), per document; the two passes before it (page text; pictures, rules and boxes) timed apart. One row per phase | `crates/akkhor-pdf/examples/reflowtime.rs` |
+| `tables.csv` | table and card corpus (tests/corpus/tables, 8 PDFs from Chrome, Word via LibreOffice, XeLaTeX, Typst): per engine and file, words intact, table rows whose cells come out one after another in order, cards whose texts come out together; for Akkhor the same on its reflow, plus text-mode rows that are one block and wide tables shown as a picture | `scripts/bench/score_tables.py`. The other engines are scored on their page text: they have no reflow, so this is the order a reader or a screen reader gets from them |
+| `tables_summary.csv` | `tables.csv` averaged per engine and producer | `scripts/bench/score_tables.py --summary` |
+| `real_world_tables.csv` | the real Bangla book (not committed): headings, table rows and cards in the reflow, Phase 4 against Phase 4b | `akkhor-bench reflow` with the book's fonts registered, both builds; spot-checked on page images |
+| `phase4b_fixes.csv` | each Phase 4b fix, before and after | named per row |
 | `history.csv` | one row per milestone and metric | each row names where it was measured and its source |
 
 ## What to keep in mind

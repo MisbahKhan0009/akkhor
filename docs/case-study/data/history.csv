@@ -51,3 +51,6 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-25,Phase 4.7,memory added Bangla and Hindi page at 2x Akkhor (all engines 4 bytes a pixel),11.56,MB,cloud VM 2 cores,data/memory.csv
 2026-11-25,Phase 4.7,memory added Bangla and Hindi page at 2x MuPDF (4 bytes a pixel; 8.83 MB at 3 bytes),10.69,MB,cloud VM 2 cores,data/memory.csv
 2026-11-25,Phase 4.7,arm64 Android library size,5.73,MB,GitHub Actions cargo-ndk,CI run 45624038605 (standard fonts from the app; reflow and Type 3 included)
+2026-11-26,Phase 4b,table rows reflowed with cells in order (table corpus),100,%,tests/corpus/tables,scripts/bench/score_tables.py (MuPDF 65%; PDFium 76%; Poppler 48% in their text)
+2026-11-26,Phase 4b,damaged PDFs whose page 1 is shown,145,of 200,compare_engines.py robustness,lenient array parsing in vendored hayro-syntax (MuPDF 130)
+2026-11-26,Phase 4b,headings in the real Bangla book's reflow,356,blocks,local only,was 1221 in Phase 4 (numbers and labels taken for headings)

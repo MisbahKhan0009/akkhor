@@ -1,0 +1,21 @@
+engine,producer,files,cards_whole_pct,pictures_pct,reflow_cards_whole_pct,reflow_rows_in_order_pct,reflow_words_intact_pct,rows_in_order_pct,text_rows_pct,words_intact_pct
+Akkhor,chrome,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+Akkhor,typst,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+Akkhor,writer,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+Akkhor,xelatex,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+Akkhor (+ device fonts),chrome,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+Akkhor (+ device fonts),typst,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+Akkhor (+ device fonts),writer,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+Akkhor (+ device fonts),xelatex,2,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+MuPDF,chrome,2,87.5,,,,,59.4,,95.6
+MuPDF,typst,2,62.5,,,,,75.0,,92.0
+MuPDF,writer,2,100.0,,,,,100.0,,98.8
+MuPDF,xelatex,2,25.0,,,,,25.0,,19.9
+PDFium,chrome,2,100.0,,,,,100.0,,51.2
+PDFium,typst,2,75.0,,,,,78.1,,84.9
+PDFium,writer,2,100.0,,,,,100.0,,93.0
+PDFium,xelatex,2,25.0,,,,,25.0,,58.8
+Poppler,chrome,2,25.0,,,,,87.5,,95.1
+Poppler,typst,2,0.0,,,,,50.0,,90.1
+Poppler,writer,2,62.5,,,,,53.1,,95.1
+Poppler,xelatex,2,25.0,,,,,0.0,,58.6

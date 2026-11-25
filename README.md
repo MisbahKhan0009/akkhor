@@ -21,6 +21,7 @@ Akkhor aims to be light **and** correct. The full gap analysis is in
 
 - **PDF:** opens from a memory map (a 308 MB, 2,000-page file opens in 5 to 89 ms with ~7 MB of heap), renders any tile of any page at any zoom straight into your pixel buffer.
 - **EPUB 2/3:** own zip reader that only reads the archive index, metadata, reading order, table of contents, chapters parsed on demand, linked stylesheets, pictures (PNG, JPEG).
+- **PDF reflow:** a page's text as headings and paragraphs in reading order (columns, running headers and page numbers left out, hyphens joined, footnotes), tables row by row or as a picture when wide, cards box by box, with every position mapped back to the page.
 - **Plain text:** UTF-8, UTF-16 and Windows-1252, and detection of Bijoy-encoded Bangla.
 - **Indic-correct text:** OpenType shaping (HarfRust), and orthographic-syllable rules for Bangla, Devanagari, Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada and Malayalam. Line breaks, taps, selections and highlights never split a conjunct.
 - **Search that understands Indic spellings:** nukta letters, split vowels, ৎ / ত্‍, ZWJ/ZWNJ and case all match their equivalents, and a search for ক never matches half of ক্ষ.
