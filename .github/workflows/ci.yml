@@ -91,7 +91,7 @@ jobs:
         with:
           key: bench
       - run: cargo build --release -p akkhor-cli
-      - name: Generate a 2,000-page, ~300 MB PDF
+      - name: Generate a 2,000-page, ~300 MB PDF and a long Bangla text
         run: python3 scripts/make_fixtures.py --big 2000 --image-kb 150
       - name: Run
         run: |
@@ -114,6 +114,18 @@ jobs:
             echo
             echo "== Hindi EPUB chapter (dusk theme)"
             $B tests/fixtures/indic-sample.epub --page 1 --theme dusk --out epub-hi.png
+            echo
+            echo "== English chapter with an image"
+            $B tests/fixtures/indic-sample.epub --page 2 --theme sepia --out epub-en.png
+            echo
+            echo "== Long Bangla text (~1,000 pages): first page vs all pages"
+            $B tests/fixtures/big-bn.txt --out big-bn.png
+            echo
+            echo "== Search the long Bangla text"
+            $B tests/fixtures/big-bn.txt --search "যুক্তবর্ণ" | tail -1
+            echo
+            echo "== Bijoy-encoded text is detected"
+            $B tests/fixtures/bijoy-sample.txt | grep encoding
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
