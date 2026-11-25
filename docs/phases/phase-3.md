@@ -205,7 +205,12 @@ review of Phase 3, as for Phases 1 and 2.
   content, as upstream hayro does). `PdfDocument::trimmed()` and Android
   `trimMemory` reopen the file (under 1 ms) and shed it: 2.1 → 1.1 MB after
   200 pages.
-- [ ] Thumbnails and table of contents, in the CLI and on Android
+- [x] Thumbnails and table of contents, in the CLI (`--toc`) and on
+  Android (`outlineTitles`, `outlineLevelsAndPages`; thumbnails through
+  `renderPdfTile` at a small scale). A 200-pixel thumbnail of a page with
+  a photo: 1.5 ms. The outline of a Chrome PDF with Bangla, Hindi and
+  English headings matches MuPDF's entry for entry; explicit, named and
+  `GoTo` destinations, loops and depth are handled.
 - [ ] arm64 library under 3.5 MB with all formats
 - [x] Case study data, figures and drafts in `docs/case-study/`,
   reproducible with two scripts (first run 2026-11-25; it also exposed the

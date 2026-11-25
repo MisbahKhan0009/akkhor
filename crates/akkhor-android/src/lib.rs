@@ -22,6 +22,9 @@
 //!                                 theme: Int): Int
 //!     external fun cancelRendering(handle: Long)
 //!     external fun trimMemory(handle: Long): Int                    // from onTrimMemory
+//!     external fun outlineTitles(handle: Long): Array<String>?      // table of contents
+//!     external fun outlineLevelsAndPages(handle: Long): IntArray?   // [level, page, ...]
+//!     // Thumbnails: renderPdfTile at scale = side / max(pageWidth, pageHeight).
 //!     external fun layoutChapter(handle: Long, chapter: Int, width: Int, height: Int,
 //!                                fontSize: Float): Int               // page count, < 0 on error
 //!     external fun renderFlowPage(handle: Long, page: Int, bitmap: Bitmap, theme: Int): Int
@@ -591,6 +594,75 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTiles(
             }
             Ok(drawn)
         })
+    })
+}
+
+#[cfg(feature = "pdf")]
+fn pdf_outline(h: jlong) -> Result<Vec<akkhor::pdf::OutlineItem>, String> {
+    with_handle(h, |hd| match &hd.book {
+        Book::Pdf(p) => Ok(p.outline()),
+        #[allow(unreachable_patterns)]
+        _ => Err("not a PDF".into()),
+    })
+}
+
+/// The PDF's table of contents: the entries' titles, in order.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_outlineTitles(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+) -> jni_sys::jobjectArray {
+    guard(std::ptr::null_mut(), || {
+        let items = pdf_outline(h)?;
+        unsafe {
+            let find = (**env).FindClass.ok_or("JNI")?;
+            let class = find(env, c"java/lang/String".as_ptr());
+            if class.is_null() {
+                return Err("no String class".into());
+            }
+            let new = (**env).NewObjectArray.ok_or("JNI")?;
+            let set = (**env).SetObjectArrayElement.ok_or("JNI")?;
+            let del = (**env).DeleteLocalRef.ok_or("JNI")?;
+            let arr = new(env, items.len() as jint, class, std::ptr::null_mut());
+            if arr.is_null() {
+                return Err("out of memory".into());
+            }
+            for (i, item) in items.iter().enumerate() {
+                let s = new_jstring(env, &item.title)?;
+                set(env, arr, i as jint, s);
+                del(env, s);
+            }
+            Ok(arr)
+        }
+    })
+}
+
+/// The same entries' nesting levels and pages: `[level, page, ...]`, page
+/// -1 when an entry points nowhere in this document.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_outlineLevelsAndPages(
+    env: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+) -> jni_sys::jintArray {
+    guard(std::ptr::null_mut(), || {
+        let flat: Vec<jint> = pdf_outline(h)?
+            .iter()
+            .flat_map(|i| [i.level as jint, i.page.map_or(-1, |p| p as jint)])
+            .collect();
+        unsafe {
+            let new = (**env).NewIntArray.ok_or("JNI")?;
+            let set = (**env).SetIntArrayRegion.ok_or("JNI")?;
+            let arr = new(env, flat.len() as jint);
+            if arr.is_null() {
+                return Err("out of memory".into());
+            }
+            set(env, arr, 0, flat.len() as jint, flat.as_ptr());
+            Ok(arr)
+        }
     })
 }
 

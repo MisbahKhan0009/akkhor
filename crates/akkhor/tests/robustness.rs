@@ -63,6 +63,8 @@ fn exercise(bytes: Vec<u8>, name: &str, fonts: &FontSet) {
                 }
             }
             let _ = pdf.search("কর", 0).take(3).count();
+            let _ = pdf.outline();
+            let _ = pdf.thumbnail(0, 64, &Theme::NIGHT);
         }
         Book::Epub(epub) => {
             let _ = epub.toc.len();

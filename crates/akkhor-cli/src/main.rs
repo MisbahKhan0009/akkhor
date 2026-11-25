@@ -3,7 +3,7 @@
 //! ```text
 //! akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH]
 //!               [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT]
-//!               [--text]
+//!               [--text] [--toc]
 //! ```
 //!
 //! `--text` prints the page's text (for PDFs: the repaired text layer, next
@@ -27,6 +27,7 @@ struct Args {
     out: Option<String>,
     search: Option<String>,
     text: bool,
+    toc: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -41,6 +42,7 @@ fn parse_args() -> Result<Args, String> {
         out: None,
         search: None,
         text: false,
+        toc: false,
     };
     while let Some(a) = it.next() {
         let mut val = || it.next().ok_or(format!("{a} needs a value"));
@@ -50,6 +52,7 @@ fn parse_args() -> Result<Args, String> {
             "--out" => args.out = Some(val()?),
             "--search" => args.search = Some(val()?),
             "--text" => args.text = true,
+            "--toc" => args.toc = true,
             "--size" => {
                 let v = val()?;
                 let (w, h) = v.split_once('x').ok_or("--size is WxH")?;
@@ -162,6 +165,9 @@ fn run(args: Args) -> Result<(), String> {
     }
     if args.text {
         return print_text(&book, args.page);
+    }
+    if args.toc {
+        return print_toc(&book);
     }
 
     let (w, h, pixels) = match &book {
@@ -339,6 +345,28 @@ fn search(book: &Book, q: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Prints the table of contents: PDF outlines, or the EPUB's.
+fn print_toc(book: &Book) -> Result<(), String> {
+    let t = Instant::now();
+    match book {
+        Book::Pdf(pdf) => {
+            let toc = pdf.outline();
+            println!("toc       {} entries in {:.2} ms", toc.len(), ms(t));
+            for item in toc {
+                let page = item.page.map_or("-".to_string(), |p| (p + 1).to_string());
+                println!("  {}{}  (p {page})", "  ".repeat(item.level), item.title);
+            }
+        }
+        Book::Epub(epub) => {
+            for entry in &epub.toc {
+                println!("  {entry:?}");
+            }
+        }
+        Book::Text(_) => println!("toc       plain text has none"),
+    }
+    Ok(())
+}
+
 /// The last `n` characters of `s`.
 fn tail(s: &str, n: usize) -> &str {
     let at = s
@@ -395,7 +423,7 @@ fn main() -> ExitCode {
                 eprintln!("error: {e}");
             }
             eprintln!(
-                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT] [--text]"
+                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT] [--text] [--toc]"
             );
             ExitCode::FAILURE
         }

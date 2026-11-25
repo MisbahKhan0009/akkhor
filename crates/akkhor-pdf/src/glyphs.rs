@@ -90,7 +90,7 @@ struct Collector {
 
 /// Decodes a PDF text string: UTF-16 with a byte-order mark, else
 /// PDFDocEncoding (Latin-1 for the characters that matter here).
-fn text_string(bytes: &[u8]) -> String {
+pub(crate) fn text_string(bytes: &[u8]) -> String {
     match bytes {
         [0xFE, 0xFF, rest @ ..] => char::decode_utf16(
             rest.chunks_exact(2)

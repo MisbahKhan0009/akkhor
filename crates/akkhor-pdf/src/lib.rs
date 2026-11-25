@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub mod glyphs;
+pub mod outline;
 mod read;
 pub mod recover;
 pub mod reference;
@@ -22,6 +23,7 @@ mod theme;
 pub use reference::register_reference_font;
 
 pub use glyphs::{PageGlyphs, PdfFont, PdfGlyph};
+pub use outline::OutlineItem;
 pub use text::{PageText, TextSpan};
 
 use akkhor_core::{Error, Result, Source, Theme, Tile};
@@ -109,6 +111,19 @@ impl PdfDocument {
             .clone();
         *fresh.recoveries.lock().unwrap_or_else(|e| e.into_inner()) = tables;
         Ok(fresh)
+    }
+
+    /// The table of contents (PDF outlines), read on demand. Empty when
+    /// the PDF has none.
+    pub fn outline(&self) -> Vec<OutlineItem> {
+        contain(|| outline::read(&self.pdf)).unwrap_or_default()
+    }
+
+    /// A small picture of a page, its longer side `max_side` pixels.
+    pub fn thumbnail(&self, index: usize, max_side: u32, theme: &Theme) -> Result<RenderedPage> {
+        let (w, h) = self.page_size(index)?;
+        let scale = max_side.max(1) as f32 / w.max(h).max(1.0);
+        self.render_page(index, scale, theme)
     }
 
     pub fn page_count(&self) -> usize {
@@ -687,6 +702,47 @@ mod tests {
         assert_eq!(pdf.page_size(0).unwrap().0, 100.0);
         assert_eq!(page_widths(&pdf), vec![100.0, 200.0, 300.0, 400.0]);
         assert!(pdf.page_size(4).is_err());
+    }
+
+    #[test]
+    fn outlines_resolve_every_kind_of_destination() {
+        let pdf = pdf_from(&[
+            // 1: catalog, with a name tree for named destinations
+            "<< /Type /Catalog /Pages 2 0 R /Outlines 6 0 R /Names << /Dests << /Names [(ch3) [5 0 R /Fit]] >> >> >>",
+            "<< /Type /Pages /Count 3 /Kids [3 0 R 4 0 R 5 0 R] >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] >>",
+            "<< /Type /Outlines /First 7 0 R /Last 9 0 R /Count 3 >>",
+            // 7: explicit destination, with a child using a GoTo action
+            "<< /Title (Chapter 1) /Parent 6 0 R /Next 9 0 R /First 8 0 R /Dest [3 0 R /XYZ 0 0 0] >>",
+            "<< /Title <FEFF0985099509CD09B709B0> /Parent 7 0 R /A << /S /GoTo /D [4 0 R /Fit] >> >>",
+            // 9: a named destination, then a loop back to 7
+            "<< /Title (Chapter\t3) /Parent 6 0 R /Dest (ch3) /Next 7 0 R >>",
+        ]);
+        let pdf = PdfDocument::open(&Source::from_vec(pdf)).unwrap();
+        let toc = pdf.outline();
+        let got: Vec<(&str, usize, Option<usize>)> = toc
+            .iter()
+            .map(|i| (i.title.as_str(), i.level, i.page))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                ("Chapter 1", 0, Some(0)),
+                ("অক্ষর", 1, Some(1)),
+                ("Chapter 3", 0, Some(2))
+            ]
+        );
+        // No outlines: empty, not an error.
+        let _ = open("fixtures/small.pdf").outline();
+    }
+
+    #[test]
+    fn thumbnails_fit_the_requested_size() {
+        let pdf = open("fixtures/indic.pdf");
+        let t = pdf.thumbnail(0, 200, &Theme::PAPER).unwrap();
+        assert_eq!(t.width.max(t.height), 200);
     }
 
     #[test]
