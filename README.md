@@ -28,6 +28,14 @@ Akkhor aims to be light **and** correct. The full gap analysis is in
 - **Fonts on demand:** a script's font is only loaded when a book uses that script.
 - **Android:** a JNI bridge that draws straight into a `Bitmap`, with hit-testing, selection, copy and search.
 
+## How it compares
+
+Measured against MuPDF, PDFium and Poppler on 36 Bangla and Hindi PDFs
+and a 2,000-page, 308 MB PDF; data, method, every chart and the scripts to
+rerun it are in [`docs/case-study/`](docs/case-study/).
+
+![Characters wrong in text copied out of Bangla and Hindi PDFs](docs/case-study/figures/text-accuracy.png)
+
 ## Format switches
 
 ```toml

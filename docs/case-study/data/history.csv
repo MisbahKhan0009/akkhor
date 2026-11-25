@@ -1,0 +1,20 @@
+date,milestone,metric,value,unit,where_measured,source
+2026-11-25,Phase 1,cold open 2000-page 308 MB PDF,333,ms,GitHub Actions ubuntu-latest,CI benchmark run 45541933636
+2026-11-25,Phase 1,first page of a 1072-page Bangla text file,0.75,ms,desktop,docs/PLAN.md Phase 1 results
+2026-11-25,Phase 1,arm64 Android library size,5.8,MB,GitHub Actions cargo-ndk,docs/PLAN.md
+2026-11-25,Phase 1 review,parse 20000 nested divs,8700,ms,desktop,docs/reviews/phase-0-1.md (before fix)
+2026-11-25,Phase 1 review,parse 20000 nested divs,500,ms,desktop,docs/reviews/phase-0-1.md (after fix; upper bound)
+2026-11-25,Phase 2,character error rate Bangla Chrome PDF read glyph by glyph,31.3,%,desktop,crates/akkhor-pdf/tests/accuracy.rs (per glyph column)
+2026-11-25,Phase 2,character error rate corpus PDFs with no text layer (known fonts),0.0,%,desktop,crates/akkhor-pdf/tests/accuracy.rs
+2026-11-25,Phase 2,Bijoy round trip words exact,99.7,%,desktop,crates/akkhor-flow/tests/bijoy_roundtrip.rs
+2026-11-25,Phase 2,arm64 Android library size,6.27,MB,GitHub Actions cargo-ndk,CI run 45555325034
+2026-11-25,Phase 2 review,first page text with 38 reference fonts (Mukta PDF),206,ms,desktop,docs/reviews/phase-2.md (before fix)
+2026-11-25,Phase 2 review,first page text with 38 reference fonts (Mukta PDF),40,ms,desktop,docs/reviews/phase-2.md (after fix)
+2026-11-25,Phase 3.1,night theme on PDFs: text visible,0,yes/no,desktop,docs/phases/phase-3.md (before: invisible)
+2026-11-25,Phase 3.1,night theme on PDFs: text visible,1,yes/no,desktop,crates/akkhor-pdf themes test
+2026-11-25,Phase 3.2,warm open 2000-page 308 MB PDF,12.1,ms,desktop,before lazy page tree
+2026-11-25,Phase 3.2,warm open 2000-page 308 MB PDF,0.46,ms,desktop,after lazy page tree
+2026-11-25,Phase 3.2,heap after open 2000-page PDF,6.6,MB,desktop,before lazy page tree
+2026-11-25,Phase 3.2,heap after open 2000-page PDF,1.0,MB,desktop,after lazy page tree
+2026-11-25,Phase 3.2,file touched at open 2000-page PDF,298,MB,desktop,before lazy page tree
+2026-11-25,Phase 3.2,file touched at open 2000-page PDF,7,MB,desktop,after lazy page tree

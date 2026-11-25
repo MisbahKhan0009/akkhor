@@ -1,0 +1,61 @@
+engine,file,page,scale,metric,best_ms,median_ms,raw_median_ms,startup_subtracted_ms
+Akkhor,"big.pdf (2,000 pages, 308 MB)",1,1.0,open,0.202,0.244,0.244,0.0
+Akkhor,"big.pdf (2,000 pages, 308 MB)",1,1.0,first_render,2.44,2.586,2.586,0.0
+Akkhor,"big.pdf (2,000 pages, 308 MB)",1,1.0,warm_render,2.381,2.596,2.596,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",1,1.0,open,0.543,0.632,0.632,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",1,1.0,first_render,10.193,11.129,11.129,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",1,1.0,warm_render,1.091,1.155,1.155,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",1,1.0,open,0.682,0.725,0.725,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",1,1.0,first_render,1.824,1.826,1.826,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",1,1.0,warm_render,1.206,1.22,1.22,0.0
+Poppler,"big.pdf (2,000 pages, 308 MB)",1,1.0,open,1.048,1.724,9.593,7.869
+Poppler,"big.pdf (2,000 pages, 308 MB)",1,1.0,first_render,16.431,17.871,25.74,7.869
+Poppler,"big.pdf (2,000 pages, 308 MB)",1,1.0,warm_render,15.634,16.639,24.509,7.869
+Akkhor,"big.pdf (2,000 pages, 308 MB)",2000,1.0,open,0.159,0.162,0.162,0.0
+Akkhor,"big.pdf (2,000 pages, 308 MB)",2000,1.0,first_render,2.122,2.314,2.314,0.0
+Akkhor,"big.pdf (2,000 pages, 308 MB)",2000,1.0,warm_render,1.891,2.033,2.033,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",2000,1.0,open,0.512,0.59,0.59,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",2000,1.0,first_render,9.637,10.605,10.605,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",2000,1.0,warm_render,1.083,1.131,1.131,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",2000,1.0,open,0.921,1.011,1.011,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",2000,1.0,first_render,13.266,13.617,13.617,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",2000,1.0,warm_render,1.662,2.361,2.361,0.0
+Poppler,"big.pdf (2,000 pages, 308 MB)",2000,1.0,open,2.789,3.224,9.893,6.669
+Poppler,"big.pdf (2,000 pages, 308 MB)",2000,1.0,first_render,29.399,32.239,38.909,6.669
+Poppler,"big.pdf (2,000 pages, 308 MB)",2000,1.0,warm_render,29.512,32.433,39.102,6.669
+Akkhor,"big.pdf (2,000 pages, 308 MB)",2000,2.0,open,0.203,0.216,0.216,0.0
+Akkhor,"big.pdf (2,000 pages, 308 MB)",2000,2.0,first_render,4.423,4.802,4.802,0.0
+Akkhor,"big.pdf (2,000 pages, 308 MB)",2000,2.0,warm_render,4.289,4.307,4.307,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",2000,2.0,open,0.481,0.57,0.57,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",2000,2.0,first_render,11.121,12.219,12.219,0.0
+MuPDF,"big.pdf (2,000 pages, 308 MB)",2000,2.0,warm_render,1.905,1.993,1.993,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",2000,2.0,open,0.93,0.977,0.977,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",2000,2.0,first_render,16.228,16.552,16.552,0.0
+PDFium,"big.pdf (2,000 pages, 308 MB)",2000,2.0,warm_render,3.786,4.097,4.097,0.0
+Poppler,"big.pdf (2,000 pages, 308 MB)",2000,2.0,open,0.924,2.749,9.65,6.902
+Poppler,"big.pdf (2,000 pages, 308 MB)",2000,2.0,first_render,33.58,43.407,50.309,6.902
+Poppler,"big.pdf (2,000 pages, 308 MB)",2000,2.0,warm_render,33.66,42.496,49.398,6.902
+Akkhor,indic.pdf (Bangla and Hindi page),1,2.0,open,0.049,0.072,0.072,0.0
+Akkhor,indic.pdf (Bangla and Hindi page),1,2.0,first_render,5.447,5.51,5.51,0.0
+Akkhor,indic.pdf (Bangla and Hindi page),1,2.0,warm_render,5.405,6.038,6.038,0.0
+MuPDF,indic.pdf (Bangla and Hindi page),1,2.0,open,0.218,0.26,0.26,0.0
+MuPDF,indic.pdf (Bangla and Hindi page),1,2.0,first_render,11.697,11.85,11.85,0.0
+MuPDF,indic.pdf (Bangla and Hindi page),1,2.0,warm_render,0.892,0.912,0.912,0.0
+PDFium,indic.pdf (Bangla and Hindi page),1,2.0,open,0.17,0.192,0.192,0.0
+PDFium,indic.pdf (Bangla and Hindi page),1,2.0,first_render,5.163,7.468,7.468,0.0
+PDFium,indic.pdf (Bangla and Hindi page),1,2.0,warm_render,2.916,3.016,3.016,0.0
+Poppler,indic.pdf (Bangla and Hindi page),1,2.0,open,0.0,0.0,7.598,8.337
+Poppler,indic.pdf (Bangla and Hindi page),1,2.0,first_render,17.438,20.954,29.291,8.337
+Poppler,indic.pdf (Bangla and Hindi page),1,2.0,warm_render,15.558,17.846,26.183,8.337
+Akkhor,bn.chrome.pdf (Bangla prose),1,2.0,open,0.048,0.05,0.05,0.0
+Akkhor,bn.chrome.pdf (Bangla prose),1,2.0,first_render,5.606,5.628,5.628,0.0
+Akkhor,bn.chrome.pdf (Bangla prose),1,2.0,warm_render,5.511,6.578,6.578,0.0
+MuPDF,bn.chrome.pdf (Bangla prose),1,2.0,open,0.206,0.341,0.341,0.0
+MuPDF,bn.chrome.pdf (Bangla prose),1,2.0,first_render,4.473,4.779,4.779,0.0
+MuPDF,bn.chrome.pdf (Bangla prose),1,2.0,warm_render,1.981,2.344,2.344,0.0
+PDFium,bn.chrome.pdf (Bangla prose),1,2.0,open,0.167,0.206,0.206,0.0
+PDFium,bn.chrome.pdf (Bangla prose),1,2.0,first_render,6.875,7.786,7.786,0.0
+PDFium,bn.chrome.pdf (Bangla prose),1,2.0,warm_render,4.958,5.305,5.305,0.0
+Poppler,bn.chrome.pdf (Bangla prose),1,2.0,open,0.187,0.323,7.757,7.435
+Poppler,bn.chrome.pdf (Bangla prose),1,2.0,first_render,16.444,18.013,25.447,7.435
+Poppler,bn.chrome.pdf (Bangla prose),1,2.0,warm_render,16.345,17.28,24.715,7.435

@@ -196,8 +196,9 @@ review of Phase 3, as for Phases 1 and 2.
 - [ ] Batch rendering can be cancelled between tiles
 - [ ] Thumbnails and table of contents, in the CLI and on Android
 - [ ] arm64 library under 3.5 MB with all formats
-- [ ] Case study data, figures and drafts in `docs/case-study/`,
-  reproducible with two scripts
+- [x] Case study data, figures and drafts in `docs/case-study/`,
+  reproducible with two scripts (first run 2026-11-25; it also exposed the
+  overstated Phase 2 baseline and led to `/ActualText` support)
 - [ ] Review written and its findings fixed; CI green
 
 ## Risks

@@ -187,7 +187,9 @@ def speed(engines, runs):
     # Cold open: the file not in the OS cache.
     cold = []
     if os.path.exists(BIG) and drop_caches():
-        for e in engines:
+        # Poppler runs as a new process, whose own start-up is also cold
+        # after the caches are dropped; its cold numbers would measure that.
+        for e in [e for e in engines if e != "poppler"]:
             vals = []
             for _ in range(3):
                 drop_caches()

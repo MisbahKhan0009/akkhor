@@ -1,0 +1,9 @@
+engine,case,added_mb
+Akkhor,"big.pdf, last page at 1x",7.16
+MuPDF,"big.pdf, last page at 1x",6.04
+PDFium,"big.pdf, last page at 1x",7.74
+Poppler,"big.pdf, last page at 1x",8.6
+Akkhor,indic.pdf at 2x,11.89
+MuPDF,indic.pdf at 2x,8.83
+PDFium,indic.pdf at 2x,7.66
+Poppler,indic.pdf at 2x,9.09
