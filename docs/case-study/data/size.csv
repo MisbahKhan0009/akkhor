@@ -1,5 +1,5 @@
 engine,file,bytes,scope,platform
-Akkhor,libakkhor.so,6785440,"PDF, EPUB, TXT, Indic shaping and text recovery","x86_64 Linux, stripped"
+Akkhor,libakkhor.so,5766688,"PDF, EPUB, TXT, Indic shaping and text recovery","x86_64 Linux, stripped"
 MuPDF,libmupdf.so.28.6,36304192,"PDF, XPS, EPUB, CBZ, ... (PyMuPDF wheel; fonts included)","x86_64 Linux, stripped"
 PDFium,libpdfium.so,6689568,PDF only,"x86_64 Linux, stripped"
 Poppler,libpoppler.so.134.0.0,3617712,"PDF only; needs FreeType, cairo or Splash, fontconfig","x86_64 Linux, stripped"

@@ -153,17 +153,37 @@ pub(crate) fn apply(out: &mut [u8], tile: Tile, scale: f32, boxes: &ImageBoxes, 
     // Colour is kept a little softer on dark themes, where full saturation
     // glares.
     let chroma = if theme.is_dark() { 200 } else { 256 };
-    let mut spans: Vec<(usize, usize)> = Vec::with_capacity(images.len());
+    // Rows are swept top to bottom with the boxes that cover them; each row
+    // gets a coverage count per pixel from a difference array, so the cost
+    // is the tile's pixels plus the boxes' heights, however many images a
+    // page draws (a page tiled with 100,000 small images stays linear).
+    let mut images = images;
+    images.sort_unstable_by_key(|b| b.2);
+    let mut next = 0;
+    let mut active: Vec<(usize, usize, usize)> = Vec::new();
+    let mut cover = vec![0i32; w + 1];
     for (y, row) in out.chunks_exact_mut(w * 4).take(h).enumerate() {
-        spans.clear();
-        spans.extend(
-            images
-                .iter()
-                .filter(|b| b.2 <= y && y < b.3)
-                .map(|b| (b.0, b.1)),
-        );
+        active.retain(|b| y < b.2);
+        while next < images.len() && images[next].2 <= y {
+            let (x0, x1, _, y1) = images[next];
+            active.push((x0, x1, y1));
+            next += 1;
+        }
+        let covered = !active.is_empty();
+        if covered {
+            cover.fill(0);
+            for &(x0, x1, _) in &active {
+                cover[x0] += 1;
+                cover[x1] -= 1;
+            }
+            let mut c = 0;
+            for v in cover.iter_mut() {
+                c += *v;
+                *v = c;
+            }
+        }
         for (x, px) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-            if !spans.is_empty() && spans.iter().any(|&(x0, x1)| x0 <= x && x < x1) {
+            if covered && cover[x] > 0 {
                 continue;
             }
             // Most of a page is blank paper.
@@ -224,5 +244,48 @@ mod tests {
         apply(&mut px, Tile::new(0, 0, 2, 2), 1.0, &boxes, &Theme::NIGHT);
         assert_eq!(&px[0..4], &[10, 200, 30, 255]); // inside the image
         assert_ne!(&px[4..8], &[10, 200, 30, 255]); // outside
+    }
+
+    #[test]
+    fn many_overlapping_images_are_kept_exactly() {
+        // Pseudo-random boxes, many overlapping; every pixel inside any box
+        // must keep its colour, every other pixel must be themed.
+        let (w, h) = (64u32, 48u32);
+        let mut seed = 7u64;
+        let mut rnd = |m: f64| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) as f64 / (1u64 << 31) as f64 * m
+        };
+        let boxes: Vec<Rect> = (0..300)
+            .map(|_| {
+                let (x, y) = (rnd(70.0) - 5.0, rnd(55.0) - 5.0);
+                Rect::new(x, y, x + rnd(12.0), y + rnd(9.0))
+            })
+            .collect();
+        let tile = Tile::new(3, 2, w, h);
+        let colour = [10u8, 200, 90, 255];
+        let mut out: Vec<u8> = colour.repeat((w * h) as usize);
+        apply(
+            &mut out,
+            tile,
+            1.0,
+            &ImageBoxes(boxes.clone()),
+            &Theme::NIGHT,
+        );
+        for y in 0..h as usize {
+            for x in 0..w as usize {
+                let inside = boxes.iter().any(|r| {
+                    let x0 = (r.x0 - 3.0).max(0.0).ceil() as usize;
+                    let y0 = (r.y0 - 2.0).max(0.0).ceil() as usize;
+                    let x1 = (r.x1 - 3.0).floor().max(0.0) as usize;
+                    let y1 = (r.y1 - 2.0).floor().max(0.0) as usize;
+                    x0 <= x && x < x1 && y0 <= y && y < y1
+                });
+                let px = &out[(y * w as usize + x) * 4..][..4];
+                assert_eq!(px == colour, inside, "pixel {x},{y}");
+            }
+        }
     }
 }
