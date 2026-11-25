@@ -125,12 +125,14 @@ the others break some words with stray spaces.
 
 | | Open (warm) | Last page, 1x | Last page, 2x | Open from disk (cold) |
 |---|---|---|---|---|
-| **Akkhor** | **0.16 ms** | **2.2 ms** | **4.5 ms** | 3.0 ms |
-| MuPDF | 0.38 ms | 7.5 ms | 11.2 ms | 5.8 ms |
-| PDFium | 0.91 ms | 12.8 ms | 15.8 ms | **2.6 ms** |
-| Poppler | 2.2 ms* | 24.4 ms* | 39.1 ms* | n/a |
+| **Akkhor** | **0.21 ms** | **2.7 ms** | **4.5 ms** | 3.0 ms |
+| MuPDF | 0.50 ms | 12.8 ms | 12.4 ms | 5.8 ms |
+| PDFium | 0.97 ms | 15.8 ms | 14.4 ms | **2.6 ms** |
+| Poppler | 1.7 ms* | 23.9 ms* | 36.1 ms* | n/a |
 
 \* Poppler measured through its command-line tools, start-up subtracted.
+Every library renders four bytes a pixel (RGBA, as Android bitmaps are);
+Poppler's `pdftoppm` uses three.
 
 From a cold disk, opening the file *and* drawing its last page takes Akkhor
 13.5 ms, MuPDF 219 ms and PDFium 185 ms
@@ -184,17 +186,72 @@ hung**. Akkhor shows page 1 of the most damaged files (143), then MuPDF
 MuPDF and PDFium opened with zero pages, which gave MuPDF 180. With the
 same rule for everyone, that lead was an artefact.
 
+### Reading a PDF like an EPUB
+
+![A two-column PDF page and its reflow on a phone](figures/reflow-showcase.png)
+
+A PDF page is made for paper. On a phone, a two-column A5 page means
+zooming and panning line by line. Akkhor can **reflow** it: the page's text
+becomes headings and paragraphs in reading order, set by the same layout
+as EPUBs at any size and theme, with pictures kept.
+
+Getting that right takes more than reading lines top to bottom:
+
+- **Columns**: two columns drawn row by row are read column by column, and
+  a heading over both columns comes first.
+- **Running headers and page numbers** (in Bangla or Devanagari digits
+  too) are left out; producers that tag them (Typst, LibreOffice) are
+  believed, the rest are found because they repeat on nearby pages.
+- **Paragraphs** continue across columns and pages; line-end hyphens are
+  removed, except in compounds (পাঠ-ইঞ্জিন) and doubled words (धीरे-धीरे).
+- **Footnotes** follow their page in a smaller size.
+- Every position maps back to the page, so the reader can switch between
+  the page view and the reflow and stay at the same sentence.
+
+Measured on 22 book-layout PDFs made by Chrome, Word (through
+LibreOffice), XeLaTeX and Typst, in Bangla and Hindi
+([`data/books.csv`](data/books.csv)): 0.0% wrong characters in the
+reflowed text, 100% of paragraph and heading breaks found, every heading at
+the right level, every footnote found, no running header or page number
+left in. Analysing a 16-page chapter takes under 1 ms once its text is read.
+
+The same corpus also shows how often the other engines break words in book
+PDFs:
+
+![Words that come out whole, per PDF maker](figures/books-words-intact.png)
+
+XeLaTeX draws no space characters and squeezes the gaps in justified
+lines; MuPDF keeps 5% of words whole there, Akkhor 99.9% (it measures the
+gaps line by line).
+
+### A real book
+
+![A real Bangla book: words intact](figures/real-world-book.png)
+
+Generated test files are cleaner than real ones. A 200-page Bangla book
+made in Word and passed through Acrobat and Ghostscript (copyrighted, so
+only its numbers are published) exposed three problems that no generated
+file had: bold text drawn twice on itself (every letter came out doubled),
+font programs rewritten so their outlines moved sideways, and a body font,
+Kalpurush, that the book uses without any text information for its
+conjuncts. All three are fixed and now reproduced on our own test files.
+With Kalpurush registered (it is free, under the OFL), 100% of the book's
+Bangla words come out whole; with only the bundled fonts, 68%; MuPDF, PDFium
+and Poppler about 26%.
+
 ## Where Akkhor is behind (and what is next)
 
 Being honest about this is part of the point:
 
 - **Drawing the same page again.** Sharing the render cache took Akkhor
-  from 5.4 to 3.0 ms on the Bangla and Hindi page, ahead of PDFium (3.7 ms)
-  but still behind MuPDF (1.1 ms), which records a page once and replays
-  it ([`figures/speed-redraw.png`](figures/speed-redraw.png)).
-- **Memory on an Indic page at 2x:** 11.4 MB added against 7.7 to 9.1 MB
-  for the others ([`figures/memory.png`](figures/memory.png)): fonts are
-  parsed once for text recovery and again for drawing.
+  from 5.4 to 2.3 ms on the Bangla and Hindi page, ahead of PDFium (2.5 ms)
+  but behind MuPDF (1.6 ms), which records a page once and replays it
+  ([`figures/speed-redraw.png`](figures/speed-redraw.png)). The renderer
+  Akkhor uses cannot record a page yet.
+- **Memory on an Indic page at 2x:** 11.6 MB added against 9.0 to 10.7 MB
+  for the others ([`figures/memory.png`](figures/memory.png)); the
+  difference is a constant few MB (code and parsed fonts), not growth per
+  page.
 - **Unknown fonts with no text layer:** if neither the PDF nor the phone
   has the font, there is nothing to recover from.
 - **Library size:** 5.8 MB on Linux and on Android (arm64) with all

@@ -180,7 +180,7 @@ def speed():
         bars(ax, labels, vals, lambda v: f"{v:.1f} ms", title, "milliseconds (best of 5, lower is better)")
     header(fig, "Drawing the same page a second time",
            "Every engine keeps what it parsed between draws. Akkhor shares one render cache per document "
-           "since Phase 3.3 (5.4 → 3.0 ms on the first page); MuPDF stays ahead.")
+           "since Phase 3.3 (5.4 → 2.3 ms on the first page, four bytes a pixel for all); MuPDF stays ahead.")
     save(fig, "speed-redraw")
 
 
@@ -403,9 +403,87 @@ def themes():
     print("wrote themes")
 
 
+def books():
+    """Words intact per engine and PDF maker, on the book-layout corpus."""
+    rows = read("books_summary.csv")
+    if not rows:
+        return
+    producers = [("writer", "Word (LibreOffice)"), ("chrome", "Chrome"), ("typst", "Typst"), ("xelatex", "XeLaTeX")]
+    engines = ["Akkhor (+ device fonts)", "MuPDF", "PDFium", "Poppler"]
+    by = {(r["engine"], r["producer"]): float(r["words_intact_pct"]) for r in rows}
+    fig, axes = plt.subplots(1, len(producers), figsize=(14, 3.3), sharey=True)
+    for ax, (key, title) in zip(axes, producers):
+        labels = [e for e in engines if (e, key) in by]
+        bars(ax, labels, [by[(e, key)] for e in labels], lambda v: f"{v:.1f}%", title,
+             "words intact (%, higher is better)", xmax=118)
+    header(fig, "Bangla and Hindi books: words that come out whole",
+           "22 book-layout PDFs (one and two columns, running headers, hyphenation, footnotes). A word run into "
+           "its neighbour or broken apart is not whole: selection, read-aloud and word counts fail on it.")
+    save(fig, "books-words-intact")
+
+
+def real_world():
+    rows = read("real_world_book.csv")
+    if not rows:
+        return
+    names = {"Akkhor (book's fonts registered)": "Akkhor (+ device fonts)", "Akkhor (bundled fonts only)": "Akkhor",
+             "MuPDF 1.28.6": "MuPDF", "PDFium 156": "PDFium", "Poppler 24.02": "Poppler"}
+    d = {names.get(r["engine"], r["engine"]): float(r["words_intact_pct"]) for r in rows}
+    labels, vals = ordered(d)
+    fig, ax = plt.subplots(figsize=(8, 3.0))
+    bars(ax, labels, vals, lambda v: f"{v:.1f}%", "", "Bangla words intact (%, higher is better)", xmax=118)
+    header(fig, "A real Bangla book: 200 pages made with Word, Acrobat and Ghostscript",
+           "Reference: Akkhor with the book's fonts (Kalpurush, Hind Siliguri; both free) registered, checked "
+           "against page images. The book itself is not published.")
+    save(fig, "real-world-book")
+
+
+def reflow_showcase():
+    """The two-column XeLaTeX page next to three phone screens of its reflow
+    in the night theme."""
+    from PIL import Image, ImageDraw, ImageFont
+    cli = os.path.join(ROOT, "target", "release", "akkhor")
+    pdf = os.path.join(ROOT, "tests", "corpus", "books", "pdf", "bn.xelatex.two.pdf")
+    if not (os.path.exists(cli) and os.path.exists(pdf)):
+        return
+    with tempfile.TemporaryDirectory() as d:
+        page = os.path.join(d, "page.png")
+        subprocess.run([cli, pdf, "--scale", "1.6", "--out", page], capture_output=True)
+        screens = []
+        for n in range(3):
+            out = os.path.join(d, f"s{n}.png")
+            subprocess.run([cli, pdf, "--reflow", "--size", "720x1280", "--theme", "night", "--screen", str(n),
+                            "--out", out], capture_output=True)
+            screens.append(Image.open(out).convert("RGB"))
+        orig = Image.open(page).convert("RGB")
+    h = 960
+    orig = orig.resize((int(orig.width * h / orig.height), h))
+    screens = [s.resize((540, h)) for s in screens]
+    pad, head = 28, 56
+    w = orig.width + sum(s.width for s in screens) + pad * 6
+    sheet = Image.new("RGB", (w, h + head + pad), "white")
+    draw = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
+    except OSError:
+        font = ImageFont.load_default()
+    x = pad
+    sheet.paste(orig, (x, head))
+    draw.rectangle([x - 1, head - 1, x + orig.width, head + h], outline=GRID)
+    draw.text((x, 16), "The PDF: two columns, A5", fill=TEXT, font=font)
+    x += orig.width + pad * 2
+    draw.text((x, 16), "Reflowed for a phone (night theme)", fill=TEXT, font=font)
+    for s in screens:
+        sheet.paste(s, (x, head))
+        x += s.width + pad
+    sheet.save(os.path.join(FIG, "reflow-showcase.png"))
+    print("wrote reflow-showcase")
+
+
 def main():
     os.makedirs(FIG, exist_ok=True)
-    for f in (text_accuracy, search, speed, cold_open, memory, size, robustness, progress, samples, themes):
+    for f in (text_accuracy, search, speed, cold_open, memory, size, robustness, progress, samples, themes,
+              books, real_world, reflow_showcase):
         f()
     if shutil.which("google-chrome") is None:
         print("note: google-chrome not found; the text sample needs it")

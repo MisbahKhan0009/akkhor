@@ -154,6 +154,12 @@ jobs:
             echo
             echo "== Search a Bangla PDF whose own text layer breaks the word"
             $B tests/corpus/pdf/bn.chrome.pdf --search "যুক্তাক্ষরের" | tail -2
+            echo
+            echo "== Reflow a two-column XeLaTeX book page for a phone (night theme)"
+            $B tests/corpus/books/pdf/bn.xelatex.two.pdf --reflow --size 720x1280 --theme night --screen 1
+            echo
+            echo "== Reflowed text of a Chrome two-column book (headings, paragraphs, no running header)"
+            $B tests/corpus/books/pdf/bn.chrome.two.pdf --reflow --text | head -12
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
