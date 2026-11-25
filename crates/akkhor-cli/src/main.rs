@@ -221,7 +221,7 @@ fn render_flow(
     images: Option<&dyn akkhor::flow::ImageProvider>,
     args: &Args,
 ) -> Result<(u32, u32, Vec<u8>), String> {
-    use akkhor::flow::{FontSet, GlyphCache, LayoutOptions, paginate_with_images, render_page};
+    use akkhor::flow::{FontSet, GlyphCache, LayoutOptions, Paginator, render_page};
     let fonts = FontSet::bundled();
     let (w, h) = args.size;
     let opts = LayoutOptions {
@@ -230,19 +230,23 @@ fn render_flow(
         ..Default::default()
     };
     let t = Instant::now();
-    let pages = paginate_with_images(doc, &opts, &fonts, images);
+    let mut paginator = Paginator::new(doc, &opts, &fonts, images);
+    let first = paginator.next().unwrap_or_default();
     println!(
-        "layout    {:.2} ms  ({} pages, {} of {} fonts loaded)",
+        "page 1    {:.2} ms  (laid out {} of {} blocks, {} of {} fonts loaded)",
         ms(t),
-        pages.len(),
+        paginator.blocks_done(),
+        doc.blocks.len(),
         fonts.loaded_count(),
         fonts.len()
     );
+    let rest = paginator.count();
+    println!("all pages {:.2} ms  ({} pages)", ms(t), rest + 1);
     let mut cache = GlyphCache::default();
     let mut px = vec![0u8; w as usize * h as usize * 4];
     let t = Instant::now();
     render_page(
-        &pages[0],
+        &first,
         &fonts,
         images,
         &mut cache,

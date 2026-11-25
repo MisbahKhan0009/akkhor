@@ -207,6 +207,11 @@ def main():
     make_pdf(os.path.join(ROOT, "small.pdf"), 3)
     if args.big:
         make_pdf(os.path.join(ROOT, "big.pdf"), args.big, args.image_kb)
+        # A long Bangla text (about as long as a 1,000-page novel).
+        paras = [p for t, p in BANGLA if t == "p"]
+        with open(os.path.join(ROOT, "big-bn.txt"), "w", encoding="utf-8") as f:
+            for i in range(6000):
+                f.write(paras[i % len(paras)].replace("<b>", "").replace("</b>", "") + "\n\n")
     print("fixtures written to", os.path.normpath(ROOT))
 
 

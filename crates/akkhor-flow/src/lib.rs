@@ -30,7 +30,7 @@ pub use css::Align;
 pub use fonts::{FontId, FontSet, FontStyle, Synthetic};
 pub use image::ImageProvider;
 pub use layout::{
-    LayoutOptions, Line, Page, PlacedGlyph, PlacedImage, paginate, paginate_with_images,
+    LayoutOptions, Line, Page, Paginator, PlacedGlyph, PlacedImage, paginate, paginate_with_images,
 };
 pub use model::{Block, BlockKind, BlockStyle, Document, Position, Style, StyleSpan};
 pub use paint::{GlyphCache, render_page};

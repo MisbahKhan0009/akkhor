@@ -6,14 +6,14 @@
 //! spaces; letters are never stretched, which matters for Bangla and
 //! Devanagari where stretching would break the headline (matra/shirorekha).
 
+use std::collections::VecDeque;
 use std::ops::Range;
 
 use crate::css::Align;
 use crate::fonts::{FontId, FontSet, FontStyle, Synthetic};
 use crate::hyphen::hyphenate;
 use crate::image::ImageProvider;
-use crate::model::StyleSpan;
-use crate::model::{BlockKind, Document};
+use crate::model::{BlockKind, Document, Position, StyleSpan};
 use crate::script::syllable_starts;
 use crate::shape::{ShapedGlyph, shape_paragraph, shape_styled};
 
@@ -158,20 +158,88 @@ pub fn paginate_with_images(
     fonts: &FontSet,
     images: Option<&dyn ImageProvider>,
 ) -> Vec<Page> {
-    let mut pages = vec![Page::default()];
-    let bottom = opts.height - opts.margin_bottom;
-    let avail = (opts.width - 2.0 * opts.margin_x).max(1.0);
-    let mut y = opts.margin_top;
+    Paginator::new(doc, opts, fonts, images).collect()
+}
 
-    let mut prev_margin_bottom = 0.0f32;
-    for (block_idx, block) in doc.blocks.iter().enumerate() {
+/// Lays out a document one page at a time.
+///
+/// Pages come out as soon as they are full, so the first page of a long
+/// chapter is ready after laying out only the blocks it needs. Stop
+/// iterating (drop the paginator) to cancel, for example when the reader
+/// changes the font size.
+pub struct Paginator<'a> {
+    doc: &'a Document,
+    opts: &'a LayoutOptions,
+    fonts: &'a FontSet,
+    images: Option<&'a dyn ImageProvider>,
+    next_block: usize,
+    ready: VecDeque<Page>,
+    current: Page,
+    y: f32,
+    prev_margin_bottom: f32,
+    emitted: usize,
+    finished: bool,
+}
+
+impl<'a> Paginator<'a> {
+    pub fn new(
+        doc: &'a Document,
+        opts: &'a LayoutOptions,
+        fonts: &'a FontSet,
+        images: Option<&'a dyn ImageProvider>,
+    ) -> Self {
+        Self {
+            doc,
+            opts,
+            fonts,
+            images,
+            next_block: 0,
+            ready: VecDeque::new(),
+            current: Page::default(),
+            y: opts.margin_top,
+            prev_margin_bottom: 0.0,
+            emitted: 0,
+            finished: false,
+        }
+    }
+
+    /// How many blocks have been laid out so far.
+    pub fn blocks_done(&self) -> usize {
+        self.next_block
+    }
+
+    /// Lays out only as far as needed to find the page holding `pos` (a
+    /// saved reading position) and returns its index and the page.
+    pub fn page_for(self, pos: Position) -> Option<(usize, Page)> {
+        let key = (pos.block, pos.offset);
+        let mut prev = None;
+        for (i, page) in self.enumerate() {
+            if page.start().is_some_and(|s| s > key) {
+                return prev;
+            }
+            prev = Some((i, page));
+        }
+        prev
+    }
+
+    fn new_page(&mut self) {
+        let full = std::mem::take(&mut self.current);
+        self.ready.push_back(full);
+        self.y = self.opts.margin_top;
+    }
+
+    fn layout_block(&mut self, block_idx: usize) {
+        let (doc, opts, fonts, images) = (self.doc, self.opts, self.fonts, self.images);
+        let block = &doc.blocks[block_idx];
+        let bottom = opts.height - opts.margin_bottom;
+        let avail = (opts.width - 2.0 * opts.margin_x).max(1.0);
         if block.kind == BlockKind::Image {
             let Some((iw, ih)) = block
                 .image
                 .as_deref()
                 .and_then(|src| images.and_then(|p| p.size(src)))
             else {
-                continue;
+                return;
             };
             // Book pixels are CSS pixels: 16 of them to the body em.
             let scale = opts.font_size / 16.0;
@@ -180,27 +248,27 @@ pub fn paginate_with_images(
                 .min(max_h / (ih as f32 * scale))
                 .min(1.0);
             let (w, h) = (iw as f32 * scale * fit, ih as f32 * scale * fit);
-            let page_empty = pages.last().is_some_and(|p| p.is_empty());
+            let page_empty = self.current.is_empty();
             if !page_empty {
-                y += opts.paragraph_gap * opts.font_size;
+                self.y += opts.paragraph_gap * opts.font_size;
             }
-            if (y + h > bottom || block.style.page_break_before) && !page_empty {
-                pages.push(Page::default());
-                y = opts.margin_top;
+            if (self.y + h > bottom || block.style.page_break_before) && !page_empty {
+                self.new_page();
+                self.y = opts.margin_top;
             }
-            pages.last_mut().expect("page").images.push(PlacedImage {
+            self.current.images.push(PlacedImage {
                 block: block_idx,
                 src: block.image.clone().unwrap_or_default(),
                 x: opts.margin_x + (avail - w) / 2.0,
-                y,
+                y: self.y,
                 width: w,
                 height: h,
             });
-            y += h;
+            self.y += h;
             // Keep a little air below a picture even when the CSS sets
             // paragraph margins to zero.
-            prev_margin_bottom = opts.paragraph_gap;
-            continue;
+            self.prev_margin_bottom = opts.paragraph_gap;
+            return;
         }
         let style = &block.style;
         let size = opts.font_size
@@ -223,16 +291,16 @@ pub fn paginate_with_images(
         };
         let first_indent = style.indent.unwrap_or(0.0) * opts.font_size;
 
-        let page_empty = pages.last().is_some_and(|p| p.is_empty());
+        let page_empty = self.current.is_empty();
         if style.page_break_before && !page_empty {
-            pages.push(Page::default());
-            y = opts.margin_top;
+            self.new_page();
+            self.y = opts.margin_top;
         } else if !page_empty {
             // Vertical margins collapse: the larger of the two wins.
             let top = style.margin_top.unwrap_or(opts.paragraph_gap);
-            y += top.max(prev_margin_bottom) * opts.font_size;
+            self.y += top.max(self.prev_margin_bottom) * opts.font_size;
         }
-        prev_margin_bottom = style.margin_bottom.unwrap_or(0.0);
+        self.prev_margin_bottom = style.margin_bottom.unwrap_or(0.0);
 
         // Forced line breaks split the block into segments laid out separately.
         let mut seg_start = 0;
@@ -265,11 +333,11 @@ pub fn paginate_with_images(
                 align,
             };
             for (range, placed) in break_lines(segment, &glyphs, &shape, hyphen) {
-                if y + lh > bottom && !pages.last().is_some_and(|p| p.is_empty()) {
-                    pages.push(Page::default());
-                    y = opts.margin_top;
+                if self.y + lh > bottom && !self.current.is_empty() {
+                    self.new_page();
+                    self.y = opts.margin_top;
                 }
-                let baseline = y + lh * 0.72;
+                let baseline = self.y + lh * 0.72;
                 let glyphs: Vec<PlacedGlyph> = placed
                     .into_iter()
                     .map(|mut g| {
@@ -280,28 +348,43 @@ pub fn paginate_with_images(
                     .collect();
                 let left = glyphs.first().map_or(opts.margin_x + indent, |g| g.pen);
                 let right = glyphs.last().map_or(left, |g| g.pen + g.advance);
-                pages
-                    .last_mut()
-                    .expect("at least one page")
-                    .lines
-                    .push(Line {
-                        block: block_idx,
-                        range: seg_range.start + range.start..seg_range.start + range.end,
-                        glyphs,
-                        top: y,
-                        bottom: y + lh,
-                        baseline,
-                        left,
-                        right,
-                    });
-                y += lh;
+                self.current.lines.push(Line {
+                    block: block_idx,
+                    range: seg_range.start + range.start..seg_range.start + range.end,
+                    glyphs,
+                    top: self.y,
+                    bottom: self.y + lh,
+                    baseline,
+                    left,
+                    right,
+                });
+                self.y += lh;
             }
         }
     }
-    if pages.len() > 1 && pages.last().is_some_and(|p| p.is_empty()) {
-        pages.pop();
+}
+
+impl Iterator for Paginator<'_> {
+    type Item = Page;
+
+    fn next(&mut self) -> Option<Page> {
+        while self.ready.is_empty() && self.next_block < self.doc.blocks.len() {
+            let b = self.next_block;
+            self.next_block += 1;
+            self.layout_block(b);
+        }
+        let page = self.ready.pop_front().or_else(|| {
+            if self.finished {
+                return None;
+            }
+            self.finished = true;
+            // The last page; an empty document still gets one empty page.
+            (!self.current.is_empty() || self.emitted == 0)
+                .then(|| std::mem::take(&mut self.current))
+        });
+        self.emitted += page.is_some() as usize;
+        page
     }
-    pages
 }
 
 /// Characters a line must not start with.
@@ -666,6 +749,48 @@ mod tests {
             "first-line indent"
         );
         assert_eq!(pages[1].lines[0].block, 3);
+    }
+
+    #[test]
+    fn paginator_is_incremental_and_matches_paginate() {
+        let fonts = FontSet::bundled();
+        let para = "আমার সোনার বাংলা, আমি তোমায় ভালোবাসি। চিরদিন তোমার আকাশ, তোমার বাতাস। ";
+        let text: Vec<String> = (0..2000)
+            .map(|i| format!("{i}. {}", para.repeat(3)))
+            .collect();
+        let doc = Document::from_plain_text(&text.join("\n\n"));
+        let opts = LayoutOptions::default();
+
+        let mut p = Paginator::new(&doc, &opts, &fonts, None);
+        let first = p.next().unwrap();
+        assert!(
+            p.blocks_done() < 10,
+            "first page needed {} blocks",
+            p.blocks_done()
+        );
+
+        let all = paginate(&doc, &opts, &fonts);
+        assert!(all.len() > 200, "{} pages", all.len());
+        assert_eq!(all[0].start(), first.start());
+        assert_eq!(all[0].lines.len(), first.lines.len());
+
+        // Jump to a saved position deep in the chapter.
+        let target = Position::new(1234, 10);
+        let (i, page) = Paginator::new(&doc, &opts, &fonts, None)
+            .page_for(target)
+            .unwrap();
+        assert!(page.start().unwrap() <= (1234, 10));
+        assert!(
+            all.get(i + 1)
+                .is_none_or(|n| n.start().unwrap() > (1234, 10))
+        );
+    }
+
+    #[test]
+    fn empty_document_has_one_page() {
+        let fonts = FontSet::bundled();
+        let pages = paginate(&Document::default(), &LayoutOptions::default(), &fonts);
+        assert_eq!(pages.len(), 1);
     }
 
     #[test]
