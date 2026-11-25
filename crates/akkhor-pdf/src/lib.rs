@@ -57,6 +57,48 @@ pub struct PdfDocument {
     image_boxes: Mutex<Vec<(usize, Arc<theme::ImageBoxes>)>>,
 }
 
+/// Draws a reflow's image blocks: regions of PDF pages.
+pub struct ReflowImages<'a> {
+    doc: &'a PdfDocument,
+}
+
+impl akkhor_flow::ImageProvider for ReflowImages<'_> {
+    fn bytes(&self, _: &str) -> Option<Vec<u8>> {
+        None
+    }
+
+    /// Two pixels per point: sharp on a phone at the width a picture gets.
+    fn size(&self, src: &str) -> Option<(u32, u32)> {
+        let (_, r) = reflow::parse_image_source(src)?;
+        Some((
+            (r.width() * 2.0).round().max(1.0) as u32,
+            (r.height() * 2.0).round().max(1.0) as u32,
+        ))
+    }
+
+    fn decoded(&self, src: &str, w: u32, h: u32) -> Option<akkhor_flow::image::DecodedImage> {
+        let (page, r) = reflow::parse_image_source(src)?;
+        let scale = (w as f64 / r.width().max(1.0))
+            .max(h as f64 / r.height().max(1.0))
+            .clamp(0.1, 8.0);
+        let tile = Tile::new(
+            (r.x0 * scale).floor().max(0.0) as u32,
+            (r.y0 * scale).floor().max(0.0) as u32,
+            (r.width() * scale).ceil().max(1.0) as u32,
+            (r.height() * scale).ceil().max(1.0) as u32,
+        );
+        let mut rgba = vec![0u8; tile.rgba_len()];
+        self.doc
+            .render_tile(page, scale as f32, tile, &Theme::ORIGINAL, &mut rgba)
+            .ok()?;
+        Some(akkhor_flow::image::DecodedImage {
+            width: tile.width,
+            height: tile.height,
+            rgba,
+        })
+    }
+}
+
 /// Pages per reflow chapter when the outline gives none (or a long one).
 pub const REFLOW_PAGES: usize = 16;
 
@@ -178,6 +220,12 @@ impl PdfDocument {
         }
         let refs: Vec<&PageText> = texts.iter().map(|t| &**t).collect();
         contain(|| reflow::reflow(pages.start, &refs, &pictures, &sizes))
+    }
+
+    /// The pictures of a reflow ([`reflow::image_source`] names), drawn
+    /// from the page at the size the layout asks for.
+    pub fn reflow_images(&self) -> ReflowImages<'_> {
+        ReflowImages { doc: self }
     }
 
     /// A small picture of a page, its longer side `max_side` pixels.

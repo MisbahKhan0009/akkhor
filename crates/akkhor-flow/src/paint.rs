@@ -18,7 +18,7 @@ use vello_cpu::{
 };
 
 use crate::fonts::{FontId, FontSet};
-use crate::image::{ImageProvider, decode, resize};
+use crate::image::{ImageProvider, resize};
 use crate::layout::Page;
 
 /// Drawing caches shared across the pages of a book: glyph outlines and
@@ -48,22 +48,19 @@ impl GlyphCache {
     ) -> Option<Arc<Pixmap>> {
         self.images
             .get_or_insert_with((src.to_string(), w, h), || {
-                let pixmap = provider
-                    .bytes(src)
-                    .and_then(|b| decode(&b))
-                    .and_then(|img| {
-                        let (pw, ph) = (u16::try_from(w).ok()?, u16::try_from(h).ok()?);
-                        let rgba = resize(&img, w, h);
-                        Some(Arc::new(Pixmap::from_parts(
-                            rgba,
-                            pw,
-                            ph,
-                            PixelMetadata {
-                                may_have_transparency: true,
-                                ..Default::default()
-                            },
-                        )))
-                    });
+                let pixmap = provider.decoded(src, w, h).and_then(|img| {
+                    let (pw, ph) = (u16::try_from(w).ok()?, u16::try_from(h).ok()?);
+                    let rgba = resize(&img, w, h);
+                    Some(Arc::new(Pixmap::from_parts(
+                        rgba,
+                        pw,
+                        ph,
+                        PixelMetadata {
+                            may_have_transparency: true,
+                            ..Default::default()
+                        },
+                    )))
+                });
                 let cost = (w as usize * h as usize * 4).max(16);
                 (pixmap, cost)
             })

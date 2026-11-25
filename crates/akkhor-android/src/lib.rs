@@ -25,6 +25,9 @@
 //!     external fun outlineTitles(handle: Long): Array<String>?      // table of contents
 //!     external fun outlineLevelsAndPages(handle: Long): IntArray?   // [level, page, ...]
 //!     // Thumbnails: renderPdfTile at scale = side / max(pageWidth, pageHeight).
+//!     // Reflow: EPUB chapters, the text file, or a PDF's reflow chapters
+//!     // (reflowChapterCount of them; headings, paragraphs, pictures, without
+//!     // running headers or page numbers).
 //!     external fun layoutChapter(handle: Long, chapter: Int, width: Int, height: Int,
 //!                                fontSize: Float): Int               // page count, < 0 on error
 //!     external fun renderFlowPage(handle: Long, page: Int, bitmap: Bitmap, theme: Int): Int
@@ -42,6 +45,14 @@
 //!     external fun pdfSelectionRects(handle: Long, start: Long, end: Long): FloatArray
 //!     external fun pdfTextBetween(handle: Long, start: Long, end: Long): String?
 //!     external fun pdfSearch(handle: Long, page: Int, query: String): LongArray // one page
+//!     // PDF reflow: chapters, and the same place in the other view.
+//!     external fun reflowChapterCount(handle: Long): Int
+//!     external fun reflowChapterOfPage(handle: Long, page: Int): Int
+//!     external fun pdfToReflow(handle: Long, chapter: Int, pdfPos: Long): Long  // -1 if none
+//!     external fun reflowToPdf(handle: Long, chapter: Int, pos: Long): Long     // -1 if none
+//!     // Engine offsets are UTF-8 bytes; Kotlin strings count UTF-16 units.
+//!     external fun utf16Offset(text: String, utf8: Int): Int
+//!     external fun utf8Offset(text: String, utf16: Int): Int
 //!     external fun lastError(): String?
 //! }
 //! ```
@@ -93,6 +104,9 @@ struct FlowState {
     chapter: usize,
     /// The laid-out chapter, for hit-testing, selection and copy.
     doc: akkhor::flow::Document,
+    /// A PDF's reflow chapter, with its map back to the pages.
+    #[cfg(feature = "pdf")]
+    reflow: Option<(usize, akkhor::pdf::reflow::Reflow)>,
 }
 
 #[cfg(feature = "flow")]
@@ -718,14 +732,6 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
     guard(-1, || {
         with_handle(h, |h| {
             let _ = chapter; // unused in TXT-only builds
-            let doc = match &h.book {
-                #[cfg(feature = "epub")]
-                Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
-                #[cfg(feature = "txt")]
-                Book::Text(t) => t.document.clone(),
-                #[allow(unreachable_patterns)]
-                _ => return Err("not a reflowable book".into()),
-            };
             let flow = h.flow.get_or_insert_with(|| FlowState {
                 fonts: font_set(),
                 glyphs: GlyphCache::default(),
@@ -734,7 +740,21 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
                 height: 0,
                 chapter: 0,
                 doc: Default::default(),
+                #[cfg(feature = "pdf")]
+                reflow: None,
             });
+            let doc = match &h.book {
+                #[cfg(feature = "epub")]
+                Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
+                #[cfg(feature = "txt")]
+                Book::Text(t) => t.document.clone(),
+                #[cfg(feature = "pdf")]
+                Book::Pdf(p) => reflow_chapter(p, &mut flow.reflow, chapter.max(0) as usize)?
+                    .document
+                    .clone(),
+                #[allow(unreachable_patterns)]
+                _ => return Err("not a reflowable book".into()),
+            };
             let opts = LayoutOptions {
                 width: width as f32,
                 height: height as f32,
@@ -745,6 +765,8 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
             let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
                 #[cfg(feature = "epub")]
                 Book::Epub(e) => Some(Box::new(e.chapter_images(chapter as usize))),
+                #[cfg(feature = "pdf")]
+                Book::Pdf(p) => Some(Box::new(p.reflow_images())),
                 #[allow(unreachable_patterns)]
                 _ => None,
             };
@@ -775,6 +797,8 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderFlowPage(
             let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
                 #[cfg(feature = "epub")]
                 Book::Epub(e) => Some(Box::new(e.chapter_images(flow.chapter))),
+                #[cfg(feature = "pdf")]
+                Book::Pdf(p) => Some(Box::new(p.reflow_images())),
                 #[allow(unreachable_patterns)]
                 _ => None,
             };
@@ -935,6 +959,16 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_search(
             Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string()),
             #[cfg(feature = "txt")]
             Book::Text(t) => Ok(t.document.clone()),
+            #[cfg(feature = "pdf")]
+            Book::Pdf(p) => {
+                let mut slot = hd.flow.as_mut().and_then(|f| f.reflow.take());
+                let doc = reflow_chapter(p, &mut slot, chapter.max(0) as usize)
+                    .map(|r| r.document.clone());
+                if let Some(f) = hd.flow.as_mut() {
+                    f.reflow = slot;
+                }
+                doc
+            }
             #[allow(unreachable_patterns)]
             _ => Err("not a reflowable book".into()),
         })?;
@@ -944,6 +978,184 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_search(
             .collect();
         unsafe { long_array(env, &hits) }
     })
+}
+
+/// The reflow of a PDF chapter, kept in `slot` until another chapter is
+/// asked for.
+#[cfg(feature = "pdf")]
+fn reflow_chapter<'s>(
+    pdf: &akkhor::pdf::PdfDocument,
+    slot: &'s mut Option<(usize, akkhor::pdf::reflow::Reflow)>,
+    chapter: usize,
+) -> Result<&'s akkhor::pdf::reflow::Reflow, String> {
+    if slot.as_ref().is_none_or(|(c, _)| *c != chapter) {
+        let range = pdf
+            .reflow_chapters()
+            .get(chapter)
+            .cloned()
+            .ok_or("reflow chapter out of range")?;
+        *slot = Some((chapter, pdf.reflow(range).map_err(|e| e.to_string())?));
+    }
+    Ok(&slot.as_ref().expect("just set").1)
+}
+
+/// Runs `f` on the reflow of PDF chapter `chapter`.
+#[cfg(feature = "pdf")]
+fn with_reflow<T>(
+    h: jlong,
+    chapter: jint,
+    f: impl FnOnce(&akkhor::pdf::reflow::Reflow) -> Result<T, String>,
+) -> Result<T, String> {
+    with_handle(h, |hd| {
+        let pdf = match &hd.book {
+            Book::Pdf(pdf) => pdf,
+            #[allow(unreachable_patterns)]
+            _ => return Err("not a PDF".into()),
+        };
+        let flow = hd.flow.get_or_insert_with(|| FlowState {
+            fonts: font_set(),
+            glyphs: GlyphCache::default(),
+            pages: Vec::new(),
+            width: 0,
+            height: 0,
+            chapter: 0,
+            doc: Default::default(),
+            reflow: None,
+        });
+        f(reflow_chapter(
+            pdf,
+            &mut flow.reflow,
+            chapter.max(0) as usize,
+        )?)
+    })
+}
+
+/// How many reflow chapters a PDF has (its top-level outline entries, or
+/// runs of 16 pages).
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_reflowChapterCount(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+) -> jint {
+    guard(-1, || {
+        with_handle(h, |hd| match &hd.book {
+            Book::Pdf(p) => Ok(p.reflow_chapters().len() as jint),
+            #[allow(unreachable_patterns)]
+            _ => Err("not a PDF".into()),
+        })
+    })
+}
+
+/// The reflow chapter that holds PDF page `page`.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_reflowChapterOfPage(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    page: jint,
+) -> jint {
+    guard(-1, || {
+        with_handle(h, |hd| match &hd.book {
+            Book::Pdf(p) => p
+                .reflow_chapters()
+                .iter()
+                .position(|r| r.contains(&(page.max(0) as usize)))
+                .map(|c| c as jint)
+                .ok_or_else(|| "page out of range".to_string()),
+            #[allow(unreachable_patterns)]
+            _ => Err("not a PDF".into()),
+        })
+    })
+}
+
+/// The reflow position of a PDF position ((page shl 32) or offset), as
+/// (block shl 32) or offset in reflow chapter `chapter`; -1 if none.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_pdfToReflow(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    chapter: jint,
+    pdf_pos: jlong,
+) -> jlong {
+    guard(-1, || {
+        let (page, offset) = pdf_unpos(pdf_pos);
+        with_reflow(h, chapter, |r| {
+            Ok(r.from_page(page, offset)
+                .map_or(-1, |(b, o)| pack(akkhor::flow::Position::new(b, o))))
+        })
+    })
+}
+
+/// The PDF position of a reflow position in chapter `chapter`; -1 if none.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_reflowToPdf(
+    _: *mut JNIEnv,
+    _: jclass,
+    h: jlong,
+    chapter: jint,
+    pos: jlong,
+) -> jlong {
+    guard(-1, || {
+        let p = unpack(pos);
+        with_reflow(h, chapter, |r| {
+            Ok(r.to_page(p.block, p.offset)
+                .map_or(-1, |(page, o)| pdf_pos(page, o)))
+        })
+    })
+}
+
+/// UTF-16 offset in `text` of UTF-8 byte offset `utf8` (snapped back to a
+/// character boundary).
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_utf16Offset(
+    env: *mut JNIEnv,
+    _: jclass,
+    text: jstring,
+    utf8: jint,
+) -> jint {
+    guard(-1, || {
+        let text = unsafe { jstr(env, text) }.ok_or("text is null")?;
+        Ok(utf16_of(&text, utf8.max(0) as usize) as jint)
+    })
+}
+
+/// UTF-8 byte offset in `text` of UTF-16 offset `utf16`.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_utf8Offset(
+    env: *mut JNIEnv,
+    _: jclass,
+    text: jstring,
+    utf16: jint,
+) -> jint {
+    guard(-1, || {
+        let text = unsafe { jstr(env, text) }.ok_or("text is null")?;
+        Ok(utf8_of(&text, utf16.max(0) as usize) as jint)
+    })
+}
+
+fn utf16_of(text: &str, utf8: usize) -> usize {
+    let mut at = utf8.min(text.len());
+    while !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    text[..at].encode_utf16().count()
+}
+
+fn utf8_of(text: &str, utf16: usize) -> usize {
+    let mut units = 0;
+    for (i, c) in text.char_indices() {
+        if units >= utf16 {
+            return i;
+        }
+        units += c.len_utf16();
+    }
+    text.len()
 }
 
 /// Runs `f` on a PDF page's text (cached for the last few pages).
@@ -1208,6 +1420,61 @@ mod tests {
         assert!(pdf_pos(1, 0) > pdf_pos(0, 99_999));
         assert!(with_pdf_text(id, 99, |_| Ok(())).is_err());
         unsafe { Java_dev_akkhor_Native_close(std::ptr::null_mut(), std::ptr::null_mut(), id) };
+    }
+
+    #[cfg(feature = "pdf")]
+    #[test]
+    fn pdf_reflow_through_the_handle() {
+        let path = format!(
+            "{}/../../tests/corpus/books/pdf/bn.chrome.two.pdf",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let font = format!(
+            "{}/../../fonts/NotoSerifBengali-Regular.ttf",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        akkhor::pdf::register_reference_font(Source::open(font).unwrap().shared());
+        let id = into_handle(akkhor::open(path).unwrap());
+        let (n, null) = (std::ptr::null_mut(), std::ptr::null_mut());
+        let chapters = unsafe { Java_dev_akkhor_Native_reflowChapterCount(n, null, id) };
+        assert_eq!(chapters, 1);
+        assert_eq!(
+            unsafe { Java_dev_akkhor_Native_reflowChapterOfPage(n, null, id, 1) },
+            0
+        );
+        let pages =
+            unsafe { Java_dev_akkhor_Native_layoutChapter(n, null, id, 0, 720, 1280, 40.0) };
+        assert!(pages >= 1, "{pages} pages");
+        // Every block start maps to its page and back.
+        let blocks = with_handle(id, |h| Ok(h.flow.as_ref().unwrap().doc.blocks.len())).unwrap();
+        assert!(blocks > 10, "{blocks} blocks");
+        for b in 0..blocks {
+            let pos = pack(akkhor::flow::Position::new(b, 0));
+            let pdf = unsafe { Java_dev_akkhor_Native_reflowToPdf(n, null, id, 0, pos) };
+            assert!(pdf >= 0);
+            let back = unsafe { Java_dev_akkhor_Native_pdfToReflow(n, null, id, 0, pdf) };
+            let kind =
+                with_handle(id, |h| Ok(h.flow.as_ref().unwrap().doc.blocks[b].kind)).unwrap();
+            if kind != akkhor::flow::BlockKind::Image {
+                assert_eq!(back, pos, "block {b}");
+            }
+        }
+        assert_eq!(
+            unsafe { Java_dev_akkhor_Native_reflowToPdf(n, null, id, 5, 0) },
+            -1
+        );
+        unsafe { Java_dev_akkhor_Native_close(n, null, id) };
+    }
+
+    #[test]
+    fn utf16_offsets() {
+        let s = "অক্ষর 😀 ok";
+        let at = s.find('😀').unwrap();
+        assert_eq!(utf16_of(s, at), 6);
+        assert_eq!(utf8_of(s, 6), at);
+        assert_eq!(utf16_of(s, at + 1), 6); // inside a character: snapped back
+        assert_eq!(utf8_of(s, 8), at + 4); // after the surrogate pair
+        assert_eq!(utf8_of(s, 999), s.len());
     }
 
     #[cfg(feature = "pdf")]

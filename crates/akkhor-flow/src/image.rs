@@ -14,6 +14,14 @@ pub trait ImageProvider {
     fn size(&self, src: &str) -> Option<(u32, u32)> {
         image_size(&self.bytes(src)?)
     }
+
+    /// The image's pixels for drawing at `w` x `h` (the result may be any
+    /// size; it is scaled). By default the bytes are decoded; a provider
+    /// that draws its images (a PDF page region) renders them at that size.
+    fn decoded(&self, src: &str, w: u32, h: u32) -> Option<DecodedImage> {
+        let _ = (w, h);
+        decode(&self.bytes(src)?)
+    }
 }
 
 /// Decoded pixels: RGBA8, straight alpha, rows tightly packed.

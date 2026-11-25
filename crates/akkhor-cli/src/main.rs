@@ -3,8 +3,12 @@
 //! ```text
 //! akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH]
 //!               [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT]
-//!               [--text] [--toc]
+//!               [--text] [--toc] [--reflow]
 //! ```
+//!
+//! `--reflow` (PDF) lays out reflow chapter `--page` like an EPUB chapter,
+//! for a screen of `--size`; with `--text`, prints its blocks. `--screen N`
+//! renders the Nth screen of a reflowed (or EPUB, or text) chapter.
 //!
 //! `--text` prints the page's text (for PDFs: the repaired text layer, next
 //! to how long extracting it took). `--search` lists hits with snippets.
@@ -28,6 +32,9 @@ struct Args {
     search: Option<String>,
     text: bool,
     toc: bool,
+    reflow: bool,
+    /// Which laid-out screen of a reflowable chapter to render.
+    screen: usize,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -43,6 +50,8 @@ fn parse_args() -> Result<Args, String> {
         search: None,
         text: false,
         toc: false,
+        reflow: false,
+        screen: 0,
     };
     while let Some(a) = it.next() {
         let mut val = || it.next().ok_or(format!("{a} needs a value"));
@@ -53,6 +62,8 @@ fn parse_args() -> Result<Args, String> {
             "--search" => args.search = Some(val()?),
             "--text" => args.text = true,
             "--toc" => args.toc = true,
+            "--reflow" => args.reflow = true,
+            "--screen" => args.screen = val()?.parse().map_err(|_| "bad --screen")?,
             "--size" => {
                 let v = val()?;
                 let (w, h) = v.split_once('x').ok_or("--size is WxH")?;
@@ -163,6 +174,46 @@ fn run(args: Args) -> Result<(), String> {
     if let Some(q) = &args.search {
         return search(&book, q);
     }
+    if args.reflow {
+        let Book::Pdf(pdf) = &book else {
+            return Err("--reflow is for PDFs (EPUB and text are reflowed anyway)".into());
+        };
+        let chapters = pdf.reflow_chapters();
+        let range = chapters
+            .get(args.page)
+            .cloned()
+            .ok_or(format!("{} reflow chapters", chapters.len()))?;
+        let t = Instant::now();
+        let r = pdf.reflow(range.clone()).map_err(|e| e.to_string())?;
+        println!(
+            "reflow    chapter {} of {} (pages {}..{}) in {:.2} ms, {} blocks",
+            args.page + 1,
+            chapters.len(),
+            range.start + 1,
+            range.end,
+            ms(t),
+            r.document.blocks.len()
+        );
+        if args.text {
+            for b in &r.document.blocks {
+                let tag = match b.kind {
+                    akkhor::flow::BlockKind::Heading(l) => format!("# h{l} "),
+                    akkhor::flow::BlockKind::Image => "[image] ".into(),
+                    _ if b.style.font_scale.is_some_and(|s| s < 1.0) => "[note] ".into(),
+                    _ => String::new(),
+                };
+                println!("{tag}{}\n", b.text);
+            }
+            return Ok(());
+        }
+        let images = pdf.reflow_images();
+        let (w, h, pixels) = render_flow(&r.document, Some(&images), &args)?;
+        if let Some(out) = &args.out {
+            write_png(out, w, h, pixels)?;
+            println!("wrote     {out}");
+        }
+        return Ok(());
+    }
     if args.text {
         return print_text(&book, args.page);
     }
@@ -267,8 +318,13 @@ fn render_flow(
         fonts.loaded_count(),
         fonts.len()
     );
-    let rest = paginator.count();
-    println!("all pages {:.2} ms  ({} pages)", ms(t), rest + 1);
+    let mut pages = vec![first];
+    pages.extend(paginator);
+    println!("all pages {:.2} ms  ({} pages)", ms(t), pages.len());
+    let first = pages
+        .into_iter()
+        .nth(args.screen)
+        .ok_or("--screen past the last page")?;
     let mut cache = GlyphCache::default();
     let mut px = vec![0u8; w as usize * h as usize * 4];
     let t = Instant::now();
@@ -423,7 +479,7 @@ fn main() -> ExitCode {
                 eprintln!("error: {e}");
             }
             eprintln!(
-                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT] [--text] [--toc]"
+                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT] [--text] [--toc] [--reflow] [--screen N]"
             );
             ExitCode::FAILURE
         }
