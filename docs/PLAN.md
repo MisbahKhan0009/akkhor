@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-25 (Phase 2: text recovery done, legacy encodings next)
+Last updated: 2026-11-25 (Phase 2: recovery and Bijoy done; PDF search and selection next)
 
 ---
 
@@ -134,7 +134,7 @@ Results (GitHub CI runner, release build):
 | Bijoy-encoded sample | detected as `LegacyBijoy` |
 | `libakkhor.so` arm64-v8a, all formats | 5.8 MB (was 5.5 MB; size work is in Phase 3) |
 
-Known limits carried forward: adjacent-sibling and attribute CSS selectors are ignored; GIF and WebP images are sized but not drawn; Bijoy text is detected but not yet converted (Phase 2).
+Known limits carried forward: adjacent-sibling and attribute CSS selectors are ignored; GIF and WebP images are sized but not drawn; Bijoy text is detected but not yet converted (done in Phase 2).
 
 ### Phase 2: PDF Indic text layer 🔄 (the headline novelty)
 
@@ -144,7 +144,7 @@ Detailed design: [phases/phase-2.md](phases/phase-2.md). Measured starting point
 2. ✅ Recover letters for every glyph. Revised: producers strip `GSUB` from embedded subsets, so each glyph is found by its outline in a complete reference font (bundled or registered by the app) and that font's shaping rules are run in reverse.
 3. ✅ Visual-to-logical reordering (pre-base vowel signs, split vowels, reph, fused reph forms).
 4. ✅ Lines, words and reading order, with every character mapped to its box. Result: 0.0% character errors on all 32 corpus PDFs (two producers, two designs per script, with and without `ToUnicode`); the PDFs' own text layers are 2 to 45% wrong.
-5. Legacy encodings: Bijoy (table from the MIT `poriborton` crate, inverted) for PDFs and `.txt`; Kruti Dev experimental.
+5. ✅ Legacy encodings: Bijoy (table from the MIT `poriborton` crate, inverted) for PDFs and `.txt`. Kruti Dev moved later: no open table or corpus to verify one against.
 6. Search, selection and copy on PDFs (CLI and Android).
 7. Accuracy corpus from several PDF producers, with and without `ToUnicode`; character error rate targets.
 

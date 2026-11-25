@@ -6,7 +6,9 @@ Each text is printed by two producers (Chrome and LibreOffice) with the
 Noto Serif fonts from fonts/ ({stem}.{producer}.pdf) and with a second
 design from tests/fonts/ ({stem}.{font}.{producer}.pdf). Every PDF is also
 saved with its ToUnicode maps removed (*.raw.pdf), which forces the engine
-to recover the text from the glyphs alone.
+to recover the text from the glyphs alone. bn.txt is also printed in Bijoy
+(converted with the poriborton crate) in a font named SutonnyMJ
+(bn.bijoy.{producer}.pdf).
 
 Needs google-chrome and soffice on PATH. Run from the repository root:
     python3 scripts/make_corpus.py
@@ -39,7 +41,33 @@ def install_fonts():
         for f in os.listdir(d):
             if f.endswith(".ttf"):
                 shutil.copy(os.path.join(d, f), dest)
+    make_fake_sutonny(os.path.join(dest, "FakeSutonnyMJ.ttf"))
     subprocess.run(["fc-cache", "-f", dest], check=False, capture_output=True)
+
+
+def make_fake_sutonny(path):
+    """A font *named* SutonnyMJ, for Bijoy PDFs. Its shapes are Noto Serif's
+    Latin (SutonnyMJ itself is not freely licensed); only the name and the
+    Latin-1 text matter to the text layer. Never committed, only installed."""
+    from fontTools.ttLib import TTFont
+
+    font = TTFont(os.path.join(ROOT, "fonts", "NotoSerif-Regular.ttf"))
+    for rec in font["name"].names:
+        if rec.nameID in (1, 4, 16, 21):
+            rec.string = "SutonnyMJ"
+        elif rec.nameID == 6:
+            rec.string = "SutonnyMJ-Regular"
+    font.save(path)
+
+
+def to_bijoy(text):
+    """Unicode Bangla to Bijoy with the poriborton crate (an independent
+    implementation from Akkhor's own converter)."""
+    out = subprocess.run(
+        ["cargo", "run", "-q", "-p", "akkhor-flow", "--example", "to_bijoy"],
+        input=text.encode(), capture_output=True, check=True, cwd=ROOT,
+    )
+    return out.stdout.decode()
 
 
 def page_html(text, family):
@@ -95,6 +123,16 @@ def main():
         stem = name[:-4]
         lang = stem.split("-")[0]
         text = open(os.path.join(CORPUS, name), encoding="utf-8").read()
+        if stem == "bn":
+            # Set D: the same text typed in Bijoy, in a font named SutonnyMJ.
+            bijoy = to_bijoy(text)
+            html_path = os.path.join(work, "bn.bijoy.html")
+            open(html_path, "w", encoding="utf-8").write(page_html(bijoy, "SutonnyMJ"))
+            for producer, make in (("chrome", chrome), ("libreoffice", libreoffice)):
+                pdf = os.path.join(OUT, f"bn.bijoy.{producer}.pdf")
+                make(html_path, pdf)
+                n = strip_tounicode(pdf, os.path.join(OUT, f"bn.bijoy.{producer}.raw.pdf"))
+                print(f"bn.bijoy.{producer}.pdf  ({os.path.getsize(pdf)} bytes, {n} ToUnicode maps)")
         for key, family in FAMILIES[lang]:
             base = stem if key is None else f"{stem}.{key}"
             html_path = os.path.join(work, base + ".html")

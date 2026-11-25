@@ -183,6 +183,11 @@ pub fn recover(data: &Data) -> Option<Recovery> {
         if let Some(&r) = shapes.get(hash) {
             to_embedded.entry(r).or_insert(*gid);
             if let Some(text) = table.map.get(&r) {
+                // The subset's own map, once trusted, names glyphs whose
+                // shapes are shared (‚ and , in Noto Serif) correctly.
+                if !table.indic && out.map.contains_key(gid) {
+                    continue;
+                }
                 out.map.insert(*gid, text.clone());
                 if table.weak.contains(&r) {
                     out.weak.insert(*gid);

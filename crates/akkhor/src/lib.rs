@@ -38,8 +38,8 @@ pub enum Book {
 #[cfg(feature = "txt")]
 pub struct TextBook {
     pub document: akkhor_flow::Document,
-    /// `LegacyBijoy` means the text is Bangla typed with Bijoy and will look
-    /// like gibberish until converted (conversion arrives in Phase 2).
+    /// `LegacyBijoy` means the file was Bangla typed with Bijoy; the document
+    /// holds it converted to Unicode.
     pub encoding: akkhor_flow::TextEncoding,
 }
 

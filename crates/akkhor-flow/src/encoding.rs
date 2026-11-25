@@ -14,8 +14,8 @@ pub enum TextEncoding {
     Utf16Be,
     /// Windows-1252 (Western European), the usual 8-bit fallback.
     Windows1252,
-    /// Bangla typed with Bijoy (SutonnyMJ and similar fonts): readable only
-    /// after conversion to Unicode.
+    /// Bangla typed with Bijoy (SutonnyMJ and similar fonts). The decoded
+    /// text has already been converted to Unicode.
     LegacyBijoy,
 }
 
@@ -99,11 +99,12 @@ pub fn decode_text(bytes: &[u8]) -> DecodedText {
     } else {
         (decode_cp1252(bytes), TextEncoding::Windows1252)
     };
-    let encoding = if looks_like_bijoy(&text) {
-        TextEncoding::LegacyBijoy
-    } else {
-        encoding
-    };
+    if looks_like_bijoy(&text) {
+        return DecodedText {
+            text: crate::bijoy::bijoy_to_unicode(&text),
+            encoding: TextEncoding::LegacyBijoy,
+        };
+    }
     DecodedText { text, encoding }
 }
 
@@ -238,6 +239,11 @@ mod tests {
         let bijoy = "Avwg evsjvq Mvb MvB| Avgvi †mvbvi evsjv, Avwg †Zvgvq fvjevwm| G‡`k Avgvi, Avwg G‡K fvjevwm|";
         let d = decode_text(&cp1252(bijoy));
         assert_eq!(d.encoding, TextEncoding::LegacyBijoy);
+        assert!(
+            d.text.starts_with("আমি বাংলায় গান গাই। আমার সোনার বাংলা"),
+            "{}",
+            d.text
+        );
         // Same text saved as UTF-8 is still Bijoy.
         assert_eq!(
             decode_text(bijoy.as_bytes()).encoding,

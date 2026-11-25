@@ -109,6 +109,33 @@ impl PdfDocument {
         let glyphs = self.glyphs(index)?;
         let tables: Vec<Option<Arc<recover::Recovery>>> =
             glyphs.fonts.iter().map(|f| self.recovery(f)).collect();
+        // Whether each font's text layer can be trusted: it must mostly
+        // agree with the letters recovered from the glyphs. (Without a
+        // ToUnicode map, the interpreter guesses text from char codes,
+        // which for a renumbered subset are meaningless.)
+        let mut votes = vec![(0usize, 0usize); glyphs.fonts.len()];
+        for g in &glyphs.glyphs {
+            let rec = tables.get(g.font).and_then(|t| t.as_deref());
+            if let (Some(own), Some(r)) = (
+                g.unicode
+                    .as_deref()
+                    .filter(|u| text::usable(u) && !u.trim().is_empty()),
+                rec.and_then(|r| r.map.get(&g.glyph_id)),
+            ) && let Some(v) = votes.get_mut(g.font)
+            {
+                v.1 += 1;
+                v.0 += usize::from(recover::canonical(own) == r.text);
+            }
+        }
+        let trusted: Vec<bool> = votes
+            .iter()
+            .map(|(agree, n)| *n == 0 || agree * 2 >= *n)
+            .collect();
+        let bijoy: Vec<bool> = glyphs
+            .fonts
+            .iter()
+            .map(|f| f.name.as_deref().is_some_and(is_bijoy_font))
+            .collect();
         contain(|| {
             text::assemble(
                 &glyphs,
@@ -118,6 +145,51 @@ impl PdfDocument {
                     while i < word.len() {
                         let g = word[i];
                         let rec = tables.get(g.font).and_then(|t| t.as_deref());
+                        // Bijoy: Latin-1 letters drawn with a Bangla-looking
+                        // font. The whole run in that font is converted.
+                        if bijoy.get(g.font).copied().unwrap_or(false) {
+                            let n = word[i..].iter().take_while(|x| x.font == g.font).count();
+                            let run = &word[i..i + n];
+                            let ascii: String = run
+                                .iter()
+                                .map(|x| {
+                                    let trust = trusted.get(x.font).copied().unwrap_or(true);
+                                    let own =
+                                        x.unicode.as_deref().filter(|u| trust && text::usable(u));
+                                    let recovered = rec
+                                        .and_then(|r| r.map.get(&x.glyph_id))
+                                        .map(|t| t.text.as_str());
+                                    match (own, recovered) {
+                                        (Some(t), _) | (None, Some(t)) => t.to_string(),
+                                        // A blank glyph with width is a space.
+                                        (None, None) if x.advance > x.size * 0.15 => {
+                                            " ".to_string()
+                                        }
+                                        (None, None) => String::new(),
+                                    }
+                                })
+                                .collect();
+                            // ‚ (ূ-kar) and the comma share one outline in
+                            // many fonts; inside a word it is never a comma.
+                            let mut ascii: Vec<char> = ascii.chars().collect();
+                            for k in 0..ascii.len().saturating_sub(1) {
+                                if ascii[k] == ',' && ascii[k + 1].is_alphanumeric() {
+                                    ascii[k] = '\u{201A}';
+                                }
+                            }
+                            let ascii: String = ascii.into_iter().collect();
+                            let mut p = text::GlyphPiece::new(
+                                g,
+                                akkhor_flow::bijoy::bijoy_to_unicode(&ascii),
+                                recover::Role::Base,
+                            );
+                            for x in &run[1..] {
+                                p.rect = p.rect.union(x.rect);
+                            }
+                            out.push(p);
+                            i += n;
+                            continue;
+                        }
                         // A run of glyphs that means more than its parts.
                         if let Some(r) = rec.filter(|r| r.max_sequence >= 2) {
                             let longest = r.max_sequence.min(word.len() - i);
@@ -149,13 +221,21 @@ impl PdfDocument {
                             continue;
                         }
                         let recovered = rec.and_then(|r| r.map.get(&g.glyph_id));
-                        let own = g.unicode.as_deref().filter(|u| text::usable(u));
+                        let trust = trusted.get(g.font).copied().unwrap_or(true);
+                        let own = g.unicode.as_deref().filter(|u| trust && text::usable(u));
                         let (t, role) = match (recovered, own) {
                             (Some(r), _) if rec.is_some_and(|r| r.indic) => {
                                 (r.text.clone(), r.role)
                             }
                             (_, Some(t)) => (recover::canonical(t), recover::role_of(t)),
                             (Some(r), None) => (r.text.clone(), r.role),
+                            // A blank glyph with width is a space.
+                            (None, None)
+                                if rec.is_some_and(|r| r.blank.contains(&g.glyph_id))
+                                    && g.advance > g.size * 0.15 =>
+                            {
+                                (" ".to_string(), recover::Role::Base)
+                            }
                             (None, None) => (String::new(), recover::Role::Base),
                         };
                         out.push(text::GlyphPiece::new(g, t, role));
@@ -314,6 +394,21 @@ fn to_affine<T: hayro::hayro_interpret::util::TransformExt>(t: T) -> Affine {
     t.to_kurbo()
 }
 
+/// Whether a font name is one of the Bijoy ("MJ") fonts, whose text is
+/// Latin-1 that only looks like Bangla: SutonnyMJ, SutonnyOMJ,
+/// SolaimanLipiMJ, "Sutonny MJ Bold", ...
+pub fn is_bijoy_font(name: &str) -> bool {
+    let base: String = name
+        .split([',', '-', '+'])
+        .find(|p| !p.is_empty() && !(p.len() == 6 && p.chars().all(|c| c.is_ascii_uppercase())))
+        .unwrap_or("")
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_uppercase();
+    base.ends_with("MJ") || base.contains("BIJOY") || base.starts_with("SUTONNY")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -321,6 +416,27 @@ mod tests {
     fn open(name: &str) -> PdfDocument {
         let path = format!("{}/../../tests/{name}", env!("CARGO_MANIFEST_DIR"));
         PdfDocument::open(&Source::open(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn recognizes_bijoy_fonts() {
+        for name in [
+            "SutonnyMJ",
+            "SutonnyOMJ-Bold",
+            "SolaimanLipiMJ,Italic",
+            "Sutonny MJ",
+            "BijoyBaijayanta",
+        ] {
+            assert!(is_bijoy_font(name), "{name}");
+        }
+        for name in [
+            "NotoSerifBengali-Regular",
+            "Kalpurush",
+            "TimesNewRomanPSMT",
+            "MJollnir",
+        ] {
+            assert!(!is_bijoy_font(name), "{name}");
+        }
     }
 
     #[test]

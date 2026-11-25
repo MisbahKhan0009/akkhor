@@ -92,6 +92,17 @@ pub fn run_corpus() -> Vec<(String, f64, f64)> {
             }
         }
     }
+    // Set D: bn.txt typed in Bijoy, in a font named SutonnyMJ.
+    let truth = std::fs::read_to_string(corpus("bn.txt")).unwrap();
+    for producer in ["chrome", "libreoffice"] {
+        for variant in ["", ".raw"] {
+            let file = format!("pdf/bn.bijoy.{producer}{variant}.pdf");
+            let pdf = PdfDocument::open(&Source::open(corpus(&file)).unwrap()).unwrap();
+            let before = cer(&truth, &document_text(&pdf, true));
+            let after = cer(&truth, &document_text(&pdf, false));
+            rows.push((file, before, after));
+        }
+    }
     println!("{:<48} {:>10} {:>10}", "file", "raw CER", "Akkhor CER");
     for (f, b, a) in &rows {
         println!("{f:<48} {:>9.1}% {:>9.1}%", b * 100.0, a * 100.0);

@@ -13,6 +13,8 @@
 //! 4. [`layout`]: line breaking and pagination.
 //! 5. [`paint`]: drawing a page into a pixel buffer.
 
+pub mod bijoy;
+mod bijoy_table;
 pub mod css;
 pub mod encoding;
 pub mod fonts;
