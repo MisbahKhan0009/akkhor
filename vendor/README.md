@@ -30,7 +30,10 @@ touched in memory.
 be parsed (a flipped byte inside a number, `84\xC5.88`) is skipped up to
 the next delimiter instead of failing the whole array. Before, one bad
 number in a page's `/MediaBox` made the page dictionary unreadable and the
-page was lost; MuPDF skips the token the same way. Content streams are
+page was lost; MuPDF skips the token the same way. A nested array, dictionary
+or string that fails still fails the whole array, as upstream (Phase 5,
+found by fuzzing: stepping over its bracket re-read an unterminated
+`[[[[...` at every level, exponential time). Content streams are
 unchanged. Test: `a_damaged_number_does_not_lose_the_page`; renders of every
 fixture and corpus PDF identical.
 

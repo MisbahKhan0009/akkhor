@@ -1,6 +1,6 @@
 --- a/src/object/array.rs
 +++ b/src/object/array.rs
-@@ -100,8 +100,27 @@
+@@ -100,8 +100,34 @@
                  return Some(());
              } else if is_content_stream {
                  r.skip_with_depth::<Object<'_>>(true, depth + 1)?;
@@ -15,13 +15,20 @@
 +                // bad number does not lose the whole dictionary around it
 +                // (a page's /MediaBox, and with it the page). Readers of the
 +                // array then see it end early or skip the element.
++                //
++                // A failed nested array, dictionary or string (unterminated)
++                // still fails the whole array, as upstream: stepping over its
++                // opening bracket and going on would read the same broken
++                // nest again at every level, which is exponential on
++                // `[[[[...` (found by fuzzing).
 +                let start = r.offset();
 +                r.forward_while(crate::trivia::is_regular_character);
 +                if r.offset() == start {
 +                    // A stray delimiter: step over it, unless it ends the array
-+                    // or the data.
++                    // or the data, or opens something.
 +                    match r.peek_byte()? {
 +                        b']' => {}
++                        b'[' | b'<' | b'(' => return None,
 +                        _ => {
 +                            r.read_byte()?;
 +                        }

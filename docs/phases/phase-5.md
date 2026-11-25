@@ -134,9 +134,9 @@ Case study, CSVs, `history.csv`; review in `docs/reviews/phase-5.md`.
 - [ ] Whole-book search with snippets, incremental and stoppable
 - [ ] Ranges: text, rects, across views; survive font changes
 - [ ] Sentences for read aloud (Bangla, Hindi, English)
-- [ ] PDF page-range writer, checked by four engines
-- [ ] Colour themes from the app; `docs/api/android.md`, `Native.kt`, `apiVersion`; JVM test of every call
-- [ ] Fuzz targets in CI; every crash found fixed with a test
+- [x] PDF page-range writer, checked by four engines
+- [x] Colour themes from the app; `docs/api/android.md`, `Native.kt`, `apiVersion`; JVM test of every call
+- [x] Fuzz targets in CI; every crash found fixed with a test
 - [ ] Missing-font hint
 - [ ] Phone numbers (with Misbah's phone)
 - [ ] Case study, review, CI green

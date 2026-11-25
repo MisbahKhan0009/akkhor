@@ -1,0 +1,85 @@
+# Fuzz targets (cargo-fuzz, nightly Rust). Not part of the main workspace.
+#   cargo +nightly fuzz run pdf ../tests/corpus/pdf -- -max_total_time=60
+# CI runs every target on each push to main (.github/workflows/fuzz.yml).
+[package]
+name = "akkhor-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+akkhor-core = { path = "../crates/akkhor-core" }
+akkhor-pdf = { path = "../crates/akkhor-pdf", features = ["write"] }
+akkhor-flow = { path = "../crates/akkhor-flow", features = ["bundled-fonts"] }
+akkhor-epub = { path = "../crates/akkhor-epub" }
+akkhor = { path = "../crates/akkhor", features = ["pdf-write", "bundled-fonts"] }
+
+# The same vendored parser as the main workspace.
+[patch.crates-io]
+hayro-syntax = { path = "../vendor/hayro-syntax" }
+
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "pdf"
+path = "fuzz_targets/pdf.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pdf_reflow"
+path = "fuzz_targets/pdf_reflow.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pdf_write"
+path = "fuzz_targets/pdf_write.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "epub"
+path = "fuzz_targets/epub.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "zip"
+path = "fuzz_targets/zip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "markup"
+path = "fuzz_targets/markup.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text"
+path = "fuzz_targets/text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "locator"
+path = "fuzz_targets/locator.rs"
+test = false
+doc = false
+bench = false

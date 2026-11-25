@@ -6,3 +6,7 @@
 /tests/fixtures/big.pdf
 /tests/fixtures/big-bn.txt
 __pycache__/
+/fuzz/target
+/fuzz/corpus
+/fuzz/artifacts
+/fuzz/coverage
