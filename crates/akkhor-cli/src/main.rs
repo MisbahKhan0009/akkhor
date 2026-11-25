@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH]
-//!               [--theme paper|sepia|dusk|night] [--out page.png] [--search TEXT]
+//!               [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT]
 //!               [--text]
 //! ```
 //!
@@ -74,6 +74,7 @@ fn parse_args() -> Result<Args, String> {
                     "sepia" => Theme::SEPIA,
                     "dusk" => Theme::DUSK,
                     "night" => Theme::NIGHT,
+                    "original" => Theme::ORIGINAL,
                     t => return Err(format!("unknown theme {t}")),
                 }
             }
@@ -394,7 +395,7 @@ fn main() -> ExitCode {
                 eprintln!("error: {e}");
             }
             eprintln!(
-                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night] [--out page.png] [--search TEXT] [--text]"
+                "usage: akkhor <file> [--page N] [--scale S] [--tile X,Y,W,H] [--size WxH] [--theme paper|sepia|dusk|night|original] [--out page.png] [--search TEXT] [--text]"
             );
             ExitCode::FAILURE
         }

@@ -17,6 +17,7 @@ mod read;
 pub mod recover;
 pub mod reference;
 pub mod text;
+mod theme;
 
 pub use reference::register_reference_font;
 
@@ -42,7 +43,12 @@ pub struct PdfDocument {
     recoveries: Mutex<HashMap<u128, Option<Arc<recover::Recovery>>>>,
     /// Text of recently used pages, most recent last.
     texts: Mutex<Vec<(usize, Arc<PageText>)>>,
+    /// Where colour images land on recently themed pages.
+    image_boxes: Mutex<Vec<(usize, Arc<theme::ImageBoxes>)>>,
 }
+
+/// Pages whose image boxes are kept for theming (a few KB each).
+const IMAGE_BOX_PAGES: usize = 16;
 
 /// Fonts per page whose glyphs are recovered; a page with more (a hostile
 /// file) reads the rest from its text layer.
@@ -75,6 +81,7 @@ impl PdfDocument {
             interpreter: InterpreterSettings::default(),
             recoveries: Mutex::new(HashMap::new()),
             texts: Mutex::new(Vec::new()),
+            image_boxes: Mutex::new(Vec::new()),
         })
     }
 
@@ -277,20 +284,43 @@ impl PdfDocument {
         );
         ctx.flush();
 
+        // Drawn on white, as the PDF was designed; the theme is applied after.
         let target =
-            PixmapMut::new(w, h, out).ok_or_else(|| Error::malformed("bad target size"))?;
-        let bg = theme.background;
+            PixmapMut::new(w, h, &mut *out).ok_or_else(|| Error::malformed("bad target size"))?;
         ctx.render_with(
             target,
             &mut Resources::default(),
             RasterizerSettings {
-                target_init: TargetInit::Clear(AlphaColor::<Srgb>::from_rgba8(
-                    bg.r, bg.g, bg.b, bg.a,
-                )),
+                target_init: TargetInit::Clear(AlphaColor::<Srgb>::from_rgba8(255, 255, 255, 255)),
                 ..Default::default()
             },
         );
+        if !theme::is_original(theme) {
+            let boxes = self.image_boxes(index, page);
+            theme::apply(out, tile, scale, &boxes, theme);
+        }
         Ok(())
+    }
+
+    /// Where colour images land on a page (cached for recent pages).
+    fn image_boxes(
+        &self,
+        index: usize,
+        page: &hayro::hayro_syntax::page::Page<'_>,
+    ) -> Arc<theme::ImageBoxes> {
+        {
+            let cache = self.image_boxes.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some((_, b)) = cache.iter().find(|(i, _)| *i == index) {
+                return b.clone();
+            }
+        }
+        let boxes = Arc::new(theme::image_boxes(page));
+        let mut cache = self.image_boxes.lock().unwrap_or_else(|e| e.into_inner());
+        if cache.len() >= IMAGE_BOX_PAGES {
+            cache.remove(0);
+        }
+        cache.push((index, boxes.clone()));
+        boxes
     }
 
     /// Convenience: renders a whole page and returns its pixels.
@@ -410,6 +440,81 @@ mod tests {
         assert!(hit >= at && hit <= at + "যুক্তাক্ষরের".len());
         // The cache returns the same extraction.
         assert!(Arc::ptr_eq(&text, &pdf.page_text_cached(0).unwrap()));
+    }
+
+    /// A one-page PDF: a 2×2 RGB image (all green) at (50, 50, 100×100)
+    /// and a black square at (200, 50, 100×100), on a 400×200 page.
+    fn image_pdf(colour_space: &str, pixels: &[u8]) -> Vec<u8> {
+        let content = "q 100 0 0 100 50 50 cm /Im Do Q 0 g 200 50 100 100 re f";
+        let objects = [
+            "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 200] /Contents 4 0 R /Resources << /XObject << /Im 5 0 R >> >> >>".to_string(),
+            format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()),
+        ];
+        let mut out = b"%PDF-1.4\n".to_vec();
+        let mut offsets = Vec::new();
+        for (i, o) in objects.iter().enumerate() {
+            offsets.push(out.len());
+            out.extend(format!("{} 0 obj\n{o}\nendobj\n", i + 1).as_bytes());
+        }
+        offsets.push(out.len());
+        out.extend(format!("5 0 obj\n<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /{colour_space} /BitsPerComponent 8 /Length {} >>\nstream\n", pixels.len()).as_bytes());
+        out.extend(pixels);
+        out.extend(b"\nendstream\nendobj\n");
+        let xref = out.len();
+        out.extend(b"xref\n0 6\n0000000000 65535 f \n");
+        for o in offsets {
+            out.extend(format!("{o:010} 00000 n \n").as_bytes());
+        }
+        out.extend(
+            format!("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n").as_bytes(),
+        );
+        out
+    }
+
+    fn pixel_at(page: &RenderedPage, x: u32, y: u32) -> [u8; 3] {
+        let i = ((y * page.width + x) * 4) as usize;
+        [page.pixels[i], page.pixels[i + 1], page.pixels[i + 2]]
+    }
+
+    #[test]
+    fn themes_recolour_text_but_not_colour_images() {
+        let green = [0u8, 200, 0].repeat(4);
+        let pdf = PdfDocument::open(&Source::from_vec(image_pdf("DeviceRGB", &green))).unwrap();
+        let t = Theme::NIGHT;
+        let page = pdf.render_page(0, 1.0, &t).unwrap();
+        // Top-left origin: the PDF's y = 50..150 is rows 50..150 here too.
+        assert_eq!(
+            pixel_at(&page, 100, 100),
+            [0, 200, 0],
+            "image keeps its colour"
+        );
+        assert_eq!(
+            pixel_at(&page, 250, 100),
+            [t.text.r, t.text.g, t.text.b],
+            "black becomes text colour"
+        );
+        assert_eq!(
+            pixel_at(&page, 350, 20),
+            [t.background.r, t.background.g, t.background.b]
+        );
+        // The original theme changes nothing.
+        let page = pdf.render_page(0, 1.0, &Theme::ORIGINAL).unwrap();
+        assert_eq!(pixel_at(&page, 250, 100), [0, 0, 0]);
+        assert_eq!(pixel_at(&page, 350, 20), [255, 255, 255]);
+    }
+
+    #[test]
+    fn greyscale_images_are_themed_like_scanned_text() {
+        let white = [255u8; 4];
+        let pdf = PdfDocument::open(&Source::from_vec(image_pdf("DeviceGray", &white))).unwrap();
+        let t = Theme::NIGHT;
+        let page = pdf.render_page(0, 1.0, &t).unwrap();
+        assert_eq!(
+            pixel_at(&page, 100, 100),
+            [t.background.r, t.background.g, t.background.b]
+        );
     }
 
     #[test]

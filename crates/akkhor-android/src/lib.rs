@@ -119,11 +119,13 @@ fn font_set() -> FontSet {
     set
 }
 
+/// 0 paper, 1 sepia, 2 dusk, 3 night, 4 original (PDF colours untouched).
 fn theme(code: jint) -> Theme {
     match code {
         1 => Theme::SEPIA,
         2 => Theme::DUSK,
         3 => Theme::NIGHT,
+        4 => Theme::ORIGINAL,
         _ => Theme::PAPER,
     }
 }

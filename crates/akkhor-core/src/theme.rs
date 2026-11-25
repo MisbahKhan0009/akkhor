@@ -22,6 +22,11 @@ pub struct Theme {
 }
 
 impl Theme {
+    /// Black on white: PDF pages exactly as designed.
+    pub const ORIGINAL: Theme = Theme {
+        background: Rgba::rgb(0xFF, 0xFF, 0xFF),
+        text: Rgba::rgb(0x00, 0x00, 0x00),
+    };
     pub const PAPER: Theme = Theme {
         background: Rgba::rgb(0xFB, 0xF8, 0xF1),
         text: Rgba::rgb(0x22, 0x1F, 0x1A),
