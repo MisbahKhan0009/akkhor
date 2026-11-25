@@ -100,6 +100,56 @@ impl akkhor_flow::ImageProvider for ReflowImages<'_> {
     }
 }
 
+type FontData = Arc<dyn AsRef<[u8]> + Send + Sync>;
+
+fn standard_fonts() -> &'static Mutex<HashMap<String, FontData>> {
+    static FONTS: std::sync::OnceLock<Mutex<HashMap<String, FontData>>> =
+        std::sync::OnceLock::new();
+    FONTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Supplies one of the 14 standard PDF fonts, for PDFs that use them
+/// without embedding: `name` is its PostScript name ("Helvetica",
+/// "Times-Bold", "Courier-Oblique", "Symbol", "ZapfDingbats", ...); the data
+/// is any TrueType, OpenType or CFF font. On Android the phone's own fonts
+/// do (Roboto for Helvetica, Noto Serif for Times, a monospace for Courier),
+/// so the engine need not carry them. A registered font is used even when
+/// the `standard-fonts` feature embeds its own.
+pub fn register_standard_font(name: &str, data: FontData) {
+    standard_fonts()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(name.to_string(), data);
+}
+
+/// Interpreter settings: standard fonts come from [`register_standard_font`]
+/// first, then (with the `standard-fonts` feature) from the embedded set.
+pub(crate) fn interpreter_settings() -> InterpreterSettings {
+    use hayro::hayro_interpret::font::FontQuery;
+    let embedded = InterpreterSettings::default().font_resolver;
+    InterpreterSettings {
+        font_resolver: Arc::new(move |query: &FontQuery| {
+            let wanted = match query {
+                FontQuery::Standard(s) => *s,
+                FontQuery::Fallback(f) => f.pick_standard_font(),
+            };
+            let registered = {
+                let fonts = standard_fonts().lock().unwrap_or_else(|e| e.into_inner());
+                fonts.get(wanted.postscript_name()).cloned().or_else(|| {
+                    // Any face of the same family beats nothing.
+                    let family = wanted.postscript_name().split('-').next().unwrap_or("");
+                    fonts
+                        .iter()
+                        .find(|(k, _)| k.split('-').next() == Some(family))
+                        .map(|(_, d)| d.clone())
+                })
+            };
+            registered.map(|d| (d, 0)).or_else(|| embedded(query))
+        }),
+        ..InterpreterSettings::default()
+    }
+}
+
 /// Recognised Type 3 glyphs get ids from here up (Type 3 glyphs otherwise
 /// all have id 0), so they never meet a real glyph id.
 const TYPE3_IDS: u32 = 0x4000_0000;
@@ -143,7 +193,7 @@ impl PdfDocument {
             render_cache: Mutex::new(None),
             data,
             pdf,
-            interpreter: InterpreterSettings::default(),
+            interpreter: interpreter_settings(),
             recoveries: Mutex::new(HashMap::new()),
             texts: Mutex::new(Vec::new()),
             image_boxes: Mutex::new(Vec::new()),

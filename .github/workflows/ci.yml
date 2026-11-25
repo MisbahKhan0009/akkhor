@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features: [pdf, "pdf,pdf-scans", epub, txt, "pdf,pdf-cjk", "pdf,epub,txt"]
+        features: [pdf, "pdf,pdf-scans", "pdf,pdf-standard-fonts", epub, txt, "pdf,pdf-cjk", "pdf,epub,txt"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -54,6 +54,9 @@ jobs:
           key: switches
       - run: cargo check -p akkhor --no-default-features --features "${{ matrix.features }}"
       - run: cargo check -p akkhor-android --no-default-features --features "${{ matrix.features }}"
+      - name: Standard fonts from the app (no embedded set)
+        if: matrix.features == 'pdf'
+        run: cargo test -p akkhor-pdf --no-default-features --features jpeg --test standard_fonts
 
   android:
     name: Android libraries

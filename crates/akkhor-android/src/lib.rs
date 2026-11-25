@@ -6,6 +6,10 @@
 //! object Native {
 //!     init { System.loadLibrary("akkhor") }
 //!     external fun registerFont(script: String, path: String)        // "Latn", "Beng", "Deva", ...
+//!     // The 14 standard PDF fonts, for PDFs that use them without embedding:
+//!     // "Helvetica" -> Roboto, "Times-Roman" -> Noto Serif, "Courier" -> a
+//!     // monospace; any face of a family stands in for the others.
+//!     external fun registerStandardFont(name: String, path: String)
 //!     external fun openFd(fd: Int, name: String?): Long              // 0 on failure
 //!     external fun openPath(path: String): Long
 //!     external fun close(handle: Long)
@@ -258,6 +262,24 @@ fn into_handle(book: Book) -> jlong {
         .unwrap_or_else(|e| e.into_inner())
         .insert(id, Arc::new(std::sync::atomic::AtomicU64::new(0)));
     id
+}
+
+/// Supplies a standard PDF font (by PostScript name) from a font file.
+#[cfg(feature = "pdf")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_registerStandardFont(
+    env: *mut JNIEnv,
+    _: jclass,
+    name: jstring,
+    path: jstring,
+) {
+    guard((), || {
+        let name = unsafe { jstr(env, name) }.ok_or("name is null")?;
+        let path = unsafe { jstr(env, path) }.ok_or("path is null")?;
+        let src = akkhor::Source::open(&path).map_err(|e| e.to_string())?;
+        akkhor::pdf::register_standard_font(&name, src.shared());
+        Ok(())
+    })
 }
 
 #[unsafe(no_mangle)]

@@ -15,10 +15,14 @@ categories = ["text-processing", "rendering"]
 # adds nothing to the binary. A format that is on costs no RAM until a file of
 # that format is opened.
 [features]
-default = ["pdf", "pdf-scans", "epub", "txt"]
+default = ["pdf", "pdf-scans", "pdf-standard-fonts", "epub", "txt"]
 # PDFs, with JPEG images and the 14 standard PDF fonts.
 # PDFs, reflow included (it uses the flow layout).
-pdf = ["dep:akkhor-pdf", "akkhor-pdf/jpeg", "akkhor-pdf/standard-fonts", "flow"]
+pdf = ["dep:akkhor-pdf", "akkhor-pdf/jpeg", "flow"]
+# The 14 standard PDF fonts compiled in (about 0.27 MB). Without them, an
+# app supplies them with `pdf::register_standard_font` (the phone's own
+# fonts do); PDFs that embed their fonts, nearly all, need nothing.
+pdf-standard-fonts = ["pdf", "akkhor-pdf/standard-fonts"]
 # Decoders for scanned pages: JBIG2 and CCITT (black and white) and
 # JPEG 2000. Common in scanned books; about 0.4 MB of code.
 pdf-scans = ["pdf", "akkhor-pdf/jbig2", "akkhor-pdf/ccitt", "akkhor-pdf/jpx"]

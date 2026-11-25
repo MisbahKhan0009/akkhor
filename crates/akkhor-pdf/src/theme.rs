@@ -12,7 +12,7 @@
 use hayro::hayro_interpret::font::GlyphRun;
 use hayro::hayro_interpret::{
     BlendMode, ClipPath, Context, Device, DrawMode, DrawProps, Image, ImageDrawProps,
-    InterpreterCache, InterpreterSettings, SoftMask, interpret_page,
+    InterpreterCache, SoftMask, interpret_page,
 };
 use hayro::hayro_syntax::object::{Array, Name, Object};
 use hayro::hayro_syntax::page::Page;
@@ -118,7 +118,7 @@ fn boxes(page: &Page<'_>, all: bool) -> ImageBoxes {
         Rect::new(0.0, 0.0, w as f64, h as f64),
         &cache,
         page.xref(),
-        InterpreterSettings::default(),
+        crate::interpreter_settings(),
     );
     let mut collector = Collector {
         boxes: Vec::new(),
