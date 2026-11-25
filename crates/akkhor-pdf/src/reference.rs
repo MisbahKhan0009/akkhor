@@ -285,18 +285,28 @@ pub(crate) fn outline_hashes(data: &[u8]) -> (Vec<(u32, u64)>, HashSet<u32>) {
     (out, blank)
 }
 
+/// Hashes a glyph outline. Horizontal position is taken from the first
+/// point: TrueType outlines are shifted by the left side bearing when the
+/// `head` flags say so, and producers that rewrite `hmtx` (Ghostscript)
+/// move the same shape sideways. Vertical position is kept: it tells a
+/// comma from a quote.
 #[derive(Default)]
 struct HashPen {
     hasher: DefaultHasher,
     ops: usize,
+    origin_x: Option<f32>,
 }
 
 impl HashPen {
     fn op(&mut self, tag: u8, points: &[f32]) {
         self.ops += 1;
         tag.hash(&mut self.hasher);
-        for p in points {
-            (p.round() as i32).hash(&mut self.hasher);
+        let ox = *self
+            .origin_x
+            .get_or_insert(points.first().copied().unwrap_or(0.0));
+        for (i, p) in points.iter().enumerate() {
+            let v = if i % 2 == 0 { p - ox } else { *p };
+            (v.round() as i32).hash(&mut self.hasher);
         }
     }
 }

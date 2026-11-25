@@ -59,6 +59,11 @@ pub struct PdfGlyph {
     /// [`PageGlyphs::actual_texts`]. Producers write the logical text of a
     /// cluster there (Chrome and LibreOffice do for every Indic cluster).
     pub actual: Option<usize>,
+    /// Inside an `/Artifact` marked-content section: running headers, page
+    /// numbers and other furniture the producer tagged as not content.
+    pub artifact: bool,
+    /// Drawn with a stroke, or drawn again over itself: synthetic bold.
+    pub bold: bool,
 }
 
 /// The glyphs of one page and the fonts they use.
@@ -86,6 +91,11 @@ struct Collector {
     /// Open marked-content sections: the `/ActualText` span each one
     /// starts, if any.
     marked: Vec<Option<usize>>,
+    /// Open marked-content sections tagged `/Artifact`.
+    artifacts: Vec<bool>,
+    /// Where each glyph was drawn: (font, glyph id, char code, x and y in
+    /// half points) to its index, to drop copies drawn on top.
+    placed: std::collections::HashMap<(usize, u32, u32, i64, i64), usize>,
 }
 
 /// Decodes a PDF text string: UTF-16 with a byte-order mark, else
@@ -157,13 +167,17 @@ impl<'a> Device<'a> for Collector {
                 self.out.actual_texts.len() - 1
             });
         self.marked.push(span);
+        self.artifacts.push(_tag == b"Artifact");
     }
 
     fn end_marked_content(&mut self) {
         self.marked.pop();
+        self.artifacts.pop();
     }
 
-    fn draw_glyph_run(&mut self, run: &GlyphRun<'_, 'a>, props: DrawProps<'a>, _: &DrawMode) {
+    fn draw_glyph_run(&mut self, run: &GlyphRun<'_, 'a>, props: DrawProps<'a>, mode: &DrawMode) {
+        let stroked = matches!(mode, DrawMode::Stroke(_) | DrawMode::FillAndStroke(..));
+        let artifact = self.artifacts.iter().any(|a| *a);
         let Some(first) = run.glyphs().first() else {
             return;
         };
@@ -187,6 +201,34 @@ impl<'a> Device<'a> for Collector {
                 BfString::Char(c) => c.to_string(),
                 BfString::String(s) => s,
             });
+            // The same glyph drawn again on itself (fill, then stroke as a
+            // second pass: how many tools fake bold) is one glyph, in bold.
+            // Positions are bucketed by half a point; a copy within 0.03 em
+            // in this bucket or a neighbouring one is the same glyph.
+            let at = (origin.x as f32, origin.y as f32);
+            let near = size * 0.03;
+            let cell = ((at.0 * 2.0).round() as i64, (at.1 * 2.0).round() as i64);
+            let mut found = None;
+            'search: for dx in -1..=1 {
+                for dy in -1..=1 {
+                    let key = (font, glyph_id, g.char_code(), cell.0 + dx, cell.1 + dy);
+                    if let Some(&i) = self.placed.get(&key) {
+                        let p = &self.out.glyphs[i];
+                        if (p.origin.0 - at.0).abs() <= near && (p.origin.1 - at.1).abs() <= near {
+                            found = Some(i);
+                            break 'search;
+                        }
+                    }
+                }
+            }
+            if let Some(i) = found {
+                self.out.glyphs[i].bold = true;
+                continue;
+            }
+            self.placed.insert(
+                (font, glyph_id, g.char_code(), cell.0, cell.1),
+                self.out.glyphs.len(),
+            );
             self.out.glyphs.push(PdfGlyph {
                 unicode,
                 char_code: g.char_code(),
@@ -197,6 +239,8 @@ impl<'a> Device<'a> for Collector {
                 size,
                 rect: Rect::new(origin.x.min(end.x), top, origin.x.max(end.x), bottom),
                 actual: self.marked.iter().flatten().next().copied(),
+                artifact,
+                bold: stroked,
             });
         }
     }
@@ -216,6 +260,8 @@ pub(crate) fn collect(page: &Page<'_>) -> PageGlyphs {
     let mut collector = Collector {
         out: PageGlyphs::default(),
         marked: Vec::new(),
+        artifacts: Vec::new(),
+        placed: Default::default(),
     };
     interpret_page(page, &mut ctx, &mut collector);
     collector.out

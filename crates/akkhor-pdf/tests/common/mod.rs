@@ -61,6 +61,7 @@ pub fn register_test_fonts() {
     for f in [
         "../fonts/HindSiliguri-Regular.ttf",
         "../fonts/Mukta-Regular.ttf",
+        "../fonts/Kalpurush-Regular.ttf",
         "../../fonts/NotoSerifBengali-Regular.ttf",
         "../../fonts/NotoSerifDevanagari-Regular.ttf",
         "../../fonts/NotoSerif-Regular.ttf",

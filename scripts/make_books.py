@@ -35,7 +35,8 @@ FONT_DIRS = [os.path.join(ROOT, "fonts"), os.path.join(ROOT, "tests", "fonts")]
 
 # family name, file, and the second design used for the two-column layout
 FONTS = {
-    "bn": [("Noto Serif Bengali", "NotoSerifBengali-Regular.ttf"), ("Hind Siliguri", "HindSiliguri-Regular.ttf")],
+    "bn": [("Noto Serif Bengali", "NotoSerifBengali-Regular.ttf"), ("Hind Siliguri", "HindSiliguri-Regular.ttf"),
+           ("Kalpurush", "Kalpurush-Regular.ttf")],
     "hi": [("Noto Serif Devanagari", "NotoSerifDevanagari-Regular.ttf"), ("Mukta", "Mukta-Regular.ttf")],
 }
 HEADER = {"bn": "নদীর ধারে একটি গ্রাম · অক্ষর পরীক্ষা", "hi": "पहाड़ों के बीच एक कस्बा · अक्षर परीक्षण"}
@@ -316,7 +317,13 @@ def main():
             if only and only != producer:
                 continue
             for layout in ("one", "two"):
-                designs = FONTS[lang] if layout == "two" and producer in ("chrome", "xelatex") else FONTS[lang][:1]
+                # Second designs in two columns for Chrome and XeLaTeX; Kalpurush
+                # through Word, the usual way it reaches a PDF.
+                designs = FONTS[lang][:1]
+                if layout == "two" and producer in ("chrome", "xelatex"):
+                    designs = FONTS[lang][:2]
+                if producer == "writer":
+                    designs = FONTS[lang][:1] + FONTS[lang][2:3]
                 for i, (family, _) in enumerate(designs):
                     blocks = with_figure(source) if layout == "two" else source
                     blocks_in = [b for b in blocks if b[0] != "footnote"] if layout == "one" else blocks
