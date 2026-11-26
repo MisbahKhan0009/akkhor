@@ -24,6 +24,8 @@ run: `environment.json`.
 | `real_world_tables.csv` | the real Bangla book (not committed): headings, table rows and cards in the reflow, Phase 4 against Phase 4b | `akkhor-bench reflow` with the book's fonts registered, both builds; spot-checked on page images |
 | `phase4b_fixes.csv` | each Phase 4b fix, before and after | named per row |
 | `history.csv` | one row per milestone and metric | each row names where it was measured and its source |
+| `page_copies.csv` | Phase 5 page writer: per test PDF, the pages copied by Akkhor, then read in MuPDF, PDFium and Poppler | `scripts/bench/check_page_copies.py`: every page of files up to 4 pages (last first), else the last and first; same text (whitespace collapsed) and pixels at 72 dpi (a channel off by more than 8 counts); `qpdf --check` on the copy |
+| `phase5_fixes.csv` | the four wrong-output, crash and hang bugs fixed in Phase 5, with how each was found | from `docs/reviews/phase-5.md` |
 
 ## What to keep in mind
 

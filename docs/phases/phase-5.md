@@ -129,17 +129,17 @@ Case study, CSVs, `history.csv`; review in `docs/reviews/phase-5.md`.
 
 ## Done when
 
-- [ ] Book info and covers for EPUB, PDF and TXT, under 50 ms a book
-- [ ] Locators, progress and the scrubber; survive font, screen and theme changes
-- [ ] Whole-book search with snippets, incremental and stoppable
-- [ ] Ranges: text, rects, across views; survive font changes
-- [ ] Sentences for read aloud (Bangla, Hindi, English)
+- [x] Book info and covers for EPUB, PDF and TXT, under 50 ms a book
+- [x] Locators, progress and the scrubber; survive font, screen and theme changes
+- [x] Whole-book search with snippets, incremental and stoppable
+- [x] Ranges: text, rects, across views; survive font changes
+- [x] Sentences for read aloud (Bangla, Hindi, English)
 - [x] PDF page-range writer, checked by four engines
 - [x] Colour themes from the app; `docs/api/android.md`, `Native.kt`, `apiVersion`; JVM test of every call
 - [x] Fuzz targets in CI; every crash found fixed with a test
-- [ ] Missing-font hint
-- [ ] Phone numbers (with Misbah's phone)
-- [ ] Case study, review, CI green
+- [x] Missing-font hint
+- [ ] Phone numbers (with Misbah's phone): the benchmark is built by CI, waiting for a run
+- [x] Case study, review, CI green
 
 ## Risks
 

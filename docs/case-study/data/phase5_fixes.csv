@@ -1,0 +1,5 @@
+finding,where,found_by,severity,before,after,test
+nested arrays re-read at every level,vendored hayro-syntax lenient arrays,fuzzing (pdf; pdf_write),hang,page text 23 s / never finished,under 10 ms,fuzz_found.rs
+percent code before a multi-byte letter,akkhor-epub percent_decode,fuzzing in CI (markup),panic,crash,decoded,percent_decoding_keeps_letters_whole
+close while searching,akkhor-android searches,review,deadlock,hung on every run,ends,NativeTest.java
+page turned by /Rotate,akkhor-pdf page text,new test file,wrong text,one letter per line,lines as MuPDF,a_turned_page_is_read_in_lines

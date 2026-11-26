@@ -55,3 +55,7 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-26,Phase 4b,damaged PDFs whose page 1 is shown,145,of 200,compare_engines.py robustness,lenient array parsing in vendored hayro-syntax (MuPDF 130)
 2026-11-26,Phase 4b,headings in the real Bangla book's reflow,356,blocks,local only,was 1221 in Phase 4 (numbers and labels taken for headings)
 2026-11-26,Phase 4b,arm64 Android library size,5.89,MB,GitHub Actions cargo-ndk,CI run on 4135a9f (tables, boxes, Type 3 bold probes; was 5.73)
+2026-11-26,Phase 5,pages copied that read and draw the same in MuPDF PDFium and Poppler,79,of 79,check_page_copies.py,identical text and pixels at 72 dpi; qpdf --check clean
+2026-11-26,Phase 5,engine calls checked against Native.kt and run from a JVM,53,calls,GitHub Actions,check_native.py and NativeTest.java
+2026-11-26,Phase 5,bugs found by fuzzing and review,4,bugs,phase-5 review,a hang and a panic (fuzzing); a deadlock (review); turned pages read letter by letter (test file)
+2026-11-26,Phase 5,arm64 Android library size (app build),6.01,MB,GitHub Actions cargo-ndk,adds the app interface and the page writer (was 5.89)

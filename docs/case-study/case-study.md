@@ -281,6 +281,27 @@ table down its columns; and the reflow has 356 headings instead of 1,221,
 because row numbers, labels around pictures and lead-ins ending in a colon
 no longer count.
 
+### Ready for an app
+
+Phase 5 put everything a reader app needs behind one interface: the
+library card (title, authors, cover, how sure the text is), a saved place
+that survives any change of font, screen or theme, a progress bar,
+search of the whole book that the app can stop at any time, highlights,
+sentences for read aloud, and "share these pages" as a new PDF.
+
+- **One Kotlin file** (`android/Native.kt`, 53 calls) is the whole
+  contract. CI checks every declaration against the library and calls
+  each one from a JVM, from several threads, after closing the book and
+  with bad input, so a mismatch fails the build, not the app.
+- **Shared pages stay real PDF pages.** Pages from all 79 test PDFs,
+  copied and opened in MuPDF, PDFium and Poppler, give the same text and
+  the same pixels as the original ([`data/page_copies.csv`](data/page_copies.csv)).
+- **Fuzzing** (eight targets, every push) and the review found four bugs
+  before any app did: a parser hang my own Phase 4b change had caused, an
+  EPUB panic on an odd link, a deadlock when a book is closed during a
+  search, and pages turned by `/Rotate` read one letter per line
+  ([`data/phase5_fixes.csv`](data/phase5_fixes.csv)).
+
 ## Where Akkhor is behind (and what is next)
 
 Being honest about this is part of the point:
@@ -300,8 +321,8 @@ Being honest about this is part of the point:
   one line above the table, not as its header; merged cells send a table to
   a picture rather than text; a table in a font with no bold has a plain
   header row.
-- **Library size:** 5.8 MB on Linux and on Android (arm64) with all
-  formats and Indic shaping: smaller than PDFium (6.7 MB, PDF only) and far
+- **Library size:** 6.0 MB on Android (arm64) for the app build (all
+  formats, scans, the page writer and Indic shaping): smaller than PDFium (6.7 MB, PDF only) and far
   below MuPDF (36 MB), but I missed my 3.5 MB target. Most of what is left
   is the shaper and font parsers, which both EPUB layout and PDF text
   recovery need.
@@ -335,6 +356,10 @@ Being honest about this is part of the point:
 - My Phase 4 reflow numbers were all from generated books with no tables.
   The first time I counted headings in the real book's reflow (1,221 for
   204 pages) was in Phase 4b; most were row numbers and labels.
+
+- My Phase 4b fix for damaged arrays (skip a broken element, go on) made
+  an unterminated nest of arrays exponential. Fuzzing found it in under
+  two minutes; no hand-made test had nested broken arrays.
 
 ## How it was built
 

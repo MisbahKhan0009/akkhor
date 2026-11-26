@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-26 (Phase 5 planned)
+Last updated: 2026-11-26 (Phase 5 done; phone numbers pending)
 
 ---
 
@@ -204,9 +204,13 @@ Results: on 8 table and card PDFs from four producers every block reflows as the
 
 Review: [reviews/phase-4b.md](reviews/phase-4b.md), 18 findings; the six wrong-output ones fixed (cell gaps, line spacing, a cut-off table row, numbering columns, labels taken for cards and headings, Typst reph). Carried: a permitted real PDF with tables, header labels in coloured boxes, headings followed by a table, one text-layer reorder seen on the real book.
 
-### Phase 5: Ready for the app 🔄
+### Phase 5: Ready for the app ✅
 
 Detailed design: [phases/phase-5.md](phases/phase-5.md). What the reader app needs from the engine, behind an interface that stops changing: book info and covers, locators that survive font and view changes, progress, whole-book search, ranges for highlights, sentences for read aloud, a PDF page-range writer, colour themes from the app, a documented and tested JNI interface (`docs/api/android.md`, `Native.kt`, `apiVersion`), fuzzing in CI, a missing-font hint, and numbers from a real phone.
+
+Results: 53 engine calls documented in `Native.kt` and [api/android.md](api/android.md), checked against the library and called from a JVM in CI. Pages copied from all 79 test PDFs read and draw the same in MuPDF, PDFium and Poppler. Eight fuzz targets run on every push. The phone benchmark is built for arm64 by CI; its numbers wait for a run on a phone.
+
+Review: [reviews/phase-5.md](reviews/phase-5.md), 12 findings; four 🔴 fixed: a parser hang and an EPUB panic found by fuzzing, a close-while-searching deadlock, pages turned by `/Rotate` read letter by letter. Carried: turned pictures in reflow, the reference-font start-up cost, slow no-hit search on huge books.
 
 ### Phase 6: More formats ⬜
 
