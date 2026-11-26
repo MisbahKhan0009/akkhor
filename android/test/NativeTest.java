@@ -103,6 +103,29 @@ public class NativeTest {
         }
         for (Thread t : ts) t.join();
         check(bad[0] == 0, "calls from several threads: " + bad[0] + " failed");
+
+        // Closing a book while other threads search it: no deadlock, and
+        // their calls end in plain errors.
+        long other = Native.openPath(root + "/tests/fixtures/indic-sample.epub");
+        Thread[] searchers = new Thread[4];
+        for (int i = 0; i < searchers.length; i++) {
+            searchers[i] = new Thread(() -> {
+                for (int k = 0; k < 200; k++) {
+                    long id = Native.searchStart(other, "অ");
+                    while (id != 0) {
+                        String b = Native.searchNext(id, 1);
+                        if (b == null || b.contains("\"done\":true")) break;
+                    }
+                }
+            });
+            searchers[i].start();
+        }
+        Thread.sleep(20);
+        Native.close(other);
+        for (Thread t : searchers) {
+            t.join(20_000);
+            check(!t.isAlive(), "a search thread is stuck after close");
+        }
         Native.close(h);
         check(Native.info(h) == null, "info after close");
         Native.close(h);

@@ -420,7 +420,9 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_sentences(
 // --- 5.3 whole-book search ---------------------------------------------
 
 /// A search in progress, and the book it searches.
-type Running = std::sync::Arc<Mutex<(jlong, BookSearch)>>;
+/// A search: its book's handle (read without locking the search, so a
+/// close never waits on a running batch) and the search itself.
+type Running = (jlong, std::sync::Arc<Mutex<BookSearch>>);
 
 /// Searches in progress by id.
 static SEARCHES: Mutex<BTreeMap<jlong, Running>> = Mutex::new(BTreeMap::new());
@@ -440,7 +442,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_searchStart(
         let id = NEXT_SEARCH.fetch_add(1, Ordering::Relaxed);
         SEARCHES.lock().map_err(|_| "searches poisoned")?.insert(
             id,
-            std::sync::Arc::new(Mutex::new((h, BookSearch::new(&query)))),
+            (h, std::sync::Arc::new(Mutex::new(BookSearch::new(&query)))),
         );
         Ok(id)
     })
@@ -456,16 +458,19 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_searchNext(
     max: jint,
 ) -> jstring {
     guard(std::ptr::null_mut(), || unsafe {
-        let running = SEARCHES
+        let (h, running) = SEARCHES
             .lock()
             .map_err(|_| "searches poisoned")?
             .get(&search)
             .cloned()
             .ok_or("no such search (finished or cancelled)")?;
         // The search's own lock, not the table's: other searches go on.
-        let mut guard = running.lock().map_err(|_| "search poisoned")?;
-        let (h, s) = &mut *guard;
-        let batch = with_reading(*h, |b, r| Ok(s.next(b, r, max.clamp(1, 500) as usize)))?;
+        // Never held while taking the table's lock (close takes the table
+        // lock first).
+        let batch = {
+            let mut s = running.lock().map_err(|_| "search poisoned")?;
+            with_reading(h, |b, r| Ok(s.next(b, r, max.clamp(1, 500) as usize)))?
+        };
         if batch.done {
             SEARCHES
                 .lock()
@@ -495,7 +500,7 @@ pub extern "system" fn Java_dev_akkhor_Native_searchCancel(
 /// Searches of a closed book are dropped with it.
 pub fn forget_searches(h: jlong) {
     if let Ok(mut s) = SEARCHES.lock() {
-        s.retain(|_, r| r.lock().is_ok_and(|g| g.0 != h));
+        s.retain(|_, (book, _)| *book != h);
     }
 }
 
