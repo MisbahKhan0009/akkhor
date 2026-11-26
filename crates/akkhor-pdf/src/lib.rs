@@ -295,10 +295,13 @@ impl PdfDocument {
         let mut texts = Vec::with_capacity(around.len());
         let mut shapes = Vec::with_capacity(around.len());
         let mut sizes = Vec::with_capacity(around.len());
+        // Pages turned by /Rotate are read upright: text, shapes and size
+        // all in reading orientation.
         for i in around.clone() {
-            texts.push(self.page_text_cached(i)?);
+            texts.push(self.upright_text(i)?);
             shapes.push(self.page_shapes(i)?);
-            sizes.push(self.page_size(i)?);
+            let page = self.pdf.pages().get(i).ok_or(Error::OutOfRange)?;
+            sizes.push(glyphs::page_transform(page, true).1);
         }
         let input: Vec<reflow::ReflowPage<'_>> = texts
             .iter()
@@ -311,11 +314,28 @@ impl PdfDocument {
             })
             .collect();
         let own = pages.start - around.start..end - around.start;
-        contain(|| reflow::reflow(around.start, &input, own))
+        let mut out = contain(|| reflow::reflow(around.start, &input, own))?;
+        // Pictures are drawn from the page as displayed.
+        for block in &mut out.document.blocks {
+            let Some((page, rect)) = block.image.as_deref().and_then(reflow::parse_image_source)
+            else {
+                continue;
+            };
+            if let Some(t) = self
+                .pdf
+                .pages()
+                .get(page)
+                .and_then(glyphs::upright_to_display)
+            {
+                block.image = Some(reflow::image_source(page, t.transform_rect_bbox(rect)));
+            }
+        }
+        Ok(out)
     }
 
     /// The pictures, rules and filled boxes of a page, as page structure
-    /// sees them (points from the top left).
+    /// sees them (points from the top left, in reading orientation: a page
+    /// turned by `/Rotate` as if it were not).
     pub fn page_shapes(&self, index: usize) -> Result<reflow::PageShapes> {
         let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
         let (pictures, vector) = contain(|| theme::page_shapes(page))?;
@@ -382,15 +402,39 @@ impl PdfDocument {
     /// origin) and whatever the PDF's own text layer says they mean.
     pub fn glyphs(&self, index: usize) -> Result<PageGlyphs> {
         let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
-        contain(|| glyphs::collect(page))
+        contain(|| glyphs::collect(page, false))
+    }
+
+    /// [`glyphs`](Self::glyphs) in reading orientation, for reading text.
+    fn upright_glyphs(&self, index: usize) -> Result<PageGlyphs> {
+        let page = self.pdf.pages().get(index).ok_or(Error::OutOfRange)?;
+        contain(|| glyphs::collect(page, true))
+    }
+
+    /// Text read upright, its boxes moved onto the page as displayed.
+    fn displayed(&self, index: usize, mut text: PageText) -> PageText {
+        let turn = self
+            .pdf
+            .pages()
+            .get(index)
+            .and_then(glyphs::upright_to_display);
+        if let Some(t) = turn {
+            for s in &mut text.spans {
+                s.rect = t.transform_rect_bbox(s.rect);
+            }
+            for l in &mut text.line_info {
+                l.rect = t.transform_rect_bbox(l.rect);
+            }
+        }
+        text
     }
 
     /// The page's text exactly as the PDF's own text layer (`ToUnicode`)
     /// gives it, with no repair. Useful for comparison; use
     /// [`page_text`](Self::page_text) for reading, search and copy.
     pub fn page_text_raw(&self, index: usize) -> Result<PageText> {
-        let glyphs = self.glyphs(index)?;
-        Ok(text::assemble(
+        let glyphs = self.upright_glyphs(index)?;
+        let text = text::assemble(
             &glyphs,
             |word| {
                 word.iter()
@@ -405,7 +449,8 @@ impl PdfDocument {
                     .collect()
             },
             |line| line,
-        ))
+        );
+        Ok(self.displayed(index, text))
     }
 
     /// The page's text, repaired for reading, search and copy.
@@ -416,7 +461,16 @@ impl PdfDocument {
     /// the PDF has no text layer at all. Glyphs are then put back into
     /// reading order: vowel signs drawn before their consonant, rephs drawn
     /// after their syllable and two-part vowels.
+    ///
+    /// A page turned by `/Rotate` is read as if it were not, so its lines
+    /// run in reading order; the boxes are on the page as displayed. On
+    /// such a page [`LineInfo::baseline`](text::LineInfo) stays in reading
+    /// orientation.
     pub fn page_text(&self, index: usize) -> Result<PageText> {
+        Ok(self.displayed(index, self.read_upright(index)?))
+    }
+
+    fn read_upright(&self, index: usize) -> Result<PageText> {
         let (glyphs, fonts) = self.prepared(index)?;
         let actual = read::ActualTexts::new(&glyphs);
         contain(|| {
@@ -480,7 +534,7 @@ impl PdfDocument {
 
     /// A page's glyphs and how to read each of its fonts.
     fn prepared(&self, index: usize) -> Result<(PageGlyphs, Vec<read::FontReading>)> {
-        let mut glyphs = self.glyphs(index)?;
+        let mut glyphs = self.upright_glyphs(index)?;
         let mut tables: Vec<Option<Arc<recover::Recovery>>> = glyphs
             .fonts
             .iter()
@@ -571,13 +625,29 @@ impl PdfDocument {
     /// [`page_text`](Self::page_text), kept for the last few pages: hit
     /// testing, selection and copy on one page reuse one extraction.
     pub fn page_text_cached(&self, index: usize) -> Result<Arc<PageText>> {
+        let upright = self.upright_text(index)?;
+        let turned = self
+            .pdf
+            .pages()
+            .get(index)
+            .and_then(glyphs::upright_to_display)
+            .is_some();
+        Ok(if turned {
+            Arc::new(self.displayed(index, (*upright).clone()))
+        } else {
+            upright
+        })
+    }
+
+    /// Page text in reading orientation, kept for the last few pages.
+    fn upright_text(&self, index: usize) -> Result<Arc<PageText>> {
         {
             let cache = self.texts.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((_, t)) = cache.iter().find(|(i, _)| *i == index) {
                 return Ok(t.clone());
             }
         }
-        let text = Arc::new(self.page_text(index)?);
+        let text = Arc::new(self.read_upright(index)?);
         let mut cache = self.texts.lock().unwrap_or_else(|e| e.into_inner());
         if cache.len() >= TEXT_CACHE_PAGES {
             cache.remove(0);

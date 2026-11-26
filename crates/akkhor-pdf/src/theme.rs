@@ -16,7 +16,7 @@ use hayro::hayro_interpret::{
 };
 use hayro::hayro_syntax::object::{Array, Name, Object};
 use hayro::hayro_syntax::page::Page;
-use hayro::kurbo::{Affine, BezPath, Rect};
+use hayro::kurbo::{BezPath, Rect};
 
 use akkhor_core::{Theme, Tile};
 
@@ -186,12 +186,11 @@ pub(crate) fn image_boxes(page: &Page<'_>) -> ImageBoxes {
     boxes(page, false)
 }
 
-/// Every raster picture on `page`, greyscale ones included (stencil masks
-/// are not pictures: they paint like text).
-/// All pictures of a page and its vector rules and filled boxes, for
-/// reflow, in one pass.
+/// All pictures of a page (greyscale ones included; stencil masks paint
+/// like text) and its vector rules and filled boxes, for reflow, in one
+/// pass, in reading orientation (see [`crate::glyphs::collect`]).
 pub(crate) fn page_shapes(page: &Page<'_>) -> (Vec<Rect>, VectorShapes) {
-    let c = collect(page, true);
+    let c = collect(page, true, true);
     (
         c.boxes,
         VectorShapes {
@@ -202,16 +201,12 @@ pub(crate) fn page_shapes(page: &Page<'_>) -> (Vec<Rect>, VectorShapes) {
 }
 
 fn boxes(page: &Page<'_>, all: bool) -> ImageBoxes {
-    ImageBoxes(collect(page, all).boxes)
+    ImageBoxes(collect(page, all, false).boxes)
 }
 
-fn collect(page: &Page<'_>, all: bool) -> Collector {
-    let (w, h) = page.render_dimensions();
+fn collect(page: &Page<'_>, all: bool, upright: bool) -> Collector {
+    let (transform, (w, h)) = crate::glyphs::page_transform(page, upright);
     let cache = InterpreterCache::new();
-    let transform: Affine = {
-        use hayro::hayro_interpret::util::TransformExt;
-        page.initial_transform(true).to_kurbo()
-    };
     let mut ctx = Context::new(
         transform,
         Rect::new(0.0, 0.0, w as f64, h as f64),

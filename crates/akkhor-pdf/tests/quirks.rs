@@ -67,3 +67,36 @@ fn a_damaged_number_does_not_lose_the_page() {
         .unwrap();
     assert!(page.width > 0 && page.height > 0);
 }
+
+/// A page turned by `/Rotate` (set on the page tree) is read upright, as
+/// MuPDF and Poppler read it; its boxes are on the page as displayed.
+#[test]
+fn a_turned_page_is_read_in_lines() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/corpus/write/inherited.pdf"
+    );
+    let pdf = akkhor_pdf::PdfDocument::open(&akkhor_core::Source::open(path).unwrap()).unwrap();
+    assert_eq!(pdf.page_size(0).unwrap(), (800.0, 400.0));
+    let text = pdf.page_text(0).unwrap();
+    assert_eq!(text.text.trim(), "Page one");
+    // MuPDF's box for "Page" on the displayed page: x 692.8 to 725.8,
+    // y 72 to 128 (the word runs down the turned page).
+    let r = text.rects(0..4);
+    assert_eq!(r.len(), 1);
+    let r = r[0];
+    // Across the line the boxes differ by font metrics (Akkhor 694 to 719).
+    assert!(r.x0 > 688.0 && r.x1 < 730.0 && r.width() > 20.0, "{r:?}");
+    assert!(
+        (r.y0 - 72.0).abs() < 4.0 && (r.y1 - 128.0).abs() < 4.0,
+        "{r:?}"
+    );
+    // And as reflowed text.
+    let flow = pdf.reflow(0..1).unwrap();
+    assert!(
+        flow.document
+            .blocks
+            .iter()
+            .any(|b| b.text.contains("Page one"))
+    );
+}

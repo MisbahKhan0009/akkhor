@@ -9,3 +9,4 @@ keeps them out of the corpus-wide PDF tests.
 |---|---|---|---|
 | `nested-arrays-1.pdf.bin` | pdf | page text took 23 s | an unterminated nest of arrays fails at once instead of being re-read at every level (vendored hayro-syntax, lenient arrays) |
 | `nested-arrays-2.pdf.bin` | pdf_write | page text did not finish | same |
+| (in a unit test) | markup (CI) | a `%` before a multi-byte letter in a link or picture path panicked | percent codes decoded on bytes (`akkhor-epub`, `percent_decoding_keeps_letters_whole`) |

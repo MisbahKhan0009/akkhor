@@ -387,12 +387,14 @@ fn type3_shape<'a>(
     crate::shape::Shape::of(&d.capture.unwrap_or_default())
 }
 
-/// Collects the glyphs drawn on `page`.
-pub(crate) fn collect(page: &Page<'_>) -> PageGlyphs {
-    let (w, h) = page.render_dimensions();
+/// Collects the glyphs drawn on `page`, as displayed (`upright` false) or
+/// in reading orientation (`upright` true: a page turned by `/Rotate` is
+/// read as if it were not turned, so its lines run left to right).
+pub(crate) fn collect(page: &Page<'_>, upright: bool) -> PageGlyphs {
+    let (transform, (w, h)) = page_transform(page, upright);
     let cache = InterpreterCache::new();
     let mut ctx = Context::new(
-        page.initial_transform(true).to_kurbo_affine(),
+        transform,
         Rect::new(0.0, 0.0, w as f64, h as f64),
         &cache,
         page.xref(),
@@ -402,6 +404,34 @@ pub(crate) fn collect(page: &Page<'_>) -> PageGlyphs {
 
     interpret_page(page, &mut ctx, &mut collector);
     collector.out
+}
+
+/// The transform from PDF user space to page points (top-left origin), and
+/// the page size: as displayed, or in reading orientation (the page's
+/// `/Rotate` left out).
+pub(crate) fn page_transform(page: &Page<'_>, upright: bool) -> (Affine, (f32, f32)) {
+    if !upright {
+        return (
+            page.initial_transform(true).to_kurbo_affine(),
+            page.render_dimensions(),
+        );
+    }
+    let crop = page.intersected_crop_box();
+    let (w, h) = page.base_dimensions();
+    let t = Affine::new([1.0, 0.0, 0.0, -1.0, 0.0, h as f64])
+        * Affine::translate((-crop.x0 as f64, -crop.y0 as f64));
+    (t, (w, h))
+}
+
+/// From reading orientation to the displayed page; `None` for a page that
+/// is not turned.
+pub(crate) fn upright_to_display(page: &Page<'_>) -> Option<Affine> {
+    if matches!(page.rotation(), hayro_syntax::page::Rotation::None) {
+        return None;
+    }
+    let (display, _) = page_transform(page, false);
+    let (upright, _) = page_transform(page, true);
+    Some(display * upright.inverse())
 }
 
 trait ToKurbo {

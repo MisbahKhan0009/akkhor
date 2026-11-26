@@ -355,11 +355,13 @@ fn percent_decode(s: &str) -> String {
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
+        // Bytes, not string slices: a '%' before a multi-byte letter must
+        // not split it (found by fuzzing).
+        let hex = |k: usize| b.get(k).and_then(|&c| (c as char).to_digit(16));
         if b[i] == b'%'
-            && i + 2 < b.len()
-            && let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+            && let (Some(hi), Some(lo)) = (hex(i + 1), hex(i + 2))
         {
-            out.push(v);
+            out.push((hi * 16 + lo) as u8);
             i += 3;
             continue;
         }
@@ -473,6 +475,16 @@ mod tests {
 
     fn zip_with(files: &[(&str, &str)]) -> ZipArchive {
         ZipArchive::open(Source::from_vec(zip_bytes(files))).unwrap()
+    }
+
+    #[test]
+    fn percent_decoding_keeps_letters_whole() {
+        // Found by fuzzing: a '%' before a multi-byte letter panicked.
+        assert_eq!(percent_decode("a%\u{e9}b"), "a%\u{e9}b");
+        assert_eq!(percent_decode("%e0%a6%95"), "\u{995}");
+        // A code at the very end is decoded too.
+        assert_eq!(percent_decode("x%41"), "xA");
+        assert_eq!(percent_decode("x%4"), "x%4");
     }
 
     fn zip_bytes(files: &[(&str, &str)]) -> Vec<u8> {
