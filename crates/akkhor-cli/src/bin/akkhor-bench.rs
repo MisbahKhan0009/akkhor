@@ -9,6 +9,8 @@
 //! akkhor-bench speed   FILE PAGE SCALE RUNS    open, first render, warm render
 //! akkhor-bench mem     FILE PAGE SCALE         resident memory before and at peak
 //! akkhor-bench survive FILE                    open, count, render and read page 1
+//! akkhor-bench phone   FILE                    what the app does, timed (any format;
+//!                                              scripts/phone/README.md)
 //! akkhor-bench tiles   FILE PAGE SCALE         every 512×512 tile of a zoomed page
 //! akkhor-bench session FILE PAGES SCALE        render pages 1..PAGES in one document:
 //!                                              memory after every 10 pages (all
@@ -240,6 +242,7 @@ fn run(args: &[String]) -> Result<String, String> {
                 status_kb("VmHWM:").saturating_sub(before) as f64 / 1024.0
             ))
         }
+        Some("phone") => phone(&arg(1)?),
         Some("survive") => {
             let outcome = (|| -> Result<(), String> {
                 let pdf = open(&arg(1)?)?;
@@ -257,8 +260,121 @@ fn run(args: &[String]) -> Result<String, String> {
                 Err(e) => format!("{{\"ok\":false,\"error\":{}}}", json_str(&e)),
             })
         }
-        _ => Err("usage: akkhor-bench text|speed|mem|survive FILE ...".into()),
+        _ => Err(
+            "usage: akkhor-bench text|reflow|speed|mem|tiles|session|survive|phone FILE ...".into(),
+        ),
     }
+}
+
+/// What the app does with a book, timed, on a phone-sized screen (1080 ×
+/// 2200 px, 42 px text): open, library card (info and cover), the first
+/// screen (a PDF page fitted to the width, or the first chapter laid out
+/// and drawn), a redraw, the first chapter as reflowed text, a search,
+/// and memory.
+fn phone(file: &str) -> Result<String, String> {
+    use akkhor::flow::{FontSet, GlyphCache, LayoutOptions, paginate, render_page};
+    let (w, h, size) = (1080u32, 2200u32, 42.0f32);
+    let _ = std::fs::write("/proc/self/clear_refs", "5");
+    let before = status_kb("VmRSS:");
+    let mut out = vec![format!("\"file\":{}", json_str(file))];
+    let time = |out: &mut Vec<String>, name: &str, t: Instant| {
+        out.push(format!("\"{name}_ms\":{:.2}", ms(t)))
+    };
+
+    let t = Instant::now();
+    let book = akkhor::open(file).map_err(|e| e.to_string())?;
+    time(&mut out, "open", t);
+    let t = Instant::now();
+    let info = book.info();
+    time(&mut out, "info", t);
+    let t = Instant::now();
+    let cover = book.cover(300, 450);
+    time(&mut out, "cover", t);
+    let fonts = FontSet::bundled();
+    let opts = LayoutOptions {
+        width: w as f32,
+        height: h as f32,
+        font_size: size,
+        margin_x: w as f32 * 0.067,
+        ..Default::default()
+    };
+    let mut pixels = vec![0u8; (w * h * 4) as usize];
+    if let akkhor::Book::Pdf(pdf) = &book {
+        let scale = w as f32 / pdf.page_size(0).map_err(|e| e.to_string())?.0;
+        let t = Instant::now();
+        pdf.render_page(0, scale, &Theme::ORIGINAL)
+            .map_err(|e| e.to_string())?;
+        time(&mut out, "first_page", t);
+        let t = Instant::now();
+        pdf.render_page(0, scale, &Theme::ORIGINAL)
+            .map_err(|e| e.to_string())?;
+        time(&mut out, "redraw", t);
+        let t = Instant::now();
+        let _ = pdf.page_text(0);
+        time(&mut out, "page_text", t);
+    }
+    let mut reading = akkhor::Reading::new(&book);
+    if reading.chapter_count() > 0 {
+        let t = Instant::now();
+        let doc = reading
+            .chapter(&book, 0)
+            .map_err(|e| e.to_string())?
+            .document
+            .clone();
+        time(&mut out, "chapter", t);
+        let t = Instant::now();
+        let pages = paginate(&doc, &opts, &fonts);
+        time(&mut out, "layout", t);
+        out.push(format!("\"screens\":{}", pages.len()));
+        let mut glyphs = GlyphCache::default();
+        if let Some(first) = pages.first() {
+            let t = Instant::now();
+            render_page(
+                first,
+                &fonts,
+                None,
+                &mut glyphs,
+                &Theme::PAPER,
+                w,
+                h,
+                &mut pixels,
+            )
+            .map_err(|e| e.to_string())?;
+            time(&mut out, "draw_screen", t);
+            let t = Instant::now();
+            render_page(
+                first,
+                &fonts,
+                None,
+                &mut glyphs,
+                &Theme::PAPER,
+                w,
+                h,
+                &mut pixels,
+            )
+            .map_err(|e| e.to_string())?;
+            time(&mut out, "redraw_screen", t);
+        }
+    }
+    let t = Instant::now();
+    let mut search = akkhor::search::BookSearch::new("এবং");
+    let mut hits = 0;
+    loop {
+        let batch = search.next(&book, &mut reading, 24);
+        hits += batch.hits.len();
+        if batch.done {
+            break;
+        }
+    }
+    time(&mut out, "search", t);
+    out.push(format!("\"hits\":{hits}"));
+    out.push(format!("\"has_cover\":{}", cover.is_some()));
+    out.push(format!("\"length\":{}", info.length));
+    out.push(format!(
+        "\"peak_added_mb\":{:.1}",
+        status_kb("VmHWM:").saturating_sub(before) as f64 / 1024.0
+    ));
+    Ok(format!("{{{}}}", out.join(",")))
 }
 
 fn main() -> std::process::ExitCode {

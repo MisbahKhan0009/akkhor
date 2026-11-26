@@ -29,6 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
+      # The prebuilt cargo-fuzz is a musl build and would aim at musl:
+      # the target is named below.
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-fuzz
@@ -47,12 +49,12 @@ jobs:
       - name: Run
         working-directory: fuzz
         run: |
-          cargo fuzz run -O ${{ matrix.target }} corpus/${{ matrix.target }} -- \
+          cargo fuzz run -O --target x86_64-unknown-linux-gnu ${{ matrix.target }} corpus/${{ matrix.target }} -- \
             -max_total_time=${{ inputs.seconds || 60 }} -rss_limit_mb=2048 -timeout=20 -max_len=1048576
       - name: Keep the corpus small
         if: success()
         working-directory: fuzz
-        run: cargo fuzz cmin -O ${{ matrix.target }} corpus/${{ matrix.target }} -- -rss_limit_mb=2048 -timeout=20 || true
+        run: cargo fuzz cmin -O --target x86_64-unknown-linux-gnu ${{ matrix.target }} corpus/${{ matrix.target }} -- -rss_limit_mb=2048 -timeout=20 || true
       - name: Upload the failing input
         if: failure()
         uses: actions/upload-artifact@v4

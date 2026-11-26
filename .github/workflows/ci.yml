@@ -107,6 +107,20 @@ jobs:
         with:
           name: jniLibs
           path: jniLibs
+      - name: Benchmark for a phone (scripts/phone/README.md)
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          cargo ndk -t arm64-v8a -P 24 build --release -p akkhor-cli --bin akkhor-bench
+          mkdir -p phone/books
+          cp target/aarch64-linux-android/release/akkhor-bench scripts/phone/on-phone.sh scripts/phone/run.sh scripts/phone/README.md phone/
+          cp tests/corpus/books/pdf/bn.chrome.two.pdf tests/corpus/books/pdf/hi.chrome.two.pdf \
+             tests/corpus/books/pdf/bn.xelatex.two.pdf tests/corpus/tables/pdf/bn.writer.pdf \
+             tests/fixtures/indic-sample.epub tests/corpus/books/bn-book.txt phone/books/
+          echo "akkhor-bench (arm64-v8a): $(stat -c %s phone/akkhor-bench) bytes" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: akkhor-bench-arm64
+          path: phone
 
   bench:
     name: Benchmark
