@@ -127,6 +127,30 @@ does not.
 
 Case study, CSVs, `history.csv`; review in `docs/reviews/phase-5.md`.
 
+## 5.12 Design answers (added 2026-11-26)
+
+The design chat answered the engine's questions (project doc
+`design-answers-for-engine.md`). What falls to the engine:
+
+1. **Built-in themes take the final values**: Paper `#F7F3EA` / `#2A2620`,
+   Sepia `#F1E4CC` / `#433422`, Dusk `#2A2825` / `#DDD3C2`, Night
+   `#000000` / `#B8B2A6`. The app can still pass its own (codes 16 to 63).
+2. **Photos at 85% brightness in Dusk and Night**, in PDF page view and in
+   reflow pictures; line art keeps the theme remap.
+3. **Latin hyphenation rules**: words of 6 or more letters, at least 3
+   letters before and 3 after the break, at most 2 hyphenated lines in a
+   row, never the last word of a paragraph. Bangla and Devanagari never
+   hyphenate (already so). "Never across a page" needs the paginator and
+   is left open.
+4. **Font-pack trigger**: the design proposed text quality below 0.85;
+   measured books that need fonts score 0.94 to 0.95, so the app should
+   use the engine's `needs_fonts` flag (below 0.98). Sent back to the
+   design chat.
+
+Selection, highlights, links and search marks are drawn by the app over
+the engine's boxes; placeholder covers, the page-view ground and the
+Page / Reflow switch are the app's.
+
 ## Done when
 
 - [x] Book info and covers for EPUB, PDF and TXT, under 50 ms a book
@@ -140,6 +164,7 @@ Case study, CSVs, `history.csv`; review in `docs/reviews/phase-5.md`.
 - [x] Missing-font hint
 - [ ] Phone numbers (with Misbah's phone): the benchmark is built by CI, waiting for a run
 - [x] Case study, review, CI green
+- [ ] Design answers (5.12)
 
 ## Risks
 
