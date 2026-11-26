@@ -418,8 +418,8 @@ pub(crate) fn page_transform(page: &Page<'_>, upright: bool) -> (Affine, (f32, f
     }
     let crop = page.intersected_crop_box();
     let (w, h) = page.base_dimensions();
-    let t = Affine::new([1.0, 0.0, 0.0, -1.0, 0.0, h as f64])
-        * Affine::translate((-crop.x0 as f64, -crop.y0 as f64));
+    let t =
+        Affine::new([1.0, 0.0, 0.0, -1.0, 0.0, h as f64]) * Affine::translate((-crop.x0, -crop.y0));
     (t, (w, h))
 }
 
