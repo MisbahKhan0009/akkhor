@@ -67,8 +67,8 @@ Realme 9i, the same phone as Phase 5, medians of the warm passes:
 | Redrawing a reflowed screen (5 books) | 13.5 to 15.9 ms | 3.6 to 5.6 ms |
 | Drawing a reflowed screen the first time (PDF reflow) | 16.1 to 17.3 ms | 17.5 to 19.3 ms |
 | A Kindle or FB2 book: open / card / first screen | | 0.2 to 1 ms / 6 to 18 ms / 7.5 to 11 ms |
-| A comic page at 1080 px, and again | | 52 ms, 47 ms |
-| First Bangla or Hindi PDF's card | 110 to 400 ms | 110 to 400 ms (not tested, see 19) |
+| A comic page at 1080 px, and again | | 52 ms, 47 ms; after finding 20: 29 ms, 25 ms |
+| First Bangla or Hindi PDF's card, from the second launch | 110 to 400 ms | 12 to 46 ms on the library screen (third run) |
 | Memory added | 14 to 21 MB | 11 to 21 MB |
 
 | # | Where | Finding | Sev. | Status |
@@ -76,7 +76,7 @@ Realme 9i, the same phone as Phase 5, medians of the warm passes:
 | 18 | Glyph masks, phone | The first draw of a reflowed PDF screen is 1.4 to 2 ms slower than in Phase 5 (8 to 12%): making the masks costs more than filling outlines once. The VM showed no loss. Redraws are 2.7 to 4.2 times faster, so a page drawn ahead and shown later comes out ahead. | 🟡 | Accepted. |
 | 19 | Phone benchmark | The benchmark never set a cache folder, so the reference-font tables on disk (6.8) were not used on the phone and the first Indic PDF's card stayed at 400 ms. Not an engine bug; the bench didn't do what the app does. | 🟠 | Fixed: `akkhor-bench` reads `AKKHOR_CACHE_DIR`, and `on-phone.sh` sets it (emptied first). Second run ([`phone_phase6_run2.csv`](../case-study/data/phone_phase6_run2.csv)): cards 400 → 47 to 76 ms for Chrome PDFs, 13 to 32 ms for the others; target 50 ms met by 3 of 4 PDFs' first card. |
 | 20 | Comics, phone | A comic page took 47 to 52 ms on the phone (3.5 times the VM). | 🟠 | Fixed: two colour channels per multiply, each source row blended across once. Second run: 29 ms first, 24.5 ms again. |
-| 21 | Card from stored tables | Reading the stored tables still costs about 3.7 ms on the VM; a third of it was hashing every font file in full to find its tables. | 🟡 | The key now hashes a font's length and its first and last 64 KB (the table directory and checksums are at the start). Next phone run to show the gain. |
+| 21 | Card from stored tables | Reading the stored tables still costs about 3.7 ms on the VM; a third of it was hashing every font file in full to find its tables. | 🟡 | The key now hashes a font's length and its first and last 64 KB (the table directory and checksums are at the start). Third run ([`phone_phase6_run3.csv`](../case-study/data/phone_phase6_run3.csv)): on the library screen the four Indic PDFs' first cards take 46, 19, 12 and 40 ms (were 404, 15, 11 and 35 with the tables built in the same run, and 400 on every launch before 6.8). Opened alone in a fresh process, the Chrome Bangla PDF's card is 59 ms, just over the 50 ms target. |
 | 22 | Phone runs | The second run was 10 to 40% slower across the board, one AZW3 screen 5 times (11 → 55 ms): the phone was likely throttled with the screen off. Numbers from one run are not comparable with another unless the phone is in the same state. | 🟡 | `scripts/phone/README.md`: keep the screen on and the phone charging during runs. |
 
 ## Result

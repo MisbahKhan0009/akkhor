@@ -214,7 +214,7 @@ Results: 54 engine calls documented in `Native.kt` and [api/android.md](api/andr
 
 Review: [reviews/phase-5.md](reviews/phase-5.md), 12 findings; four 🔴 fixed: a parser hang and an EPUB panic found by fuzzing, a close-while-searching deadlock, pages turned by `/Rotate` read letter by letter. Carried: turned pictures in reflow, the reference-font start-up cost, slow no-hit search on huge books.
 
-### Phase 6: Every format, and the engine finished for the app ✅ (phone run pending)
+### Phase 6: Every format, and the engine finished for the app ✅
 
 Detailed design: [phases/phase-6.md](phases/phase-6.md). The engine is finished before the reader app starts, so the app is written once. MOBI/AZW3 (PalmDB, PalmDOC and HUFF/CDIC decompression, KF8 skeleton/fragments → HTML → `Document`), FB2, CBZ behind the same calls as EPUB, PDF and TXT; DRM-protected files are detected and reported, never opened. Also the engine items Phase 5 carried: reference-font tables kept on disk, a glyph bitmap cache, upright pictures from turned pages, no hyphen on a page's last line, and neutral names for page-view calls while no app exists.
 

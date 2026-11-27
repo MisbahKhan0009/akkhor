@@ -125,7 +125,9 @@ PDF photos). No text: search ends at once, reflow is not offered.
   engine version, loaded in a few milliseconds. Target: the first Indic
   PDF's card under 50 ms on the phone from the second launch on.
   *Result (VM):* tables built in 2 to 85 ms read back in 0.04 to 0.8 ms
-  (`data/ref_tables.csv`); phone run in 6.11.
+  (`data/ref_tables.csv`). *Phone, from the second launch:* the library
+  screen's first Indic PDF card 12 to 46 ms (was 400); a Chrome Bangla
+  PDF opened alone in a fresh process 59 ms (`data/phone_phase6_run3.csv`).
 - **Glyph bitmap cache for reflowed screens:** rasterised glyph masks per
   font, glyph, size and subpixel offset, under a byte budget. Target:
   redrawing a screen at least twice as fast as now, pixels unchanged.
@@ -168,7 +170,7 @@ phone` and `library`); case study, CSVs, `history.csv`; review in
 - [x] Fuzz targets for the new formats (3 bugs found and fixed, 2 more by review: `data/fuzz_phase6.csv`)
 - [x] Size per switch measured (MOBI 56 KB, FB2 38 KB, comics 209 KB, together 306 KB on arm64)
 - [x] Case study data, review (`docs/reviews/phase-6.md`), CI green
-- [ ] Phone numbers for the new formats (needs a run on the phone)
+- [x] Phone numbers for the new formats (three runs; `data/phone_phase6*.csv`)
 
 ## Risks
 

@@ -70,3 +70,5 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-27,Phase 6,comic page at phone width (1080 px),12-16,ms,akkhor-bench phone on the VM,was 44 ms
 2026-11-27,Phase 6,crash bugs found by fuzzing and review,5,bugs,cargo fuzz (stable) + review,all fixed with tests
 2026-11-27,Phase 6,redraw of a reflowed screen on a phone,3.6-5.6,ms median,akkhor-bench phone,Realme 9i; was 13.5 to 15.9 ms in Phase 5
+2026-11-27,Phase 6,first Indic PDF card on a phone from the second launch,12-46,ms,akkhor-bench library (phone),was 400 ms; tables kept on disk
+2026-11-27,Phase 6,comic page at 1080 px on a phone,29,ms,akkhor-bench phone,was 52 ms
