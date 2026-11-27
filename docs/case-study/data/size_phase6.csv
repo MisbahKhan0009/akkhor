@@ -1,0 +1,6 @@
+build,libakkhor_so_bytes,switch_cost_bytes,platform
+"app build (pdf, pdf-scans, pdf-write, epub, txt)",6094760,,"arm64-v8a, release, CI (Rust 1.100, NDK latest)"
+"app build + mobi, fb2, cbz",6408064,313304,"arm64-v8a, release, CI (Rust 1.100, NDK latest)"
+"mobi (full minus mobi)",6350984,57080,"arm64-v8a, release, CI (Rust 1.100, NDK latest)"
+"fb2 (full minus fb2)",6369288,38776,"arm64-v8a, release, CI (Rust 1.100, NDK latest)"
+"cbz incl. WebP and GIF (full minus cbz)",6194448,213616,"arm64-v8a, release, CI (Rust 1.100, NDK latest)"

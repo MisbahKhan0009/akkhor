@@ -120,7 +120,9 @@ jobs:
           cp target/aarch64-linux-android/release/akkhor-bench scripts/phone/on-phone.sh scripts/phone/run.sh scripts/phone/README.md phone/
           cp tests/corpus/books/pdf/bn.chrome.two.pdf tests/corpus/books/pdf/hi.chrome.two.pdf \
              tests/corpus/books/pdf/bn.xelatex.two.pdf tests/corpus/tables/pdf/bn.writer.pdf \
-             tests/fixtures/indic-sample.epub tests/corpus/books/bn-book.txt phone/books/
+             tests/fixtures/indic-sample.epub tests/corpus/books/bn-book.txt \
+             tests/corpus/formats/bn.azw3 tests/corpus/formats/hi.kf7.mobi \
+             tests/corpus/formats/rich.bn.fb2 tests/corpus/formats/manga.cbz phone/books/
           echo "akkhor-bench (arm64-v8a): $(stat -c %s phone/akkhor-bench) bytes" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
