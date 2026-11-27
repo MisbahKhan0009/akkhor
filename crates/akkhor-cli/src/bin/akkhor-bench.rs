@@ -315,6 +315,20 @@ fn phone(file: &str) -> Result<String, String> {
         let _ = pdf.page_text(0);
         time(&mut out, "page_text", t);
     }
+    // A comic's page view: the page fitted to the width, then a redraw.
+    if let akkhor::Book::Cbz(comic) = &book {
+        let scale = w as f32 / comic.page_size(0).map_err(|e| e.to_string())?.0;
+        let t = Instant::now();
+        comic
+            .render_page(0, scale, &Theme::ORIGINAL)
+            .map_err(|e| e.to_string())?;
+        time(&mut out, "first_page", t);
+        let t = Instant::now();
+        comic
+            .render_page(0, scale, &Theme::ORIGINAL)
+            .map_err(|e| e.to_string())?;
+        time(&mut out, "redraw", t);
+    }
     let mut reading = akkhor::Reading::new(&book);
     if reading.chapter_count() > 0 {
         let t = Instant::now();

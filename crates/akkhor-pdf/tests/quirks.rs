@@ -135,8 +135,16 @@ fn a_turned_pages_picture_is_upright() {
     assert_eq!((img.width, img.height), (w, h));
     let row_kind = |y: u32| {
         let row = &img.rgba[(y * img.width * 4) as usize..((y + 1) * img.width * 4) as usize];
-        let blue = row.chunks_exact(4).any(|p| p[2] > 200 && p[0] < 60);
-        let ink = row.chunks_exact(4).any(|p| p[0] < 100 && p[2] < 100);
+        let blue = row
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|p| p[2] > 200 && p[0] < 60);
+        let ink = row
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|p| p[0] < 100 && p[2] < 100);
         (ink, blue)
     };
     let top = (0..img.height / 3).map(row_kind).collect::<Vec<_>>();

@@ -186,9 +186,7 @@ fn attr<'a>(attrs: &'a [(String, String)], key: &str) -> Option<&'a str> {
 
 /// The `description`: title, authors, language, publisher, cover.
 fn metadata(xml: &str) -> Metadata {
-    let end = xml
-        .find("</description>")
-        .map_or(xml.len().min(1 << 20), |i| i);
+    let end = xml.find("</description>").unwrap_or(xml.len().min(1 << 20));
     let mut m = Metadata::default();
     let mut path: Vec<String> = Vec::new();
     let mut author: Vec<String> = Vec::new();

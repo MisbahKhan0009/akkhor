@@ -237,7 +237,7 @@ fn draw_mask(
             ..Default::default()
         },
     );
-    let alpha: Vec<u8> = rgba.chunks_exact(4).map(|p| p[3]).collect();
+    let alpha: Vec<u8> = rgba.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
     if alpha.iter().all(|&a| a == 0) {
         return None;
     }
@@ -446,7 +446,7 @@ pub fn render_page(
             b.a,
         ];
         let row = width as usize * 4;
-        for chunk in out[..row].chunks_exact_mut(4) {
+        for chunk in out[..row].as_chunks_mut::<4>().0 {
             chunk.copy_from_slice(&px);
         }
         let (first, rest) = out[..needed].split_at_mut(row);
@@ -536,7 +536,7 @@ mod tests {
             assert!(mean < 0.5, "mean {mean}");
             assert!(cache.masks.used_bytes() > 0);
             // Ink is there: the page is not just background.
-            assert!(b.chunks_exact(4).any(|p| p[0] < 128));
+            assert!(b.as_chunks::<4>().0.iter().any(|p| p[0] < 128));
         }
         // A repeat draw from the cache gives the same pixels.
         let mut cache = GlyphCache::new(1 << 20);

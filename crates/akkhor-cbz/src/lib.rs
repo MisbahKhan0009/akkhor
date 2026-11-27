@@ -177,20 +177,92 @@ impl CbzBook {
         let step = k / f64::from(scale.max(1e-3));
         let dim = if theme.is_dark() { 217u32 } else { 256 };
         let mut pixels = vec![0u8; (w as usize) * (h as usize) * 4];
-        for oy in 0..h {
-            let sy0 = f64::from(y + oy) * step;
-            let sy1 = (sy0 + step).max(sy0 + 1.0);
-            for ox in 0..w {
-                let sx0 = f64::from(x + ox) * step;
-                let sx1 = (sx0 + step).max(sx0 + 1.0);
-                let px = average(&img, sx0, sy0, sx1, sy1);
-                let a = u32::from(px[3]);
-                let o = ((oy * w + ox) * 4) as usize;
+        // Each output pixel depends only on its place on the whole page, so
+        // tiles join without seams. Columns and rows are worked out once.
+        let iw = img.width as usize;
+        let src = &img.rgba;
+        let put = |o: usize, px: [u32; 4], pixels: &mut [u8]| {
+            let a = px[3];
+            let out = &mut pixels[o..o + 4];
+            if a == 255 {
+                // Nearly every comic page: no premultiplying to do.
+                for c in 0..3 {
+                    out[c] = ((px[c] * dim) >> 8) as u8;
+                }
+            } else {
                 for c in 0..3 {
                     // Premultiplied, dimmed.
-                    pixels[o + c] = ((u32::from(px[c]) * a / 255 * dim) >> 8) as u8;
+                    out[c] = ((px[c] * a / 255 * dim) >> 8) as u8;
                 }
-                pixels[o + 3] = px[3];
+            }
+            out[3] = a as u8;
+        };
+        if step < 1.0 {
+            // Enlarged: bilinear, 8-bit weights.
+            let axis = |from: u32, n: u32, len: u32| -> Vec<(usize, usize, u32)> {
+                (0..n)
+                    .map(|i| {
+                        let c = ((f64::from(from + i) + 0.5) * step - 0.5).max(0.0);
+                        let i0 = (c.floor() as usize).min(len as usize - 1);
+                        let i1 = (i0 + 1).min(len as usize - 1);
+                        (i0, i1, ((c - i0 as f64) * 256.0).round().min(256.0) as u32)
+                    })
+                    .collect()
+            };
+            let cols = axis(x, w, img.width);
+            let rows = axis(y, h, img.height);
+            for (oy, &(y0, y1, fy)) in rows.iter().enumerate() {
+                let (r0, r1) = (y0 * iw, y1 * iw);
+                for (ox, &(x0, x1, fx)) in cols.iter().enumerate() {
+                    let (a, b) = ((r0 + x0) * 4, (r0 + x1) * 4);
+                    let (c, d) = ((r1 + x0) * 4, (r1 + x1) * 4);
+                    let (a, b, c, d) = (
+                        &src[a..a + 4],
+                        &src[b..b + 4],
+                        &src[c..c + 4],
+                        &src[d..d + 4],
+                    );
+                    let mut px = [0u32; 4];
+                    for k in 0..4 {
+                        let top = u32::from(a[k]) * (256 - fx) + u32::from(b[k]) * fx;
+                        let bottom = u32::from(c[k]) * (256 - fx) + u32::from(d[k]) * fx;
+                        px[k] = (top * (256 - fy) + bottom * fy + (1 << 15)) >> 16;
+                    }
+                    put((oy * w as usize + ox) * 4, px, &mut pixels);
+                }
+            }
+        } else {
+            // Shrunk: the average of the source pixels each one covers, on
+            // a grid of at most 4 x 4 for large areas.
+            let axis = |from: u32, n: u32, len: u32| -> Vec<(usize, usize, usize)> {
+                (0..n)
+                    .map(|i| {
+                        let a0 = f64::from(from + i) * step;
+                        let a = (a0 as usize).min(len as usize - 1);
+                        let b = ((a0 + step).ceil() as usize).clamp(a + 1, len as usize);
+                        (a, b, ((b - a) / 4).max(1))
+                    })
+                    .collect()
+            };
+            let cols = axis(x, w, img.width);
+            let rows = axis(y, h, img.height);
+            for (oy, &(ya, yb, sy)) in rows.iter().enumerate() {
+                for (ox, &(xa, xb, sx)) in cols.iter().enumerate() {
+                    let mut acc = [0u32; 4];
+                    let mut n = 0u32;
+                    for yy in (ya..yb).step_by(sy) {
+                        let row = yy * iw;
+                        for xx in (xa..xb).step_by(sx) {
+                            let p = (row + xx) * 4;
+                            for (a, &v) in acc.iter_mut().zip(&src[p..p + 4]) {
+                                *a += u32::from(v);
+                            }
+                            n += 1;
+                        }
+                    }
+                    let px = acc.map(|v| v / n.max(1));
+                    put((oy * w as usize + ox) * 4, px, &mut pixels);
+                }
             }
         }
         Ok(Rendered {
@@ -223,34 +295,6 @@ impl CbzBook {
 
 /// The average colour of the source area `[x0, x1) x [y0, y1)` (box
 /// filter when shrinking, nearest pixel when enlarging).
-fn average(img: &DecodedImage, x0: f64, y0: f64, x1: f64, y1: f64) -> [u8; 4] {
-    let (w, h) = (img.width as usize, img.height as usize);
-    let xa = (x0 as usize).min(w - 1);
-    let ya = (y0 as usize).min(h - 1);
-    let xb = (x1.ceil() as usize).clamp(xa + 1, w);
-    let yb = (y1.ceil() as usize).clamp(ya + 1, h);
-    // Large areas are sampled on a grid, so a zoomed-out page stays cheap.
-    let sx = ((xb - xa) / 4).max(1);
-    let sy = ((yb - ya) / 4).max(1);
-    let mut acc = [0u32; 4];
-    let mut n = 0u32;
-    let mut yy = ya;
-    while yy < yb {
-        let row = yy * w;
-        let mut xx = xa;
-        while xx < xb {
-            let p = (row + xx) * 4;
-            for (a, &v) in acc.iter_mut().zip(&img.rgba[p..p + 4]) {
-                *a += u32::from(v);
-            }
-            n += 1;
-            xx += sx;
-        }
-        yy += sy;
-    }
-    acc.map(|v| (v / n.max(1)) as u8)
-}
-
 fn is_page_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     let file = lower.rsplit('/').next().unwrap_or(&lower);
