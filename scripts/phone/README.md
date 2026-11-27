@@ -46,7 +46,9 @@ gh auth login                      # GitHub.com, HTTPS, log in with a browser
 curl -LO https://raw.githubusercontent.com/MisbahKhan0009/akkhor/main/scripts/phone/watch.sh
 ```
 
-Then, with the phone charging: `sh watch.sh` (checks every 5 minutes;
+Then, with the phone charging and its screen on (a phone with the screen
+off slows down, and runs stop being comparable; Developer options, "Stay
+awake" keeps it on while charging): `sh watch.sh` (checks every 5 minutes;
 Ctrl+C stops it), or `sh watch.sh once` to check one time.
 
 Your own books can be added at the end of either command

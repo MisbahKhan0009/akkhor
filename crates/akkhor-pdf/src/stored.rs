@@ -50,14 +50,27 @@ fn prune(dir: &Path) {
     }
 }
 
-/// FNV-1a over the font's bytes: stable across builds and platforms.
+/// FNV-1a over the font's length, its first and its last 64 KB: stable
+/// across builds and platforms. The start holds the table directory with
+/// every table's checksum, so another font, or another version of one,
+/// differs there; hashing whole files cost a few ms a launch on a phone.
 pub(crate) fn font_key(data: &[u8]) -> u64 {
+    const PART: usize = 64 << 10;
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for &b in data {
-        h ^= u64::from(b);
-        h = h.wrapping_mul(0x0100_0000_01b3);
+    let mut eat = |bytes: &[u8]| {
+        for &b in bytes {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+    };
+    eat(&(data.len() as u64).to_le_bytes());
+    if data.len() <= 2 * PART {
+        eat(data);
+    } else {
+        eat(&data[..PART]);
+        eat(&data[data.len() - PART..]);
     }
-    h ^ data.len() as u64
+    h
 }
 
 fn path(key: u64, kind: &str) -> Option<PathBuf> {
@@ -293,6 +306,22 @@ pub(crate) fn read_pictures(r: &mut R) -> Option<Vec<(u32, f32, Shape)>> {
 mod tests {
     use super::*;
     use std::sync::Arc;
+
+    #[test]
+    fn font_keys_tell_fonts_apart() {
+        let fonts = akkhor_flow::fonts::BUNDLED;
+        let keys: HashSet<u64> = fonts.iter().map(|(_, b)| font_key(b)).collect();
+        assert_eq!(keys.len(), fonts.len());
+        // A changed byte at either end, or a different length, is another font.
+        let base: Vec<u8> = fonts[0].1.to_vec();
+        let k = font_key(&base);
+        for at in [0, 40, base.len() - 1] {
+            let mut b = base.clone();
+            b[at] ^= 1;
+            assert_ne!(font_key(&b), k, "byte {at}");
+        }
+        assert_ne!(font_key(&base[..base.len() - 1]), k);
+    }
 
     #[test]
     fn tables_read_back_as_built() {

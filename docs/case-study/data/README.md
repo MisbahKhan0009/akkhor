@@ -34,6 +34,7 @@ run: `environment.json`.
 | `fuzz_phase6.csv` | Phase 6: fuzz rounds for the MOBI, FB2 and comic targets and what each found | `cargo fuzz run -s none` |
 | `phone_phase6.csv` | Phase 6 on the Realme 9i: the Phase 5 books plus an AZW3, a MOBI 7, an FB2 and a comic, cold and warm passes (each a new process). The reference-font tables were not kept on disk in this run (see the Phase 6 review, finding 19) | `scripts/phone/on-phone.sh` |
 | `phone_phase6_library.csv` | the same run's library screen: every book's card in one process, twice | `akkhor-bench library` |
+| `phone_phase6_run2.csv` | the second Phase 6 phone run, through `watch.sh`, with the tables kept on disk; slower across the board than the first (screen likely off, see the Phase 6 review, finding 22) | `scripts/phone/watch.sh` |
 | `phone.csv` | Phase 5 on a real phone (Realme 9i, Snapdragon 680, Android 13) and the cloud VM, same books and steps; one row per book and pass (each pass a new process, like the app starting) | `akkhor-bench phone FILE` (`scripts/phone/`): 1080 × 2200 screen, 42 px text; times in ms, memory in MB added at peak |
 | `phone_summary.csv` | median of the warm passes per format and measure, phone against VM | from `phone.csv` |
 

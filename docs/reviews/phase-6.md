@@ -74,8 +74,10 @@ Realme 9i, the same phone as Phase 5, medians of the warm passes:
 | # | Where | Finding | Sev. | Status |
 |---|---|---|---|---|
 | 18 | Glyph masks, phone | The first draw of a reflowed PDF screen is 1.4 to 2 ms slower than in Phase 5 (8 to 12%): making the masks costs more than filling outlines once. The VM showed no loss. Redraws are 2.7 to 4.2 times faster, so a page drawn ahead and shown later comes out ahead. | 🟡 | Accepted. |
-| 19 | Phone benchmark | The benchmark never set a cache folder, so the reference-font tables on disk (6.8) were not used on the phone and the first Indic PDF's card stayed at 400 ms. Not an engine bug; the bench didn't do what the app does. | 🟠 | Fixed: `akkhor-bench` reads `AKKHOR_CACHE_DIR`, and `on-phone.sh` sets it (emptied first). Needs a second phone run. |
-| 20 | Comics, phone | A comic page took 47 to 52 ms on the phone (3.5 times the VM). | 🟠 | Faster again: two colour channels per multiply, each source row blended across once. VM 12 to 16 ms → 6 ms; phone numbers in the next run. |
+| 19 | Phone benchmark | The benchmark never set a cache folder, so the reference-font tables on disk (6.8) were not used on the phone and the first Indic PDF's card stayed at 400 ms. Not an engine bug; the bench didn't do what the app does. | 🟠 | Fixed: `akkhor-bench` reads `AKKHOR_CACHE_DIR`, and `on-phone.sh` sets it (emptied first). Second run ([`phone_phase6_run2.csv`](../case-study/data/phone_phase6_run2.csv)): cards 400 → 47 to 76 ms for Chrome PDFs, 13 to 32 ms for the others; target 50 ms met by 3 of 4 PDFs' first card. |
+| 20 | Comics, phone | A comic page took 47 to 52 ms on the phone (3.5 times the VM). | 🟠 | Fixed: two colour channels per multiply, each source row blended across once. Second run: 29 ms first, 24.5 ms again. |
+| 21 | Card from stored tables | Reading the stored tables still costs about 3.7 ms on the VM; a third of it was hashing every font file in full to find its tables. | 🟡 | The key now hashes a font's length and its first and last 64 KB (the table directory and checksums are at the start). Next phone run to show the gain. |
+| 22 | Phone runs | The second run was 10 to 40% slower across the board, one AZW3 screen 5 times (11 → 55 ms): the phone was likely throttled with the screen off. Numbers from one run are not comparable with another unless the phone is in the same state. | 🟡 | `scripts/phone/README.md`: keep the screen on and the phone charging during runs. |
 
 ## Result
 
