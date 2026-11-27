@@ -289,7 +289,7 @@ that survives any change of font, screen or theme, a progress bar,
 search of the whole book that the app can stop at any time, highlights,
 sentences for read aloud, and "share these pages" as a new PDF.
 
-- **One Kotlin file** (`android/Native.kt`, 54 calls) is the whole
+- **One Kotlin file** (`android/Native.kt`, 54 calls then, 55 now) is the whole
   contract. CI checks every declaration against the library and calls
   each one from a JVM, from several threads, after closing the book and
   with bad input, so a mismatch fails the build, not the app.
@@ -312,12 +312,39 @@ in a few milliseconds, with 14 to 21 MB of memory added
 The phone is two to three times slower than the cloud VM the other
 numbers come from. One cost stands out: the first Bangla or Hindi PDF
 of a run spends up to 0.4 s building tables from the reference fonts,
-once; keeping them on disk is next.
+once. Phase 6 keeps them on disk: from the second launch they load in
+under a millisecond.
+
+### Every format
+
+Phase 6 added Kindle books (MOBI, AZW3 and older combined files),
+FictionBook and comics behind the same calls, before the app exists, so
+the app is written once.
+
+- **Every word, in order.** In 15 Kindle and FB2 books made by Calibre in
+  Bangla, Hindi and English, Akkhor gets every word of the source in
+  order. MuPDF reads no text from AZW3 and about half the Bangla words
+  elsewhere; Calibre's own text export drops a word from each AZW3 and
+  takes half a second or more a book ([`data/formats_scores.csv`](data/formats_scores.csv)).
+  The test books are short, so this shows correctness, not scale.
+- **306 KB** on Android for all three formats, WebP and GIF decoding for
+  comics included ([`data/size_phase6.csv`](data/size_phase6.csv)).
+- **Faster redraws.** Glyphs are now kept as small coverage masks:
+  redrawing a reflowed screen is 2.1 to 2.7 times faster on eight books
+  ([`data/glyph_masks.csv`](data/glyph_masks.csv)).
+- **Fuzzing found three crashes** in the new parsers, and looking for the
+  same mistakes elsewhere found two more: an FB2 cut inside a Bangla
+  letter, a Kindle index asking for 8 GB. All five are fixed and kept as
+  tests ([`data/fuzz_phase6.csv`](data/fuzz_phase6.csv)).
 
 ## Where Akkhor is behind (and what is next)
 
 Being honest about this is part of the point:
 
+- **Very long chapters.** A book that is one huge chapter (common in
+  converted files) is laid out whole before its first screen: about
+  0.4 s for a 2.6 MB Bangla book on the VM. Splitting long chapters into
+  parts is planned next (Phase 6b).
 - **Drawing the same page again.** Sharing the render cache took Akkhor
   from 5.4 to 2.3 ms on the Bangla and Hindi page, ahead of PDFium (2.5 ms)
   but behind MuPDF (1.6 ms), which records a page once and replays it
@@ -333,8 +360,8 @@ Being honest about this is part of the point:
   one line above the table, not as its header; merged cells send a table to
   a picture rather than text; a table in a font with no bold has a plain
   header row.
-- **Library size:** 6.0 MB on Android (arm64) for the app build (all
-  formats, scans, the page writer and Indic shaping): smaller than PDFium (6.7 MB, PDF only) and far
+- **Library size:** 6.4 MB on Android (arm64) for the app build (all
+  six formats, scans, the page writer and Indic shaping): smaller than PDFium (6.7 MB, PDF only) and far
   below MuPDF (36 MB), but I missed my 3.5 MB target. Most of what is left
   is the shaper and font parsers, which both EPUB layout and PDF text
   recovery need.

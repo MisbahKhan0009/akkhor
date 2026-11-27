@@ -1,6 +1,6 @@
 [package]
 name = "akkhor"
-description = "A tiny, fast reading engine that gets Indic scripts right: PDF, EPUB and text, with formats switched on and off at build time."
+description = "A tiny, fast reading engine that gets Indic scripts right: PDF, EPUB, MOBI/AZW3, FB2, CBZ and text, with formats switched on and off at build time."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 readme = "../../README.md"
-keywords = ["ebook", "epub", "pdf", "bangla", "devanagari"]
+keywords = ["ebook", "epub", "pdf", "mobi", "bangla"]
 categories = ["text-processing", "rendering"]
 
 # Each format is a switch. A format that is off is not compiled at all, so it
