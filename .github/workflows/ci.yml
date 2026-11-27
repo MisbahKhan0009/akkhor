@@ -98,10 +98,15 @@ jobs:
           export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
           echo "| arm64-v8a build | bytes |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          for f in "pdf,epub,txt" "pdf,pdf-scans" "pdf" "epub,txt"; do
+          # The app build, then without each Phase 6 format: the
+          # difference is what that switch costs.
+          app="pdf,pdf-scans,pdf-write,epub,txt"
+          for f in "$app,mobi,fb2,cbz" "$app,fb2,cbz" "$app,mobi,cbz" "$app,mobi,fb2" "$app" \
+                   "pdf,epub,txt" "pdf,pdf-scans" "pdf" "epub,txt"; do
             out="only-${f//,/-}"
             cargo ndk -t arm64-v8a -P 24 -o "$out" build --release -p akkhor-android --no-default-features --features "$f"
             echo "| $f | $(stat -c %s $out/arm64-v8a/libakkhor.so) |" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "SIZE,$f,$(stat -c %s $out/arm64-v8a/libakkhor.so)"
           done
       - uses: actions/upload-artifact@v4
         with:
