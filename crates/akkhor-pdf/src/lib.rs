@@ -26,6 +26,7 @@ pub mod text;
 mod theme;
 #[cfg(feature = "write")]
 mod write;
+mod xmp;
 
 pub use reference::register_reference_font;
 
@@ -360,9 +361,10 @@ impl PdfDocument {
     }
 
     /// Title, author and subject from the document information dictionary,
-    /// with text strings decoded (UTF-16 or PDFDocEncoding).
-    /// Producers often leave the title as a file name or "Untitled"; such
-    /// values are dropped.
+    /// with text strings decoded (UTF-16 or PDFDocEncoding); a title or
+    /// author it lacks comes from the XMP metadata (`dc:title`,
+    /// `dc:creator`). Producers often leave the title as a file name or
+    /// "Untitled"; such values are dropped.
     pub fn info(&self) -> PdfInfo {
         let m = self.pdf.metadata();
         let text = |v: &Option<Box<[u8]>>| {
@@ -371,7 +373,7 @@ impl PdfDocument {
                 .map(|t| t.trim().trim_matches('\0').trim().to_string())
                 .filter(|t| !t.is_empty())
         };
-        let title = text(&m.title).filter(|t| {
+        let usable = |t: &String| {
             let lower = t.to_ascii_lowercase();
             !(lower == "untitled"
                 || lower.starts_with("microsoft word - ")
@@ -380,12 +382,36 @@ impl PdfDocument {
                 ]
                 .iter()
                 .any(|ext| lower.ends_with(ext)))
-        });
+        };
+        let mut title = text(&m.title).filter(usable);
+        let mut author = text(&m.author);
+        if title.is_none() || author.is_none() {
+            let xmp = contain(|| self.xmp()).ok().flatten();
+            if let Some(xmp) = xmp {
+                if title.is_none() {
+                    title = xmp::first(&xmp, "dc:title").filter(usable);
+                }
+                if author.is_none() {
+                    let creators = xmp::all(&xmp, "dc:creator");
+                    author = (!creators.is_empty()).then(|| creators.join(", "));
+                }
+            }
+        }
         PdfInfo {
             title,
-            author: text(&m.author),
+            author,
             subject: text(&m.subject),
         }
+    }
+
+    /// The document's XMP metadata as text, if it has some (at most 1 MB).
+    fn xmp(&self) -> Option<String> {
+        use hayro_syntax::object::{Dict, Stream};
+        let xref = self.pdf.xref();
+        let catalog = xref.get::<Dict<'_>>(xref.root_id())?;
+        let stream = catalog.get::<Stream<'_>>(b"Metadata")?;
+        let data = stream.decoded().ok()?;
+        (data.len() <= 1 << 20).then(|| String::from_utf8_lossy(&data).into_owned())
     }
 
     pub fn page_count(&self) -> usize {

@@ -41,6 +41,15 @@ fn pdf_info_guesses_title_and_language() {
 }
 
 #[test]
+fn pdf_title_and_authors_from_xmp() {
+    // No information dictionary entries; title and creators only in XMP
+    // (tests/fixtures/xmp-only.pdf, made with PyMuPDF).
+    let i = info("fixtures/xmp-only.pdf");
+    assert_eq!(i.title.as_deref(), Some("নদীর ধারে"));
+    assert_eq!(i.authors, ["লেখক এক, Writer Two"]);
+}
+
+#[test]
 fn text_info_and_bijoy() {
     let i = info("corpus/bn.txt");
     assert_eq!(i.language.as_deref(), Some("bn"));

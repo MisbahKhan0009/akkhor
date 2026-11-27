@@ -47,6 +47,26 @@ impl fmt::Display for Locator {
 }
 
 impl Locator {
+    /// The same place moved `bytes` further in its block or page text: a
+    /// word inside a sentence, from the sentence's start.
+    pub fn advanced(&self, bytes: usize) -> Locator {
+        match *self {
+            Locator::Flow {
+                chapter,
+                block,
+                offset,
+            } => Locator::Flow {
+                chapter,
+                block,
+                offset: offset + bytes,
+            },
+            Locator::Page { page, offset } => Locator::Page {
+                page,
+                offset: offset + bytes,
+            },
+        }
+    }
+
     /// The start of the book (its first chapter or page).
     pub const START: Locator = Locator::Flow {
         chapter: 0,

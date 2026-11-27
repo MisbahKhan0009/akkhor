@@ -158,6 +158,11 @@ public class NativeTest {
         check(String.valueOf(Native.lastError()).contains("protected"), "lastError: " + Native.lastError());
         Native.close(locked);
 
+        // Read aloud: a word inside a sentence as a place.
+        check("akkhor:1/c0/b1/o13".equals(Native.locatorInText("akkhor:1/c0/b1/o0", "ভাষা আমাদের", 5)),
+              "locatorInText: " + Native.locatorInText("akkhor:1/c0/b1/o0", "ভাষা আমাদের", 5));
+        check(Native.locatorInText("nonsense", "x", 0) == null, "locatorInText of a bad locator");
+
         // Strings: UTF-8 bytes against UTF-16 units.
         check(Native.utf16Offset("আ😀b", 7) == 3, "utf16Offset");
         check(Native.utf8Offset("আ😀b", 3) == 7, "utf8Offset");

@@ -196,4 +196,10 @@ object Native {
     /** Engine offsets are UTF-8 bytes; Kotlin strings count UTF-16. */
     external fun utf16Offset(text: String, utf8: Int): Int
     external fun utf8Offset(text: String, utf16: Int): Int
+
+    /** The place [utf16] units into [text], where [text] starts at the
+     *  locator [start]: for read aloud, a sentence from [sentences] and the
+     *  offset TextToSpeech's onRangeStart reports, so the word being read
+     *  can be highlighted with [rectsOfRange]. Null for a bad locator. */
+    external fun locatorInText(start: String, text: String, utf16: Int): String?
 }

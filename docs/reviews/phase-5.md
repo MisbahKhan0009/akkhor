@@ -17,7 +17,7 @@ Severity: 🔴 must fix (wrong output, crash, hang) · 🟠 should fix ·
 
 | Check | Result |
 |---|---|
-| Interface | 53 calls in `Native.kt`, each checked against the library's exports (names, argument and return types) and called from a JVM in CI, with bad handles, closed books, bad locators and six threads at once |
+| Interface | 54 calls in `Native.kt`, each checked against the library's exports (names, argument and return types) and called from a JVM in CI, with bad handles, closed books, bad locators and six threads at once |
 | Info and covers | under 50 ms a book once warm; the first PDF of a process reads the reference fonts (130 to 170 ms on the VM) |
 | Locators | survive font size, screen size and theme; progress and its inverse round-trip within 0.01; PDF page and reflow places convert both ways |
 | Page copies | 79 test PDFs: copied pages open in MuPDF, PDFium and Poppler with the same text and identical pixels at 72 dpi, and pass `qpdf --check`; the encrypted one is refused ([`page_copies.csv`](../case-study/data/page_copies.csv)). 11 pages of the real 41 MB book: 2.5 MB in 30 ms, identical in MuPDF |

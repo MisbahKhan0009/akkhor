@@ -1128,7 +1128,7 @@ fn utf16_of(text: &str, utf8: usize) -> usize {
     text[..at].encode_utf16().count()
 }
 
-fn utf8_of(text: &str, utf16: usize) -> usize {
+pub(crate) fn utf8_of(text: &str, utf16: usize) -> usize {
     let mut units = 0;
     for (i, c) in text.char_indices() {
         if units >= utf16 {

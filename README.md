@@ -29,7 +29,7 @@ Akkhor aims to be light **and** correct. The full gap analysis is in
 - **For a reader app:** book info and covers (under 50 ms a book), saved places (locators) that survive font, screen and theme changes, progress, whole-book search in stoppable batches with snippets, text and boxes for highlights, sentences for read aloud, a "fonts may be missing" hint for Indic PDFs, and chosen PDF pages saved as a new PDF (copies read and draw the same in MuPDF, PDFium and Poppler).
 - **Hard to break:** eight fuzz targets run on every push; every input that crashed or hung is kept as a test.
 - **Fonts on demand:** a script's font is only loaded when a book uses that script.
-- **Android:** a JNI bridge that draws straight into a `Bitmap`; the whole interface is one Kotlin file, [`android/Native.kt`](android/Native.kt) (53 calls, explained in [docs/api/android.md](docs/api/android.md)), checked against the library and called from a JVM in CI.
+- **Android:** a JNI bridge that draws straight into a `Bitmap`; the whole interface is one Kotlin file, [`android/Native.kt`](android/Native.kt) (54 calls, explained in [docs/api/android.md](docs/api/android.md)), checked against the library and called from a JVM in CI.
 
 ## How it compares
 

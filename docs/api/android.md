@@ -128,8 +128,9 @@ view can be shown in the other with `convertLocator` on both ends.
 Sentences end at `.`, `?`, `!`, `।` and `॥` (not at abbreviations such as
 "Dr." or initials) and never cross a paragraph or heading. Speak `text`
 with Android's `TextToSpeech`; its `onRangeStart` gives UTF-16 ranges
-inside `text`, which `utf8Offset` turns into byte offsets to add to the
-sentence's `start` for a word highlight. PDF page places are read in the
+inside `text`, and `locatorInText(sentence.start, text, offset)` turns
+each end into a locator, so `rectsOfRange` highlights the word being
+read. PDF page places are read in the
 reflowed text (without running headers).
 
 ## Search

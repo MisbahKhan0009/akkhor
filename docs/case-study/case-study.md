@@ -289,7 +289,7 @@ that survives any change of font, screen or theme, a progress bar,
 search of the whole book that the app can stop at any time, highlights,
 sentences for read aloud, and "share these pages" as a new PDF.
 
-- **One Kotlin file** (`android/Native.kt`, 53 calls) is the whole
+- **One Kotlin file** (`android/Native.kt`, 54 calls) is the whole
   contract. CI checks every declaration against the library and calls
   each one from a JVM, from several threads, after closing the book and
   with bad input, so a mismatch fails the build, not the app.

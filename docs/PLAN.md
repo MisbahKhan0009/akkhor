@@ -210,7 +210,7 @@ Detailed design: [phases/phase-5.md](phases/phase-5.md). What the reader app nee
 
 Design answers from the app's design chat (5.12): the built-in themes take the final colours, photos show at 85% on dark themes, and English hyphenation follows the design's rules.
 
-Results: 53 engine calls documented in `Native.kt` and [api/android.md](api/android.md), checked against the library and called from a JVM in CI. Pages copied from all 79 test PDFs read and draw the same in MuPDF, PDFium and Poppler. Eight fuzz targets run on every push. The phone benchmark is built for arm64 by CI; its numbers wait for a run on a phone.
+Results: 54 engine calls documented in `Native.kt` and [api/android.md](api/android.md), checked against the library and called from a JVM in CI. Pages copied from all 79 test PDFs read and draw the same in MuPDF, PDFium and Poppler. Eight fuzz targets run on every push. The phone benchmark is built for arm64 by CI; its numbers wait for a run on a phone.
 
 Review: [reviews/phase-5.md](reviews/phase-5.md), 12 findings; four 🔴 fixed: a parser hang and an EPUB panic found by fuzzing, a close-while-searching deadlock, pages turned by `/Rotate` read letter by letter. Carried: turned pictures in reflow, the reference-font start-up cost, slow no-hit search on huge books.
 

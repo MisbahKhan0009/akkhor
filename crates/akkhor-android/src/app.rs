@@ -504,6 +504,25 @@ pub fn forget_searches(h: jlong) {
     }
 }
 
+/// The place `utf16` units into `text`, where `text` starts at `start`: a
+/// sentence from `sentences` and the offset Android's speech engine
+/// reports for the word it is reading. Null for a bad locator.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_locatorInText(
+    env: *mut JNIEnv,
+    _: jclass,
+    start: jstring,
+    text: jstring,
+    utf16: jint,
+) -> jstring {
+    guard(std::ptr::null_mut(), || unsafe {
+        let at = locator(env, start)?;
+        let text = jstr(env, text).ok_or("no text")?;
+        let bytes = crate::utf8_of(&text, utf16.max(0) as usize);
+        new_jstring(env, &at.advanced(bytes).to_string())
+    })
+}
+
 /// Chosen pages (0-based, in that order) of an open PDF saved as a new PDF
 /// at `path`; returns the bytes written, or -1 (encrypted file, a page out
 /// of range, a write failure; see lastError).

@@ -68,10 +68,11 @@ reflow and the other way round. Stored ranges survive a font size change
 ## 5.5 Read aloud
 
 `sentences(handle, from, count)`: the next sentences from a locator, each
-with its text, its locator range and UTF-16 offsets, ending at `.`, `?`,
-`!`, `।`, `॥` and paragraph ends (not at abbreviations such as "Dr." in
-English). Android's offline voices read the text and report UTF-16 offsets;
-`rectsOf` highlights the word being read.
+with its text and its locator range, ending at `.`, `?`, `!`, `।`, `॥` and
+paragraph ends (not at abbreviations such as "Dr." in English). Android's
+offline voices read the text and report UTF-16 offsets inside it;
+`locatorInText(start, text, offset)` turns such an offset into a locator,
+and `rectsOf` highlights the word being read.
 
 ## 5.6 Pages of a PDF as a new PDF
 
