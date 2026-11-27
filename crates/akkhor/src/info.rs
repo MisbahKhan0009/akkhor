@@ -30,6 +30,10 @@ pub struct BookInfo {
     pub needs_fonts: bool,
     /// A text file typed in Bijoy, shown converted to Unicode.
     pub bijoy: bool,
+    /// The series the book belongs to (FB2, comics), with its number.
+    pub series: Option<String>,
+    /// Pages are read right to left (manga).
+    pub right_to_left: bool,
 }
 
 /// A cover image, RGBA, unpremultiplied.
@@ -49,7 +53,9 @@ impl BookInfo {
                     Format::Pdf => "pdf",
                     Format::Epub => "epub",
                     Format::Txt => "txt",
-                    _ => "other",
+                    Format::Mobi => "mobi",
+                    Format::Fb2 => "fb2",
+                    Format::Cbz => "cbz",
                 },
             )
             .opt_str("title", self.title.as_deref())
@@ -63,6 +69,8 @@ impl BookInfo {
             .opt_num("text_quality", self.text_quality.map(f64::from))
             .bool("needs_fonts", self.needs_fonts)
             .bool("bijoy", self.bijoy)
+            .opt_str("series", self.series.as_deref())
+            .str("direction", if self.right_to_left { "rtl" } else { "ltr" })
             .end()
     }
 }
@@ -138,6 +146,59 @@ impl Book {
                     text_quality: None,
                     needs_fonts: false,
                     bijoy: false,
+                    series: None,
+                    right_to_left: false,
+                }
+            }
+            #[cfg(feature = "mobi")]
+            Book::Mobi(b) => {
+                let m = &b.metadata;
+                flow_info(
+                    self,
+                    Format::Mobi,
+                    m.title.clone(),
+                    m.authors.clone(),
+                    m.language.clone(),
+                    m.publisher.clone(),
+                    b.cover_bytes().is_some(),
+                    None,
+                )
+            }
+            #[cfg(feature = "fb2")]
+            Book::Fb2(b) => {
+                let m = &b.metadata;
+                flow_info(
+                    self,
+                    Format::Fb2,
+                    m.title.clone(),
+                    m.authors.clone(),
+                    m.language.clone(),
+                    m.publisher.clone(),
+                    m.cover.is_some(),
+                    m.series.clone(),
+                )
+            }
+            #[cfg(feature = "cbz")]
+            Book::Cbz(c) => {
+                let m = &c.metadata;
+                BookInfo {
+                    format: Format::Cbz,
+                    title: m.title.clone(),
+                    authors: m.writers.clone(),
+                    language: m.language.clone(),
+                    language_guessed: false,
+                    publisher: None,
+                    length: c.page_count(),
+                    has_cover: true,
+                    reflowable: false,
+                    text_quality: None,
+                    needs_fonts: false,
+                    bijoy: false,
+                    series: m.series.as_ref().map(|s| match &m.number {
+                        Some(n) => format!("{s} {n}"),
+                        None => s.clone(),
+                    }),
+                    right_to_left: m.right_to_left,
                 }
             }
             #[cfg(feature = "txt")]
@@ -170,6 +231,8 @@ impl Book {
                     text_quality: None,
                     needs_fonts: false,
                     bijoy: t.encoding == crate::flow::TextEncoding::LegacyBijoy,
+                    series: None,
+                    right_to_left: false,
                 }
             }
         }
@@ -193,6 +256,12 @@ impl Book {
                     rgba: page.into_unpremultiplied(),
                 })
             }
+            #[cfg(feature = "cbz")]
+            Book::Cbz(c) => fit(&c.cover_bytes()?, mw, mh),
+            #[cfg(feature = "mobi")]
+            Book::Mobi(b) => fit(&b.cover_bytes()?, mw, mh),
+            #[cfg(feature = "fb2")]
+            Book::Fb2(b) => fit(&b.cover_bytes()?, mw, mh),
             #[cfg(feature = "epub")]
             Book::Epub(e) => {
                 let bytes = e.cover_bytes()?;
@@ -213,6 +282,67 @@ impl Book {
             #[allow(unreachable_patterns)]
             _ => None,
         }
+    }
+}
+
+/// A picture fitted inside `mw` x `mh`, never enlarged.
+#[allow(dead_code)]
+fn fit(bytes: &[u8], mw: u32, mh: u32) -> Option<Cover> {
+    // Comic covers may be big scans.
+    let img = crate::flow::image::decode_up_to(bytes, 40_000_000)?;
+    let scale = (mw as f32 / img.width.max(1) as f32)
+        .min(mh as f32 / img.height.max(1) as f32)
+        .min(1.0);
+    let (w, h) = (
+        ((img.width as f32 * scale).round() as u32).max(1),
+        ((img.height as f32 * scale).round() as u32).max(1),
+    );
+    Some(Cover {
+        width: w,
+        height: h,
+        rgba: crate::flow::image::resize(&img, w, h),
+    })
+}
+
+/// A reflowable book's description from its metadata; the language is
+/// guessed from the first chapter when the book names none.
+#[allow(dead_code, clippy::too_many_arguments)]
+fn flow_info(
+    book: &Book,
+    format: Format,
+    title: Option<String>,
+    authors: Vec<String>,
+    language: Option<String>,
+    publisher: Option<String>,
+    has_cover: bool,
+    series: Option<String>,
+) -> BookInfo {
+    let flow = book.flow();
+    let (language, language_guessed) = match language {
+        Some(l) => (Some(l), false),
+        None => {
+            let text = flow
+                .and_then(|f| f.chapter(0).ok())
+                .map(|d| d.blocks.iter().map(|b| b.text.as_str()).collect::<String>())
+                .unwrap_or_default();
+            (guess_language(&text), true)
+        }
+    };
+    BookInfo {
+        format,
+        title,
+        authors,
+        language,
+        language_guessed,
+        publisher,
+        length: flow.map_or(0, |f| f.chapter_count()),
+        has_cover,
+        reflowable: true,
+        text_quality: None,
+        needs_fonts: false,
+        bijoy: false,
+        series,
+        right_to_left: false,
     }
 }
 
@@ -255,5 +385,7 @@ fn pdf_info(p: &crate::pdf::PdfDocument) -> BookInfo {
         text_quality: quality,
         needs_fonts: quality.is_some_and(|q| q < crate::pdf::TEXT_QUALITY_GOOD),
         bijoy: false,
+        series: None,
+        right_to_left: false,
     }
 }

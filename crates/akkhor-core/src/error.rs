@@ -15,6 +15,9 @@ pub enum Error {
     Malformed(String),
     /// The file is DRM-protected.
     Protected,
+    /// A container the engine recognises but cannot read (KFX, Topaz, CBR,
+    /// CB7); the name says which.
+    Unsupported(&'static str),
     /// A page, chapter or entry index is out of range.
     OutOfRange,
     /// A caller-supplied buffer is too small for the requested render.
@@ -40,6 +43,7 @@ impl fmt::Display for Error {
             }
             Error::Malformed(m) => write!(f, "malformed file: {m}"),
             Error::Protected => write!(f, "file is DRM-protected"),
+            Error::Unsupported(what) => write!(f, "{what} files are not supported"),
             Error::OutOfRange => write!(f, "index out of range"),
             Error::BufferTooSmall { needed, got } => {
                 write!(f, "buffer too small: need {needed} bytes, got {got}")

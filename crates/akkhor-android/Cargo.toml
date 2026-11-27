@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 # Format switches pass straight through to the engine, so an app can build a
 # PDF-only or EPUB-only library.
 [features]
-default = ["pdf", "pdf-scans", "pdf-write", "epub", "txt"]
+default = ["pdf", "pdf-scans", "pdf-write", "epub", "txt", "mobi", "fb2", "cbz"]
 pdf = ["akkhor/pdf", "flow"]
 # JBIG2, CCITT and JPEG 2000 decoders for scanned pages.
 pdf-scans = ["pdf", "akkhor/pdf-scans"]
@@ -28,7 +28,11 @@ pdf-write = ["pdf", "akkhor/pdf-write"]
 pdf-standard-fonts = ["pdf", "akkhor/pdf-standard-fonts"]
 epub = ["akkhor/epub", "flow"]
 txt = ["akkhor/txt", "flow"]
-# Reflowable text (EPUB, TXT, PDF reflow); switched on by any of them.
+mobi = ["akkhor/mobi", "flow"]
+fb2 = ["akkhor/fb2", "flow"]
+# Comics: the page view (renderPageTile), no reflow.
+cbz = ["akkhor/cbz", "flow"]
+# Reflowable text (EPUB, MOBI, FB2, TXT, PDF reflow); switched on by any of them.
 flow = []
 
 [dependencies]

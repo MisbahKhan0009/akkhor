@@ -192,10 +192,9 @@ impl Reading {
         let weights = match book {
             #[cfg(feature = "pdf")]
             Book::Pdf(_) => pdf_chapters.iter().map(|r| r.len() as u64).collect(),
-            #[cfg(feature = "epub")]
-            Book::Epub(e) => e.chapter_sizes(),
-            #[cfg(feature = "txt")]
-            Book::Text(_) => vec![1],
+            // Comics have pages, not chapters.
+            #[allow(unreachable_patterns)]
+            _ => book.flow().map(|f| f.chapter_sizes()).unwrap_or_default(),
         };
         Self {
             #[cfg(feature = "pdf")]
@@ -246,17 +245,10 @@ impl Reading {
                     reflow: Some(r),
                 }
             }
-            #[cfg(feature = "epub")]
-            Book::Epub(e) => Chapter {
+            #[allow(unreachable_patterns)]
+            _ => Chapter {
                 index: i,
-                document: e.chapter(i)?,
-                #[cfg(feature = "pdf")]
-                reflow: None,
-            },
-            #[cfg(feature = "txt")]
-            Book::Text(t) => Chapter {
-                index: i,
-                document: t.document.clone(),
+                document: book.flow().ok_or(Error::OutOfRange)?.chapter(i)?,
                 #[cfg(feature = "pdf")]
                 reflow: None,
             },
@@ -309,6 +301,15 @@ impl Reading {
                     };
                     return Ok(Locator::Page { page, offset });
                 }
+                #[cfg(feature = "cbz")]
+                #[allow(irrefutable_let_patterns)]
+                if let Book::Cbz(c) = book {
+                    let n = c.page_count();
+                    return Ok(Locator::Page {
+                        page: page.min(n.saturating_sub(1)),
+                        offset: 0,
+                    });
+                }
                 let _ = (page, offset);
                 Err(Error::OutOfRange)
             }
@@ -343,6 +344,11 @@ impl Reading {
                     let within = offset as f64 / len as f64;
                     return Ok(((page as f64 + within) / n as f64).clamp(0.0, 1.0));
                 }
+                #[cfg(feature = "cbz")]
+                #[allow(irrefutable_let_patterns)]
+                if let Book::Cbz(c) = book {
+                    return Ok((page as f64 / c.page_count().max(1) as f64).clamp(0.0, 1.0));
+                }
                 let _ = (page, offset);
                 Err(Error::OutOfRange)
             }
@@ -352,6 +358,13 @@ impl Reading {
     /// The place at `progress` (0 to 1) through the reflowed book, for a
     /// scrubber. The inverse of [`progress`](Self::progress), to the byte.
     pub fn at_progress(&mut self, book: &Book, progress: f64) -> Result<Locator> {
+        #[cfg(feature = "cbz")]
+        #[allow(irrefutable_let_patterns)]
+        if let Book::Cbz(c) = book {
+            let n = c.page_count();
+            let page = ((progress.clamp(0.0, 1.0) * n as f64) as usize).min(n.saturating_sub(1));
+            return Ok(Locator::Page { page, offset: 0 });
+        }
         let n = self.chapter_count();
         if n == 0 {
             return Ok(Locator::START);

@@ -271,6 +271,40 @@ fn run(args: Args) -> Result<(), String> {
             println!("encoding  {:?}", text.encoding);
             render_flow(&text.document, None, &args)?
         }
+        Book::Cbz(comic) => {
+            println!("pages     {}", comic.page_count());
+            let t = Instant::now();
+            let p = comic
+                .render_page(args.page, args.scale, &args.theme)
+                .map_err(|e| e.to_string())?;
+            println!(
+                "render    {:.2} ms  (page {}, {}x{} px)",
+                ms(t),
+                args.page,
+                p.width,
+                p.height
+            );
+            (p.width, p.height, p.pixels)
+        }
+        other => {
+            let info = other.info();
+            println!(
+                "title     {}",
+                info.title.as_deref().unwrap_or("(untitled)")
+            );
+            let flow = other.flow().ok_or("not a reflowable book")?;
+            println!("chapters  {}", flow.chapter_count());
+            let t = Instant::now();
+            let doc = flow.chapter(args.page).map_err(|e| e.to_string())?;
+            println!(
+                "chapter   {:.2} ms  ({} blocks, {} chars)",
+                ms(t),
+                doc.blocks.len(),
+                doc.char_count()
+            );
+            let images = flow.images(args.page);
+            render_flow(&doc, images.as_deref(), &args)?
+        }
     };
 
     if let Some((peak, now)) = memory_kb() {
@@ -365,19 +399,7 @@ fn search(book: &Book, q: &str) -> Result<(), String> {
             shown += 1;
         };
     match book {
-        Book::Epub(epub) => {
-            for c in 0..epub.chapter_count() {
-                let doc = epub.chapter(c).map_err(|e| e.to_string())?;
-                for m in find_all(&doc, q) {
-                    print(Some(c), &doc, &m);
-                }
-            }
-        }
-        Book::Text(text) => {
-            for m in find_all(&text.document, q) {
-                print(None, &text.document, &m);
-            }
-        }
+        Book::Cbz(_) => println!("search    a comic has no text"),
         Book::Pdf(pdf) => {
             for m in pdf.search(q, 0) {
                 if shown < 20 {
@@ -394,6 +416,15 @@ fn search(book: &Book, q: &str) -> Result<(), String> {
                     );
                 }
                 shown += 1;
+            }
+        }
+        other => {
+            let flow = other.flow().ok_or("not a reflowable book")?;
+            for c in 0..flow.chapter_count() {
+                let doc = flow.chapter(c).map_err(|e| e.to_string())?;
+                for m in find_all(&doc, q) {
+                    print(Some(c), &doc, &m);
+                }
             }
         }
     }
@@ -419,6 +450,27 @@ fn print_toc(book: &Book) -> Result<(), String> {
             }
         }
         Book::Text(_) => println!("toc       plain text has none"),
+        Book::Mobi(m) => {
+            for e in m.toc() {
+                println!(
+                    "  {}{}  (chapter {})",
+                    "  ".repeat(e.depth as usize),
+                    e.title,
+                    e.chapter
+                );
+            }
+        }
+        Book::Fb2(f) => {
+            for e in f.toc() {
+                println!(
+                    "  {}{}  (chapter {})",
+                    "  ".repeat(e.depth as usize),
+                    e.title,
+                    e.chapter
+                );
+            }
+        }
+        Book::Cbz(_) => println!("toc       comics have none"),
     }
     Ok(())
 }
@@ -456,14 +508,14 @@ fn print_text(book: &Book, page: usize) -> Result<(), String> {
             );
             println!("{}", text.text);
         }
-        Book::Epub(epub) => {
-            let doc = epub.chapter(page).map_err(|e| e.to_string())?;
+        Book::Cbz(_) => println!("a comic has no text"),
+        other => {
+            let doc = other
+                .flow()
+                .ok_or("not a reflowable book")?
+                .chapter(page)
+                .map_err(|e| e.to_string())?;
             for b in &doc.blocks {
-                println!("{}\n", b.text);
-            }
-        }
-        Book::Text(text) => {
-            for b in &text.document.blocks {
                 println!("{}\n", b.text);
             }
         }

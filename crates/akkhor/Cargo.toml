@@ -15,7 +15,7 @@ categories = ["text-processing", "rendering"]
 # adds nothing to the binary. A format that is on costs no RAM until a file of
 # that format is opened.
 [features]
-default = ["pdf", "pdf-scans", "pdf-standard-fonts", "epub", "txt"]
+default = ["pdf", "pdf-scans", "pdf-standard-fonts", "epub", "txt", "mobi", "fb2", "cbz"]
 # PDFs, with JPEG images and the 14 standard PDF fonts.
 # PDFs, reflow included (it uses the flow layout).
 pdf = ["dep:akkhor-pdf", "akkhor-pdf/jpeg", "flow"]
@@ -32,6 +32,12 @@ pdf-cjk = ["pdf", "akkhor-pdf/cjk"]
 pdf-write = ["pdf", "akkhor-pdf/write"]
 epub = ["dep:akkhor-epub", "flow"]
 txt = ["flow"]
+# Kindle books: MOBI 7, AZW, AZW3 (KF8), combined files, PalmDOC.
+mobi = ["dep:akkhor-mobi", "flow"]
+# FictionBook 2, plain or zipped.
+fb2 = ["dep:akkhor-fb2", "flow"]
+# Comic book archives (zip of pictures; WebP and GIF decoding included).
+cbz = ["dep:akkhor-cbz", "flow"]
 # The reflowable-text pipeline shared by EPUB, TXT and (later) MOBI and FB2.
 flow = ["dep:akkhor-flow"]
 # Compile Noto Serif fonts (Latin, Bengali, Devanagari) into the binary; PDF
@@ -42,6 +48,9 @@ bundled-fonts = ["flow", "akkhor-flow/bundled-fonts", "akkhor-pdf?/bundled-fonts
 akkhor-core.workspace = true
 akkhor-pdf = { workspace = true, optional = true }
 akkhor-epub = { workspace = true, optional = true }
+akkhor-mobi = { workspace = true, optional = true }
+akkhor-fb2 = { workspace = true, optional = true }
+akkhor-cbz = { workspace = true, optional = true }
 akkhor-flow = { workspace = true, optional = true }
 
 [dev-dependencies]

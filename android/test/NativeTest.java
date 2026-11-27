@@ -140,7 +140,7 @@ public class NativeTest {
         check(flow != null && flow.startsWith("akkhor:1/c"), "page place to reflow place: " + flow);
         check(Native.convertLocator(pdf, flow) != null, "and back");
         check(Native.pdfPageText(pdf, 0) != null, "pdfPageText");
-        check(Native.renderPdfTile(pdf, 0, 1f, 0, 0, new Object(), 16) < 0, "drawing needs an Android bitmap");
+        check(Native.renderPageTile(pdf, 0, 1f, 0, 0, new Object(), 16) < 0, "drawing needs an Android bitmap");
         check(Native.renderCover(pdf, new Object()) == -1, "cover needs an Android bitmap");
         // Two pages, last first, as a new PDF that reads the same.
         String out = System.getProperty("java.io.tmpdir") + "/akkhor-copy.pdf";
@@ -162,6 +162,43 @@ public class NativeTest {
         check("akkhor:1/c0/b1/o13".equals(Native.locatorInText("akkhor:1/c0/b1/o0", "ভাষা আমাদের", 5)),
               "locatorInText: " + Native.locatorInText("akkhor:1/c0/b1/o0", "ভাষা আমাদের", 5));
         check(Native.locatorInText("nonsense", "x", 0) == null, "locatorInText of a bad locator");
+
+        // Kindle, FictionBook and comics through the same calls.
+        String[][] books = {
+            {"tests/corpus/formats/bn.azw3", "3", "\"format\":\"mobi\""},
+            {"tests/corpus/formats/bn.kf7.mobi", "3", "\"format\":\"mobi\""},
+            {"tests/corpus/formats/rich.bn.fb2", "4", "\"series\":\"অক্ষর সিরিজ\""},
+        };
+        for (String[] b : books) {
+            long k = Native.openPath(root + "/" + b[0]);
+            check(k != 0 && Native.format(k) == Integer.parseInt(b[1]), "open " + b[0]);
+            String kinfo = Native.info(k);
+            check(kinfo != null && kinfo.contains(b[2]) && kinfo.contains("\"has_cover\":true"), b[0] + ": " + kinfo);
+            check(Native.chapterCount(k) >= 3, b[0] + " chapters");
+            check(Native.layoutChapter(k, 1, 720, 900, 40f) >= 1, b[0] + " layout");
+            String t = Native.textOfRange(k, "akkhor:1/c1/b0/o0", "akkhor:1/c1/b1/o0");
+            check(t != null && !t.isBlank(), b[0] + " text: " + t);
+            long ks = Native.searchStart(k, "নদী");
+            String kb = Native.searchNext(ks, 50);
+            check(kb != null && kb.contains("\"snippet\""), b[0] + " search: " + kb);
+            Native.searchCancel(ks);
+            Native.close(k);
+        }
+        long comic = Native.openPath(root + "/tests/corpus/formats/manga.cbz");
+        check(comic != 0 && Native.format(comic) == 5, "open comic");
+        String cinfo = Native.info(comic);
+        check(cinfo != null && cinfo.contains("\"direction\":\"rtl\"") && cinfo.contains("\"length\":3"), "comic info: " + cinfo);
+        check(Native.count(comic) == 3 && Native.pageWidth(comic, 0) == 600f, "comic pages");
+        check(Native.renderPageTile(comic, 0, 1f, 0, 0, new Object(), 0) < 0, "comic drawing needs a bitmap");
+        check(Math.abs(Native.progressOf(comic, "akkhor:1/p2/o0") - 2.0 / 3) < 1e-9, "comic progress");
+        check("akkhor:1/p1/o0".equals(Native.locatorAtProgress(comic, 0.5)), "comic scrubber");
+        Native.close(comic);
+        // A RAR comic is named, not opened.
+        java.nio.file.Path rar = java.nio.file.Files.createTempFile("akkhor", ".cbz");
+        java.nio.file.Files.write(rar, "Rar!\u001a\u0007\u0000 not a zip".getBytes("ISO-8859-1"));
+        check(Native.openPath(rar.toString()) == 0, "a RAR comic does not open");
+        check(String.valueOf(Native.lastError()).contains("CBR"), "lastError names it: " + Native.lastError());
+        java.nio.file.Files.delete(rar);
 
         // Strings: UTF-8 bytes against UTF-16 units.
         check(Native.utf16Offset("আ😀b", 7) == 3, "utf16Offset");

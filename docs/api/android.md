@@ -78,7 +78,7 @@ reference fonts once (a few hundred ms).
 
 Two views:
 
-- **Page view** (PDF): `renderPdfTile` / `renderPdfTiles` draw tiles of a
+- **Page view** (PDF and comics): `renderPageTile` / `renderPageTiles` draw tiles of a
   page at any zoom; `pdfHitTest`, `pdfWordAt`, `pdfSelectionRects`,
   `pdfTextBetween`, `pdfSearch` work on its text.
 - **Reflowed text** (EPUB, TXT, PDF "Reflow"): `layoutChapter(handle,

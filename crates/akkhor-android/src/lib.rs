@@ -168,7 +168,7 @@ static NEXT_ID: AtomicI64 = AtomicI64::new(1);
 static GENERATIONS: Mutex<BTreeMap<jlong, Arc<std::sync::atomic::AtomicU64>>> =
     Mutex::new(BTreeMap::new());
 
-#[cfg(feature = "pdf")]
+#[cfg(any(feature = "pdf", feature = "cbz"))]
 fn generation(h: jlong) -> Option<Arc<std::sync::atomic::AtomicU64>> {
     GENERATIONS
         .lock()
@@ -338,7 +338,9 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_format(
                 Format::Pdf => 0,
                 Format::Epub => 1,
                 Format::Txt => 2,
-                _ => 9,
+                Format::Mobi => 3,
+                Format::Fb2 => 4,
+                Format::Cbz => 5,
             })
         })
     })
@@ -355,25 +357,58 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_count(
             Ok(match &h.book {
                 #[cfg(feature = "pdf")]
                 Book::Pdf(p) => p.page_count() as jint,
-                #[cfg(feature = "epub")]
-                Book::Epub(e) => e.chapter_count() as jint,
-                #[cfg(feature = "txt")]
-                Book::Text(_) => 1,
+                #[cfg(feature = "cbz")]
+                Book::Cbz(c) => c.page_count() as jint,
+                #[allow(unreachable_patterns)]
+                book => book.flow().map_or(0, |f| f.chapter_count()) as jint,
             })
         })
     })
 }
 
-#[cfg(feature = "pdf")]
-fn pdf_size(h: jlong, page: jint) -> Result<(f32, f32), String> {
+/// Size of a page of a page book (PDF points, comic pixels).
+#[cfg(any(feature = "pdf", feature = "cbz"))]
+fn page_size(h: jlong, page: jint) -> Result<(f32, f32), String> {
     with_handle(h, |h| match &h.book {
-        Book::Pdf(p) => p.page_size(page as usize).map_err(|e| e.to_string()),
+        #[cfg(feature = "pdf")]
+        Book::Pdf(p) => p.page_size(page.max(0) as usize).map_err(|e| e.to_string()),
+        #[cfg(feature = "cbz")]
+        Book::Cbz(c) => c.page_size(page.max(0) as usize).map_err(|e| e.to_string()),
         #[allow(unreachable_patterns)]
-        _ => Err("not a PDF".into()),
+        _ => Err("not a page book (PDF or comic)".into()),
     })
 }
 
-#[cfg(feature = "pdf")]
+/// Draws `tile` of `page` of a page book into `out`.
+#[cfg(any(feature = "pdf", feature = "cbz"))]
+fn draw_tile(
+    book: &Book,
+    page: usize,
+    scale: f32,
+    tile: akkhor::Tile,
+    theme: &akkhor::Theme,
+    out: &mut [u8],
+) -> Result<(), String> {
+    match book {
+        #[cfg(feature = "pdf")]
+        Book::Pdf(pdf) => pdf
+            .render_tile(page, scale, tile, theme, out)
+            .map_err(|e| e.to_string()),
+        #[cfg(feature = "cbz")]
+        Book::Cbz(c) => {
+            let r = c
+                .render_tile(page, scale, tile, theme)
+                .map_err(|e| e.to_string())?;
+            let n = r.pixels.len().min(out.len());
+            out[..n].copy_from_slice(&r.pixels[..n]);
+            Ok(())
+        }
+        #[allow(unreachable_patterns)]
+        _ => Err("not a page book (PDF or comic)".into()),
+    }
+}
+
+#[cfg(any(feature = "pdf", feature = "cbz"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_dev_akkhor_Native_pageWidth(
     _: *mut JNIEnv,
@@ -381,10 +416,10 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_pageWidth(
     h: jlong,
     page: jint,
 ) -> jfloat {
-    guard(-1.0, || pdf_size(h, page).map(|s| s.0))
+    guard(-1.0, || page_size(h, page).map(|s| s.0))
 }
 
-#[cfg(feature = "pdf")]
+#[cfg(any(feature = "pdf", feature = "cbz"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_dev_akkhor_Native_pageHeight(
     _: *mut JNIEnv,
@@ -392,7 +427,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_pageHeight(
     h: jlong,
     page: jint,
 ) -> jfloat {
-    guard(-1.0, || pdf_size(h, page).map(|s| s.1))
+    guard(-1.0, || page_size(h, page).map(|s| s.1))
 }
 
 /// Locked pixels of an Android `Bitmap`.
@@ -493,10 +528,11 @@ impl Drop for LockedBitmap {
 }
 
 /// Renders the tile of `page` at `scale` whose top-left corner is (x, y) into
-/// `bitmap`; the tile is the bitmap's size. Returns 0 on success.
-#[cfg(feature = "pdf")]
+/// `bitmap`; the tile is the bitmap's size. PDFs and comics. Returns 0 on
+/// success.
+#[cfg(any(feature = "pdf", feature = "cbz"))]
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTile(
+pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPageTile(
     env: *mut JNIEnv,
     _: jclass,
     h: jlong,
@@ -509,15 +545,17 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTile(
 ) -> jint {
     guard(-1, || {
         with_handle(h, |h| {
-            #[allow(irrefutable_let_patterns)]
-            let Book::Pdf(pdf) = &h.book else {
-                return Err("not a PDF".into());
-            };
             let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
             let tile = akkhor::Tile::new(x.max(0) as u32, y.max(0) as u32, bmp.width, bmp.height);
             let out = bmp.pixels()?;
-            pdf.render_tile(page as usize, scale, tile, &theme(theme_code), out)
-                .map_err(|e| e.to_string())?;
+            draw_tile(
+                &h.book,
+                page.max(0) as usize,
+                scale,
+                tile,
+                &theme(theme_code),
+                out,
+            )?;
             Ok(0)
         })
     })
@@ -527,9 +565,9 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTile(
 /// (each tile is its bitmap's size), sharing the page's parsed fonts and
 /// images. Stops before the next tile once `cancelRendering` is called.
 /// Returns the number of tiles drawn, or -1 on error.
-#[cfg(feature = "pdf")]
+#[cfg(any(feature = "pdf", feature = "cbz"))]
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTiles(
+pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPageTiles(
     env: *mut JNIEnv,
     _: jclass,
     h: jlong,
@@ -556,10 +594,6 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTiles(
             (n, vx, vy)
         };
         with_handle(h, |hd| {
-            #[allow(irrefutable_let_patterns)]
-            let Book::Pdf(pdf) = &hd.book else {
-                return Err("not a PDF".into());
-            };
             let mut drawn = 0;
             for i in 0..n {
                 if generation.load(Ordering::Relaxed) != started {
@@ -577,8 +611,14 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderPdfTiles(
                     bmp.height,
                 );
                 let out = bmp.pixels()?;
-                pdf.render_tile(page.max(0) as usize, scale, tile, &theme(theme_code), out)
-                    .map_err(|e| e.to_string())?;
+                draw_tile(
+                    &hd.book,
+                    page.max(0) as usize,
+                    scale,
+                    tile,
+                    &theme(theme_code),
+                    out,
+                )?;
                 drop(bmp);
                 unsafe {
                     if let Some(del) = (**env).DeleteLocalRef {
@@ -664,7 +704,6 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_outlineLevelsAndPages(
 /// Frees what reading a PDF has accumulated (decoded page content, fonts
 /// and images kept for redraws) by opening it afresh; call it from
 /// `onTrimMemory`. Waits for a render in progress. Returns 0, or -1 on error.
-#[cfg(feature = "pdf")]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_dev_akkhor_Native_trimMemory(
     _: *mut JNIEnv,
@@ -673,10 +712,19 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_trimMemory(
 ) -> jint {
     guard(-1, || {
         with_handle(h, |hd| {
-            #[allow(irrefutable_let_patterns)]
-            if let Book::Pdf(pdf) = &hd.book {
-                let fresh = pdf.trimmed().map_err(|e| e.to_string())?;
-                hd.book = Book::Pdf(fresh);
+            match &hd.book {
+                #[cfg(feature = "pdf")]
+                Book::Pdf(pdf) => {
+                    let fresh = pdf.trimmed().map_err(|e| e.to_string())?;
+                    hd.book = Book::Pdf(fresh);
+                }
+                // A comic keeps one decoded page; drop it.
+                #[cfg(feature = "cbz")]
+                Book::Cbz(c) => {
+                    c.trim();
+                }
+                #[allow(unreachable_patterns)]
+                _ => {}
             }
             Ok(0)
         })
@@ -685,7 +733,7 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_trimMemory(
 
 /// Stops the tile batches running for `handle` before their next tile
 /// (the user scrolled away). Never waits for them.
-#[cfg(feature = "pdf")]
+#[cfg(any(feature = "pdf", feature = "cbz"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_dev_akkhor_Native_cancelRendering(
     _: *mut JNIEnv,
@@ -725,16 +773,16 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
                 reflow: None,
             });
             let doc = match &h.book {
-                #[cfg(feature = "epub")]
-                Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string())?,
-                #[cfg(feature = "txt")]
-                Book::Text(t) => t.document.clone(),
                 #[cfg(feature = "pdf")]
                 Book::Pdf(p) => reflow_chapter(p, &mut flow.reflow, chapter.max(0) as usize)?
                     .document
                     .clone(),
                 #[allow(unreachable_patterns)]
-                _ => return Err("not a reflowable book".into()),
+                book => book
+                    .flow()
+                    .ok_or("not a reflowable book")?
+                    .chapter(chapter.max(0) as usize)
+                    .map_err(|e| e.to_string())?,
             };
             let opts = LayoutOptions {
                 width: width as f32,
@@ -744,12 +792,10 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_layoutChapter(
                 ..Default::default()
             };
             let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
-                #[cfg(feature = "epub")]
-                Book::Epub(e) => Some(Box::new(e.chapter_images(chapter as usize))),
                 #[cfg(feature = "pdf")]
                 Book::Pdf(p) => Some(Box::new(p.reflow_images())),
                 #[allow(unreachable_patterns)]
-                _ => None,
+                book => book.flow().and_then(|f| f.images(chapter.max(0) as usize)),
             };
             flow.pages =
                 akkhor::flow::paginate_with_images(&doc, &opts, &flow.fonts, images.as_deref());
@@ -776,12 +822,10 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_renderFlowPage(
         with_handle(h, |h| {
             let flow = h.flow.as_mut().ok_or("call layoutChapter first")?;
             let images: Option<Box<dyn akkhor::flow::ImageProvider + '_>> = match &h.book {
-                #[cfg(feature = "epub")]
-                Book::Epub(e) => Some(Box::new(e.chapter_images(flow.chapter))),
                 #[cfg(feature = "pdf")]
                 Book::Pdf(p) => Some(Box::new(p.reflow_images())),
                 #[allow(unreachable_patterns)]
-                _ => None,
+                book => book.flow().and_then(|f| f.images(flow.chapter)),
             };
             let p = flow.pages.get(page as usize).ok_or("page out of range")?;
             let mut bmp = unsafe { LockedBitmap::lock(env, bitmap) }?;
@@ -936,10 +980,6 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_search(
         let _ = chapter; // unused in TXT-only builds
         let query = unsafe { jstr(env, query) }.ok_or("query is null")?;
         let doc = with_handle(h, |hd| match &hd.book {
-            #[cfg(feature = "epub")]
-            Book::Epub(e) => e.chapter(chapter as usize).map_err(|e| e.to_string()),
-            #[cfg(feature = "txt")]
-            Book::Text(t) => Ok(t.document.clone()),
             #[cfg(feature = "pdf")]
             Book::Pdf(p) => {
                 let mut slot = hd.flow.as_mut().and_then(|f| f.reflow.take());
@@ -951,7 +991,11 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_search(
                 doc
             }
             #[allow(unreachable_patterns)]
-            _ => Err("not a reflowable book".into()),
+            book => book
+                .flow()
+                .ok_or("not a reflowable book")?
+                .chapter(chapter.max(0) as usize)
+                .map_err(|e| e.to_string()),
         })?;
         let hits: Vec<jlong> = akkhor::flow::find_all(&doc, &query)
             .iter()

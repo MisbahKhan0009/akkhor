@@ -53,7 +53,9 @@ object Native {
     /** Closes a book; harmless twice. A call still running ends first. */
     external fun close(handle: Long)
 
-    /** 0 PDF, 1 EPUB, 2 TXT; -1 on error. */
+    /** 0 PDF, 1 EPUB, 2 TXT, 3 MOBI (AZW, AZW3, PalmDOC), 4 FB2,
+     *  5 CBZ (comic); -1 on error. PDF and CBZ are page books (page view);
+     *  the others are reflowable (layoutChapter). */
     external fun format(handle: Long): Int
 
     /** PDF pages, EPUB chapters, 1 for TXT. */
@@ -76,23 +78,24 @@ object Native {
     /** Frees caches; call from onTrimMemory. Bytes freed. */
     external fun trimMemory(handle: Long): Int
 
-    // --- PDF page view -----------------------------------------------
+    // --- Page view: PDF and comics (CBZ) -----------------------------
 
-    /** Page size in PDF points. */
+    /** Page size: PDF points, comic pixels. */
     external fun pageWidth(handle: Long, page: Int): Float
     external fun pageHeight(handle: Long, page: Int): Float
 
-    /** Draws the tile of `page` at `scale` (pixels per point) whose top
-     *  left is (x, y), the bitmap's size. 0 on success. Thumbnails: scale
-     *  = side / max(pageWidth, pageHeight). */
-    external fun renderPdfTile(handle: Long, page: Int, scale: Float,
-                               x: Int, y: Int, bitmap: Bitmap, theme: Int): Int
+    /** Draws the tile of `page` at `scale` (pixels per point, or per comic
+     *  pixel) whose top left is (x, y), the bitmap's size. 0 on success.
+     *  Thumbnails: scale = side / max(pageWidth, pageHeight). Comics keep
+     *  their colours (85% brightness on dark themes). */
+    external fun renderPageTile(handle: Long, page: Int, scale: Float,
+                                x: Int, y: Int, bitmap: Bitmap, theme: Int): Int
 
     /** Several tiles of one page, sharing its fonts and images; returns
      *  how many were drawn (cancelRendering stops before the next). */
-    external fun renderPdfTiles(handle: Long, page: Int, scale: Float,
-                                bitmaps: Array<Bitmap>, xs: IntArray, ys: IntArray,
-                                theme: Int): Int
+    external fun renderPageTiles(handle: Long, page: Int, scale: Float,
+                                 bitmaps: Array<Bitmap>, xs: IntArray, ys: IntArray,
+                                 theme: Int): Int
     external fun cancelRendering(handle: Long)
 
     /** Page text, positions as Longs: (page shl 32) or byte offset, boxes

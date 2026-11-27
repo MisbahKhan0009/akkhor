@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features: [pdf, "pdf,pdf-scans", "pdf,pdf-standard-fonts", "pdf,pdf-write", epub, txt, "pdf,pdf-cjk", "pdf,epub,txt"]
+        features: [pdf, "pdf,pdf-scans", "pdf,pdf-standard-fonts", "pdf,pdf-write", epub, txt, mobi, fb2, cbz, "pdf,pdf-cjk", "pdf,epub,txt"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

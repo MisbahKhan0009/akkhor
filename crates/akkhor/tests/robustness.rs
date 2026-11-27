@@ -115,6 +115,33 @@ fn exercise(bytes: Vec<u8>, name: &str, fonts: &FontSet) {
             }
             let _ = find_all(&t.document, "আমি");
         }
+        Book::Cbz(c) => {
+            for i in 0..c.page_count().min(3) {
+                let _ = c.render_page(i, 0.2, &Theme::NIGHT);
+            }
+        }
+        other => {
+            let _ = other.info();
+            let flow = other.flow().expect("reflowable");
+            for c in 0..flow.chapter_count().min(4) {
+                let Ok(doc) = flow.chapter(c) else { continue };
+                let images = flow.images(c);
+                let pages = paginate_with_images(&doc, &opts, fonts, images.as_deref());
+                if let Some(p) = pages.first() {
+                    let _ = render_page(
+                        p,
+                        fonts,
+                        images.as_deref(),
+                        &mut cache,
+                        &Theme::NIGHT,
+                        240,
+                        360,
+                        &mut px,
+                    );
+                }
+                let _ = find_all(&doc, "নদী");
+            }
+        }
     }
 }
 
@@ -167,6 +194,20 @@ fn damaged_files_never_panic() {
         &fonts,
     );
     run("small.pdf", &fixture("small.pdf"), &mut rng, 200, &fonts);
+    // Kindle, FictionBook and comics.
+    for (name, n) in [
+        ("bn.azw3", 150),
+        ("bn.kf7.mobi", 150),
+        ("rich.bn.fb2", 150),
+        ("manga.cbz", 40),
+    ] {
+        let data = std::fs::read(format!(
+            "{}/../../tests/corpus/formats/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        run(name, &data, &mut rng, n, &fonts);
+    }
     run("indic.pdf", &fixture("indic.pdf"), &mut rng, 120, &fonts);
     // LibreOffice output: renumbered subsets, symbol character maps.
     let lo = std::fs::read(format!(
