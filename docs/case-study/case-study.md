@@ -302,6 +302,18 @@ sentences for read aloud, and "share these pages" as a new PDF.
   search, and pages turned by `/Rotate` read one letter per line
   ([`data/phase5_fixes.csv`](data/phase5_fixes.csv)).
 
+### On a real phone
+
+On a Realme 9i, a mid-range phone (Snapdragon 680, Android 13), any book
+opens in under a millisecond, a PDF page at the phone's full width draws
+in about 30 ms, a reflowed screen in about 17 ms, and a chapter lays out
+in a few milliseconds, with 14 to 21 MB of memory added
+([`data/phone.csv`](data/phone.csv), [`data/phone_summary.csv`](data/phone_summary.csv)).
+The phone is two to three times slower than the cloud VM the other
+numbers come from. One cost stands out: the first Bangla or Hindi PDF
+of a run spends up to 0.4 s building tables from the reference fonts,
+once; keeping them on disk is next.
+
 ## Where Akkhor is behind (and what is next)
 
 Being honest about this is part of the point:

@@ -23,6 +23,8 @@ for f in "$@"; do
     case "$f" in /*) ;; *) f="$here/$f" ;; esac
     i=$((i + 1)); run "own-$i" "$f"
 done
+# The library screen: every book's card in one process, twice.
+note "{\"library\":[$(./akkhor-bench library books/* | paste -sd, -)]}"
 if [ -f books/big.pdf ]; then
     note "{\"big_last_page\":$(./akkhor-bench speed books/big.pdf 1999 2.5 3)}"
     note "{\"big_session_100_pages\":$(./akkhor-bench session books/big.pdf 100 2.5)}"

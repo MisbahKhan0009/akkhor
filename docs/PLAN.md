@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-27 (Phase 5 done, design answers applied; phone numbers pending)
+Last updated: 2026-11-27 (Phase 5 done, with numbers from a real phone)
 
 ---
 
@@ -210,7 +210,7 @@ Detailed design: [phases/phase-5.md](phases/phase-5.md). What the reader app nee
 
 Design answers from the app's design chat (5.12): the built-in themes take the final colours, photos show at 85% on dark themes, and English hyphenation follows the design's rules.
 
-Results: 54 engine calls documented in `Native.kt` and [api/android.md](api/android.md), checked against the library and called from a JVM in CI. Pages copied from all 79 test PDFs read and draw the same in MuPDF, PDFium and Poppler. Eight fuzz targets run on every push. The phone benchmark is built for arm64 by CI; its numbers wait for a run on a phone.
+Results: 54 engine calls documented in `Native.kt` and [api/android.md](api/android.md), checked against the library and called from a JVM in CI. Pages copied from all 79 test PDFs read and draw the same in MuPDF, PDFium and Poppler. Eight fuzz targets run on every push. On a Realme 9i (Snapdragon 680, Android 13): any book opens in under 1 ms, a PDF page at full phone width draws in 21 to 36 ms, a reflowed screen in 16 to 27 ms (14 to 17 ms again), a chapter lays out in 2 to 9 ms, and memory grows by 14 to 21 MB; the first Indic PDF's card costs 110 to 400 ms of one-time set-up (2 to 3 times the VM).
 
 Review: [reviews/phase-5.md](reviews/phase-5.md), 12 findings; four 🔴 fixed: a parser hang and an EPUB panic found by fuzzing, a close-while-searching deadlock, pages turned by `/Rotate` read letter by letter. Carried: turned pictures in reflow, the reference-font start-up cost, slow no-hit search on huge books.
 

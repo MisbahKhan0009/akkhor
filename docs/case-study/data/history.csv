@@ -59,3 +59,7 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-26,Phase 5,engine calls checked against Native.kt and run from a JVM,53,calls,GitHub Actions,check_native.py and NativeTest.java
 2026-11-26,Phase 5,bugs found by fuzzing and review,4,bugs,phase-5 review,a hang and a panic (fuzzing); a deadlock (review); turned pages read letter by letter (test file)
 2026-11-26,Phase 5,arm64 Android library size (app build),6.01,MB,GitHub Actions cargo-ndk,adds the app interface and the page writer (was 5.89)
+2026-11-27,Phase 5,a book opens on a phone (Realme 9i),0.5,ms median,akkhor-bench phone,Snapdragon 680 Android 13; PDF EPUB and TXT
+2026-11-27,Phase 5,first PDF page at phone width (1080 px) on a phone,29.8,ms median,akkhor-bench phone,Realme 9i; 21 to 36 ms across 4 PDFs
+2026-11-27,Phase 5,reflowed screen drawn on a phone,17.0,ms median,akkhor-bench phone,Realme 9i; 14 to 17 ms when drawn again
+2026-11-27,Phase 5,first Indic PDF library card on a phone (one-time set-up included),260,ms median,akkhor-bench phone,Realme 9i; 110 to 400 ms; later books on the VM 5 to 16 ms

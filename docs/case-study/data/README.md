@@ -26,6 +26,8 @@ run: `environment.json`.
 | `history.csv` | one row per milestone and metric | each row names where it was measured and its source |
 | `page_copies.csv` | Phase 5 page writer: per test PDF, the pages copied by Akkhor, then read in MuPDF, PDFium and Poppler | `scripts/bench/check_page_copies.py`: every page of files up to 4 pages (last first), else the last and first; same text (whitespace collapsed) and pixels at 72 dpi (a channel off by more than 8 counts); `qpdf --check` on the copy |
 | `phase5_fixes.csv` | the four wrong-output, crash and hang bugs fixed in Phase 5, with how each was found | from `docs/reviews/phase-5.md` |
+| `phone.csv` | Phase 5 on a real phone (Realme 9i, Snapdragon 680, Android 13) and the cloud VM, same books and steps; one row per book and pass (each pass a new process, like the app starting) | `akkhor-bench phone FILE` (`scripts/phone/`): 1080 × 2200 screen, 42 px text; times in ms, memory in MB added at peak |
+| `phone_summary.csv` | median of the warm passes per format and measure, phone against VM | from `phone.csv` |
 
 ## What to keep in mind
 

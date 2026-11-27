@@ -163,7 +163,7 @@ Page / Reflow switch are the app's.
 - [x] Colour themes from the app; `docs/api/android.md`, `Native.kt`, `apiVersion`; JVM test of every call
 - [x] Fuzz targets in CI; every crash found fixed with a test
 - [x] Missing-font hint
-- [ ] Phone numbers (with Misbah's phone): the benchmark is built by CI, waiting for a run
+- [x] Phone numbers: Realme 9i (Snapdragon 680, Android 13), [`phone.csv`](../case-study/data/phone.csv)
 - [x] Case study, review, CI green
 - [x] Design answers (5.12)
 

@@ -9,6 +9,7 @@
 //! akkhor-bench speed   FILE PAGE SCALE RUNS    open, first render, warm render
 //! akkhor-bench mem     FILE PAGE SCALE         resident memory before and at peak
 //! akkhor-bench survive FILE                    open, count, render and read page 1
+//! akkhor-bench library FILE...                 library cards for many books in one process
 //! akkhor-bench phone   FILE                    what the app does, timed (any format;
 //!                                              scripts/phone/README.md)
 //! akkhor-bench tiles   FILE PAGE SCALE         every 512×512 tile of a zoomed page
@@ -243,6 +244,7 @@ fn run(args: &[String]) -> Result<String, String> {
             ))
         }
         Some("phone") => phone(&arg(1)?),
+        Some("library") => library(&args[1..]),
         Some("survive") => {
             let outcome = (|| -> Result<(), String> {
                 let pdf = open(&arg(1)?)?;
@@ -375,6 +377,36 @@ fn phone(file: &str) -> Result<String, String> {
         status_kb("VmHWM:").saturating_sub(before) as f64 / 1024.0
     ));
     Ok(format!("{{{}}}", out.join(",")))
+}
+
+/// A library scan in one process, as the app does it: open, info and a
+/// cover for each file, twice. The first file pays the one-time costs.
+fn library(files: &[String]) -> Result<String, String> {
+    let mut rows = Vec::new();
+    for pass in ["first", "again"] {
+        for f in files {
+            let t = Instant::now();
+            let book = akkhor::open(f).map_err(|e| e.to_string())?;
+            let open = ms(t);
+            let t = Instant::now();
+            let info = book.info();
+            let info_ms = ms(t);
+            let t = Instant::now();
+            let cover = book.cover(300, 450);
+            let cover_ms = ms(t);
+            let name = std::path::Path::new(f)
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            rows.push(format!(
+                "{{\"file\":{},\"pass\":\"{pass}\",\"open_ms\":{open:.2},\"info_ms\":{info_ms:.2},\"cover_ms\":{cover_ms:.2},\"has_cover\":{},\"text_quality\":{}}}",
+                json_str(&name),
+                cover.is_some(),
+                info.text_quality.map_or("null".into(), |q| format!("{q:.3}"))
+            ));
+        }
+    }
+    Ok(rows.join("\n"))
 }
 
 fn main() -> std::process::ExitCode {

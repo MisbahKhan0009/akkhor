@@ -23,7 +23,7 @@ Severity: 🔴 must fix (wrong output, crash, hang) · 🟠 should fix ·
 | Page copies | 79 test PDFs: copied pages open in MuPDF, PDFium and Poppler with the same text and identical pixels at 72 dpi, and pass `qpdf --check`; the encrypted one is refused ([`page_copies.csv`](../case-study/data/page_copies.csv)). 11 pages of the real 41 MB book: 2.5 MB in 30 ms, identical in MuPDF |
 | Fuzzing | 8 targets; locally 1 to 2 minutes each, in CI 60 s each on every push to `main`. Found a hang and a panic (findings 1 and 2) |
 | `libakkhor.so` arm64, app build (CI) | 5.89 → 6.01 MB (the interface and the page writer); PDF only 5.26 MB |
-| Phone | the benchmark is built for arm64 by CI (`akkhor-bench-arm64`); numbers wait for a phone |
+| Phone | Realme 9i (Snapdragon 680, Android 13): see "On a real phone" below |
 
 ## Findings
 
@@ -38,7 +38,7 @@ Severity: 🔴 must fix (wrong output, crash, hang) · 🟠 should fix ·
 | 7 | fuzz CI | The prebuilt `cargo-fuzz` is a musl build and aimed the sanitizer build at musl: every target failed to compile on the first run. | 🟠 | Fixed: the target is named. |
 | 8 | page copies | Links, the outline and form fields' links to other pages are not copied; a copied form widget becomes a field of its own (full name and type from its parents). | 🟡 | Documented in `Native.kt` and `docs/api/android.md`. |
 | 9 | errors | An encrypted PDF refused for copying reports "file is DRM-protected", also when it opens with an empty password. | 🟡 | Documented; the app should say "this PDF is protected". |
-| 10 | cost | The first PDF opened in a process pays 130 to 170 ms (VM) for the reference fonts, so the library's first card is slower than the rest. | 🟡 | Documented; measure on the phone. |
+| 10 | cost | The first PDF opened in a process pays 130 to 170 ms (VM) for the reference fonts, so the library's first card is slower than the rest. | 🟡 | Measured on the phone: 110 to 400 ms, raised to 🟠 as finding 13. |
 | 11 | search | A whole-book search of the 2,000-page PDF with no hits takes 3.8 s; it runs in batches the app can stop, but a first hit deep in a large book is slow. | 🟡 | Documented. |
 | 12 | fuzzing reach | The PDF targets run 10 to 40 inputs a second (text recovery and reflow are heavy), so 60 s in CI is a shallow pass; the corpus is kept between runs to make up for it. | 🟡 | Documented. |
 
@@ -61,9 +61,35 @@ limit). Sent back: the font-pack hint should follow the engine's
 0.94 to 0.95 and a 0.85 threshold would miss them all. Open: no hyphen
 across a page break (needs the paginator).
 
+## On a real phone (2026-11-27)
+
+Misbah ran the benchmark on a Realme 9i (Snapdragon 680, Android 13);
+data in [`phone.csv`](../case-study/data/phone.csv) and
+[`phone_summary.csv`](../case-study/data/phone_summary.csv). The phone is
+2 to 3 times slower than the cloud VM.
+
+| Step (median, warm file cache) | Phone | VM |
+|---|---|---|
+| Open a book | 0.5 ms | 0.1 ms |
+| PDF page at full width (1080 px), first time | 30 ms | 15 ms |
+| PDF page text | 8 ms | 2 ms |
+| Reflowed screen, first draw / again | 17 / 15 ms | 8 / 5 ms |
+| Chapter layout | 2 to 6 ms | 1 ms |
+| Memory added at peak | 14 to 21 MB | 14 to 27 MB |
+| First Indic PDF's card (info), with one-time set-up | 110 to 400 ms | 40 to 150 ms |
+
+New findings:
+
+| # | Finding | Sev. | Status |
+|---|---|---|---|
+| 13 | The first Bangla or Hindi PDF of a run costs 110 to 400 ms for its card: building the reference fonts' glyph tables, once per process (Chrome-made PDFs need the deepest tables). Later books on the VM: 5 to 16 ms. | 🟠 | App: warm the engine on a background thread at start. Engine (next phase): keep the tables on disk between runs. `akkhor-bench library` now measures a whole library in one process. |
+| 14 | Drawing a reflowed screen again costs 15 ms on the phone (5 on the VM): glyphs are rasterised from outlines every time; only the outlines are cached. Fine for page turns (a page is drawn once, ahead), tight for scrolling. | 🟡 | Open: a cache of rasterised glyphs. |
+
 ## Result
 
 🔴 four found, all fixed (two by fuzzing, one by review, one by a new
-test file). 🟠 fixed. 🟡 documented or carried: turned pictures in
-reflow, the reference-font start-up cost, slow no-hit search on huge
-books. Still open from the plan: numbers from a real phone.
+test file). 🟠 6 and 7 fixed; 13 (the first Indic PDF's one-time font
+tables, up to 0.4 s on a phone) carried to the next phase: keep them on
+disk. 🟡 documented or carried: turned pictures in reflow, slow no-hit
+search on huge books, a cache of drawn glyphs (finding 14). Nothing from
+the plan is open.
