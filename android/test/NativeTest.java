@@ -40,6 +40,17 @@ public class NativeTest {
         check(Native.info(999_999) == null, "info of a bad handle");
         check(Native.clampLocator(999_999, "not a locator") == null, "a bad locator");
 
+        // Cache folder: made if missing, stale tables removed, set once.
+        java.io.File cache = java.nio.file.Files.createTempDirectory("akkhor-cache").toFile();
+        java.io.File stale = new java.io.File(cache, "akkhor-0000000000000000-deep1-0000000000000000.bin");
+        check(stale.createNewFile(), "a stale table");
+        java.io.File foreign = new java.io.File(cache, "someone-else.bin");
+        check(foreign.createNewFile(), "a file that is not ours");
+        check(Native.setCacheDir(cache.getPath()), "setCacheDir");
+        check(!stale.exists(), "stale tables removed");
+        check(foreign.exists(), "other files kept");
+        check(!Native.setCacheDir(root), "setCacheDir only once");
+
         Native.registerFont("Latn", root + "/fonts/NotoSerif-Regular.ttf");
         Native.registerFont("Beng", root + "/fonts/NotoSerifBengali-Regular.ttf");
         Native.registerFont("Deva", root + "/fonts/NotoSerifDevanagari-Regular.ttf");

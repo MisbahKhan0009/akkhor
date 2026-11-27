@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use akkhor::{Book, Format, Source, Theme};
-use jni_sys::{JNIEnv, jclass, jfloat, jint, jlong, jobject, jstring};
+use jni_sys::{JNIEnv, jboolean, jclass, jfloat, jint, jlong, jobject, jstring};
 
 #[cfg(feature = "flow")]
 use akkhor::flow::{FontSet, GlyphCache, LayoutOptions, Page, Script, fonts::FontData};
@@ -236,6 +236,27 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_registerStandardFont(
         let src = akkhor::Source::open(&path).map_err(|e| e.to_string())?;
         akkhor::pdf::register_standard_font(&name, src.shared());
         Ok(())
+    })
+}
+
+/// The app's cache folder. Tables the engine builds from registered fonts
+/// (a few tens of milliseconds each) are kept there, keyed by the font's
+/// bytes and the engine build. Only the first call counts.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_dev_akkhor_Native_setCacheDir(
+    env: *mut JNIEnv,
+    _: jclass,
+    path: jstring,
+) -> jboolean {
+    guard(0, || {
+        let path = unsafe { jstr(env, path) }.ok_or("path is null")?;
+        #[cfg(feature = "pdf")]
+        return Ok(u8::from(akkhor::pdf::set_cache_dir(path)));
+        #[cfg(not(feature = "pdf"))]
+        {
+            let _ = path;
+            Ok(1)
+        }
     })
 }
 

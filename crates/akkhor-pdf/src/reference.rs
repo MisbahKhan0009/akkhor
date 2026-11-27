@@ -24,6 +24,7 @@ use skrifa::{FontRef, GlyphId, MetadataProvider};
 
 use crate::recover::{self, GlyphText, Recovery};
 use crate::shape::Shape;
+use crate::stored;
 
 type Data = Arc<dyn AsRef<[u8]> + Send + Sync>;
 
@@ -52,6 +53,8 @@ struct ReferenceFont {
     /// advance in 1000-unit ems, shape), 264 bytes a glyph.
     pictures: OnceLock<Vec<(u32, f32, Shape)>>,
     name: OnceLock<Option<String>>,
+    /// Hash of the font's bytes, naming its tables on disk.
+    key: OnceLock<u64>,
 }
 
 /// A font name without subset prefix, spaces, dashes or case:
@@ -68,16 +71,32 @@ fn normalized_name(name: &str) -> String {
 }
 
 impl ReferenceFont {
+    fn key(&self) -> u64 {
+        *self
+            .key
+            .get_or_init(|| stored::font_key((*self.data).as_ref()))
+    }
+
+    /// A recovery table, from disk when kept there (see `stored`).
+    fn table(&self, deep: bool) -> Option<Arc<Recovery>> {
+        let names = GLYPH_NAMES.load(Ordering::Relaxed);
+        let kind = format!("{}{}", if deep { "deep" } else { "quick" }, u8::from(names));
+        stored::cached(
+            self.key(),
+            &kind,
+            || build(&self.data, deep),
+            stored::write_recovery,
+            stored::read_recovery,
+        )
+        .map(Arc::new)
+    }
+
     fn recovery(&self) -> Option<&Arc<Recovery>> {
-        self.recovery
-            .get_or_init(|| build(&self.data, false).map(Arc::new))
-            .as_ref()
+        self.recovery.get_or_init(|| self.table(false)).as_ref()
     }
 
     fn deep_recovery(&self) -> Option<&Arc<Recovery>> {
-        self.deep
-            .get_or_init(|| build(&self.data, true).map(Arc::new))
-            .as_ref()
+        self.deep.get_or_init(|| self.table(true)).as_ref()
     }
 
     /// The PostScript name, normalized (see [`normalized_name`]).
@@ -94,11 +113,19 @@ impl ReferenceFont {
 
     fn shapes(&self) -> &HashMap<u64, u32> {
         self.shapes.get_or_init(|| {
-            let mut index = HashMap::new();
-            for (gid, hash) in outline_hashes((*self.data).as_ref()).0 {
-                index.entry(hash).or_insert(gid);
-            }
-            index
+            stored::cached(
+                self.key(),
+                "shapes",
+                || {
+                    let mut index = HashMap::new();
+                    for (gid, hash) in outline_hashes((*self.data).as_ref()).0 {
+                        index.entry(hash).or_insert(gid);
+                    }
+                    index
+                },
+                stored::write_shapes,
+                stored::read_shapes,
+            )
         })
     }
 }
@@ -106,6 +133,18 @@ impl ReferenceFont {
 impl ReferenceFont {
     fn pictures(&self) -> &[(u32, f32, Shape)] {
         self.pictures.get_or_init(|| {
+            stored::cached(
+                self.key(),
+                "pictures",
+                || self.draw_pictures(),
+                |v, w| stored::write_pictures(v, w),
+                stored::read_pictures,
+            )
+        })
+    }
+
+    fn draw_pictures(&self) -> Vec<(u32, f32, Shape)> {
+        {
             let mut out = Vec::new();
             let Ok(font) = FontRef::new((*self.data).as_ref()) else {
                 return out;
@@ -136,7 +175,7 @@ impl ReferenceFont {
                 out.push((gid, advance, shape));
             }
             out
-        })
+        }
     }
 }
 
@@ -315,6 +354,7 @@ fn registry() -> &'static Mutex<Vec<Arc<ReferenceFont>>> {
                 shapes: OnceLock::new(),
                 pictures: OnceLock::new(),
                 name: OnceLock::new(),
+                key: OnceLock::new(),
             }));
         }
         Mutex::new(fonts)
@@ -332,6 +372,7 @@ pub fn register_reference_font(data: Arc<dyn AsRef<[u8]> + Send + Sync>) {
         shapes: OnceLock::new(),
         pictures: OnceLock::new(),
         name: OnceLock::new(),
+        key: OnceLock::new(),
     });
     registry()
         .lock()
@@ -529,5 +570,32 @@ impl OutlinePen for HashPen {
     }
     fn close(&mut self) {
         self.op(4, &[]);
+    }
+}
+
+/// Times building each table for every registered font (for tuning).
+#[doc(hidden)]
+pub fn print_build_times() {
+    for f in references() {
+        let t = std::time::Instant::now();
+        let _ = f.shapes().len();
+        let shapes = t.elapsed();
+        let t = std::time::Instant::now();
+        let _ = f.recovery().is_some();
+        let quick = t.elapsed();
+        let t = std::time::Instant::now();
+        let _ = f.deep_recovery().is_some();
+        let deep = t.elapsed();
+        let t = std::time::Instant::now();
+        let _ = f.pictures().len();
+        let pictures = t.elapsed();
+        println!(
+            "{:40} shapes {:>8.1?} quick {:>8.1?} deep {:>8.1?} pictures {:>8.1?}",
+            f.name().clone().unwrap_or_default(),
+            shapes,
+            quick,
+            deep,
+            pictures
+        );
     }
 }

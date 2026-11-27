@@ -154,6 +154,10 @@ fn write_png(path: &str, w: u32, h: u32, premul: Vec<u8>) -> Result<(), String> 
 }
 
 fn run(args: Args) -> Result<(), String> {
+    // Reference-font tables kept between runs, as an app keeps them.
+    if let Ok(dir) = std::env::var("AKKHOR_CACHE_DIR") {
+        akkhor::pdf::set_cache_dir(dir);
+    }
     let file_mb = std::fs::metadata(&args.file)
         .map(|m| m.len() as f64 / 1e6)
         .unwrap_or(0.0);

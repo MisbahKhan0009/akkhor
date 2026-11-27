@@ -34,6 +34,9 @@ refuse to run with an engine whose version differs from `Native.API_VERSION`.
 
 ```kotlin
 check(Native.apiVersion() == Native.API_VERSION)
+// Tables built from the fonts below (tens of ms each) are kept here and
+// read back in a few ms on later starts. Old ones are removed.
+Native.setCacheDir(context.cacheDir.resolve("akkhor").path)
 // The phone's fonts: used for drawing, and to read PDFs that embed
 // stripped copies of them.
 Native.registerFont("Latn", "/system/fonts/NotoSerif-Regular.ttf")

@@ -20,8 +20,10 @@ pub mod recover;
 pub mod reference;
 pub mod reflow;
 pub mod shape;
+mod stored;
 pub mod structure;
 pub mod tables;
+pub use stored::set_cache_dir;
 pub mod text;
 mod theme;
 #[cfg(feature = "write")]

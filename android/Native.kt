@@ -27,6 +27,11 @@ object Native {
     /** Why the last call on this thread failed. */
     external fun lastError(): String?
 
+    /** The app's cache folder (`context.cacheDir`). Tables the engine
+     *  builds from registered fonts are kept there. Call once, before
+     *  registerFont. False if the folder can't be made or one is set. */
+    external fun setCacheDir(path: String): Boolean
+
     /** A font for a script ("Latn", "Beng", "Deva", "Guru", "Gujr", "Orya",
      *  "Taml", "Telu", "Knda", "Mlym"); also used to read PDFs that embed
      *  stripped copies of it. Register the phone's fonts at start-up. */
