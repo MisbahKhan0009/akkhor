@@ -26,7 +26,7 @@ fix · 🟡 improve or document.
 | Speed, VM | every new-format book opens in under 0.2 ms; card (cover) 3 to 5 ms; first reflowed screen 4 to 8 ms; a comic page at phone width 12 to 16 ms ([`phase6_vm.csv`](../case-study/data/phase6_vm.csv)) |
 | Glyph masks | redrawing a screen 2.1 to 2.7 times faster on 8 books; first and next screens never slower ([`glyph_masks.csv`](../case-study/data/glyph_masks.csv)) |
 | Reference-font tables | built in 2 to 85 ms, read back from disk in 0.04 to 0.8 ms ([`ref_tables.csv`](../case-study/data/ref_tables.csv)) |
-| Phone | not yet run for Phase 6: the CI bundle now carries an AZW3, a MOBI 7, an FB2 and a comic |
+| Phone | Realme 9i (Snapdragon 680, Android 13), see "On the phone" below ([`phone_phase6.csv`](../case-study/data/phone_phase6.csv)) |
 
 ## Findings
 
@@ -57,6 +57,25 @@ only `akkhor-*.bin` files of older engines; the turned-picture maths (an
 exact inverse for all three turns, by test); carrying hyphenated lines
 keeps every line on its page and the text complete (600 page sizes, by
 test).
+
+## On the phone
+
+Realme 9i, the same phone as Phase 5, medians of the warm passes:
+
+| Measure | Phase 5 | Phase 6 |
+|---|---|---|
+| Redrawing a reflowed screen (5 books) | 13.5 to 15.9 ms | 3.6 to 5.6 ms |
+| Drawing a reflowed screen the first time (PDF reflow) | 16.1 to 17.3 ms | 17.5 to 19.3 ms |
+| A Kindle or FB2 book: open / card / first screen | | 0.2 to 1 ms / 6 to 18 ms / 7.5 to 11 ms |
+| A comic page at 1080 px, and again | | 52 ms, 47 ms |
+| First Bangla or Hindi PDF's card | 110 to 400 ms | 110 to 400 ms (not tested, see 19) |
+| Memory added | 14 to 21 MB | 11 to 21 MB |
+
+| # | Where | Finding | Sev. | Status |
+|---|---|---|---|---|
+| 18 | Glyph masks, phone | The first draw of a reflowed PDF screen is 1.4 to 2 ms slower than in Phase 5 (8 to 12%): making the masks costs more than filling outlines once. The VM showed no loss. Redraws are 2.7 to 4.2 times faster, so a page drawn ahead and shown later comes out ahead. | 🟡 | Accepted. |
+| 19 | Phone benchmark | The benchmark never set a cache folder, so the reference-font tables on disk (6.8) were not used on the phone and the first Indic PDF's card stayed at 400 ms. Not an engine bug; the bench didn't do what the app does. | 🟠 | Fixed: `akkhor-bench` reads `AKKHOR_CACHE_DIR`, and `on-phone.sh` sets it (emptied first). Needs a second phone run. |
+| 20 | Comics, phone | A comic page took 47 to 52 ms on the phone (3.5 times the VM). | 🟠 | Faster again: two colour channels per multiply, each source row blended across once. VM 12 to 16 ms → 6 ms; phone numbers in the next run. |
 
 ## Result
 

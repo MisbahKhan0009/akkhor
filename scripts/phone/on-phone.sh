@@ -7,6 +7,10 @@
 here=$(pwd)
 cd "$(dirname "$0")" || exit 1
 chmod 755 akkhor-bench
+# The app's cache folder: emptied, so the first run of each book builds the
+# reference-font tables and later runs (new processes) read them back.
+rm -rf cache
+export AKKHOR_CACHE_DIR="$(pwd)/cache"
 out=results.jsonl
 : > $out
 note() { echo "$1" | tee -a $out; }

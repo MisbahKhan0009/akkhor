@@ -424,6 +424,11 @@ fn library(files: &[String]) -> Result<String, String> {
 }
 
 fn main() -> std::process::ExitCode {
+    // Reference-font tables kept between runs, as the app keeps them in its
+    // cache folder (Native.setCacheDir).
+    if let Ok(dir) = std::env::var("AKKHOR_CACHE_DIR") {
+        akkhor::pdf::set_cache_dir(dir);
+    }
     register_fonts();
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {

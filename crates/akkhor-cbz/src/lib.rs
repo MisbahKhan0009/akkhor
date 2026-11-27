@@ -237,24 +237,45 @@ impl CbzBook {
             };
             let cols = axis(x, w, img.width);
             let rows = axis(y, h, img.height);
+            // Each source row is blended across once, into packed pixels,
+            // and kept while output rows still need it.
+            let across = |row: usize, out: &mut Vec<u32>| {
+                out.clear();
+                let r = row * iw;
+                out.extend(
+                    cols.iter()
+                        .map(|&(x0, x1, fx)| lerp(pack(src, r + x0), pack(src, r + x1), fx)),
+                );
+            };
+            let (mut top, mut bottom) = (
+                Vec::with_capacity(cols.len()),
+                Vec::with_capacity(cols.len()),
+            );
+            let (mut have_top, mut have_bottom) = (usize::MAX, usize::MAX);
             for (oy, &(y0, y1, fy)) in rows.iter().enumerate() {
-                let (r0, r1) = (y0 * iw, y1 * iw);
-                for (ox, &(x0, x1, fx)) in cols.iter().enumerate() {
-                    let (a, b) = ((r0 + x0) * 4, (r0 + x1) * 4);
-                    let (c, d) = ((r1 + x0) * 4, (r1 + x1) * 4);
-                    let (a, b, c, d) = (
-                        &src[a..a + 4],
-                        &src[b..b + 4],
-                        &src[c..c + 4],
-                        &src[d..d + 4],
-                    );
-                    let mut px = [0u32; 4];
-                    for k in 0..4 {
-                        let top = u32::from(a[k]) * (256 - fx) + u32::from(b[k]) * fx;
-                        let bottom = u32::from(c[k]) * (256 - fx) + u32::from(d[k]) * fx;
-                        px[k] = (top * (256 - fy) + bottom * fy + (1 << 15)) >> 16;
+                if have_top != y0 {
+                    if have_bottom == y0 {
+                        std::mem::swap(&mut top, &mut bottom);
+                        have_bottom = usize::MAX;
+                    } else {
+                        across(y0, &mut top);
                     }
-                    put((oy * w as usize + ox) * 4, px, &mut pixels);
+                    have_top = y0;
+                }
+                if have_bottom != y1 {
+                    across(y1, &mut bottom);
+                    have_bottom = y1;
+                }
+                let out = &mut pixels[oy * w as usize * 4..(oy + 1) * w as usize * 4];
+                for ((o, &t), &b) in out.as_chunks_mut::<4>().0.iter_mut().zip(&top).zip(&bottom) {
+                    let v = lerp(t, b, fy).to_le_bytes();
+                    if v[3] == 255 && dim == 256 {
+                        *o = v;
+                    } else {
+                        let mut q = [0u8; 4];
+                        put_into(&mut q, v.map(u32::from), dim);
+                        *o = q;
+                    }
                 }
             }
         } else {
@@ -317,6 +338,38 @@ impl CbzBook {
             .map(|img| img.rgba.len())
             .sum()
     }
+}
+
+/// The RGBA pixel at index `i`, packed little-endian.
+#[inline]
+fn pack(src: &[u8], i: usize) -> u32 {
+    let p = &src[i * 4..i * 4 + 4];
+    u32::from_le_bytes([p[0], p[1], p[2], p[3]])
+}
+
+/// Blends packed pixels `a` and `b`, `f`/256 of the way to `b`: red and
+/// blue in one multiply, green and alpha in another.
+#[inline]
+fn lerp(a: u32, b: u32, f: u32) -> u32 {
+    let g = 256 - f;
+    let rb = (((a & 0x00ff_00ff) * g + (b & 0x00ff_00ff) * f + 0x0080_0080) >> 8) & 0x00ff_00ff;
+    let ga = ((((a >> 8) & 0x00ff_00ff) * g + ((b >> 8) & 0x00ff_00ff) * f + 0x0080_0080) >> 8)
+        & 0x00ff_00ff;
+    rb | (ga << 8)
+}
+
+/// Writes a straight-alpha pixel premultiplied and dimmed (`dim`/256).
+#[inline]
+fn put_into(out: &mut [u8; 4], px: [u32; 4], dim: u32) {
+    let a = px[3];
+    for c in 0..3 {
+        out[c] = if a == 255 {
+            ((px[c] * dim) >> 8) as u8
+        } else {
+            ((px[c] * a / 255 * dim) >> 8) as u8
+        };
+    }
+    out[3] = a as u8;
 }
 
 fn is_page_name(name: &str) -> bool {

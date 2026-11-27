@@ -69,3 +69,4 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-27,Phase 6,reference-font tables read from disk,0.04-0.8,ms,reftimes example on the VM,built in 2 to 85 ms
 2026-11-27,Phase 6,comic page at phone width (1080 px),12-16,ms,akkhor-bench phone on the VM,was 44 ms
 2026-11-27,Phase 6,crash bugs found by fuzzing and review,5,bugs,cargo fuzz (stable) + review,all fixed with tests
+2026-11-27,Phase 6,redraw of a reflowed screen on a phone,3.6-5.6,ms median,akkhor-bench phone,Realme 9i; was 13.5 to 15.9 ms in Phase 5
