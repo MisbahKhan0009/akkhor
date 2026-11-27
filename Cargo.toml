@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/akkhor-core", "crates/akkhor-pdf", "crates/akkhor-flow", "crates/akkhor-epub", "crates/akkhor", "crates/akkhor-cli", "crates/akkhor-android"]
+members = ["crates/akkhor-core", "crates/akkhor-pdf", "crates/akkhor-flow", "crates/akkhor-epub", "crates/akkhor-mobi", "crates/akkhor", "crates/akkhor-cli", "crates/akkhor-android"]
 exclude = ["vendor"]
 
 [workspace.package]
@@ -16,6 +16,7 @@ akkhor-core = { path = "crates/akkhor-core", version = "0.1.0" }
 akkhor-pdf = { path = "crates/akkhor-pdf", version = "0.1.0", default-features = false }
 akkhor-flow = { path = "crates/akkhor-flow", version = "0.1.0" }
 akkhor-epub = { path = "crates/akkhor-epub", version = "0.1.0" }
+akkhor-mobi = { path = "crates/akkhor-mobi", version = "0.1.0" }
 akkhor = { path = "crates/akkhor", version = "0.1.0", default-features = false }
 
 memmap2 = "0.9"

@@ -1,0 +1,18 @@
+[package]
+name = "akkhor-mobi"
+description = "MOBI, AZW, AZW3 (KF8) and PalmDOC support for the Akkhor reading engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+akkhor-core.workspace = true
+akkhor-flow.workspace = true
+miniz_oxide.workspace = true
+
+[dev-dependencies]
+akkhor-flow = { workspace = true, features = ["bundled-fonts"] }
+akkhor-epub.workspace = true

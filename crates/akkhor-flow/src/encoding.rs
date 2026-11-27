@@ -32,7 +32,8 @@ const CP1252_HIGH: [u16; 32] = [
     0x2122, 0x0161, 0x203A, 0x0153, 0, 0x017E, 0x0178,
 ];
 
-fn decode_cp1252(b: &[u8]) -> String {
+/// Windows-1252 bytes as text (MOBI books, FB2 files that declare it).
+pub fn decode_cp1252(b: &[u8]) -> String {
     b.iter()
         .map(|&c| match c {
             0x80..=0x9F => char::from_u32(CP1252_HIGH[(c - 0x80) as usize] as u32)

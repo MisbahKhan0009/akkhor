@@ -70,6 +70,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "akkhor-mobi"
+version = "0.1.0"
+dependencies = [
+ "akkhor-core",
+ "akkhor-epub",
+ "akkhor-flow",
+ "miniz_oxide 0.8.9",
+]
+
+[[package]]
 name = "akkhor-pdf"
 version = "0.1.0"
 dependencies = [
