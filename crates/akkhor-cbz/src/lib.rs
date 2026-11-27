@@ -4,8 +4,9 @@
 //! `ComicInfo.xml`, when present, gives title, series, number, writer,
 //! language, the front cover and right-to-left reading (manga). A page's
 //! size comes from its picture's header, so opening and laying out cost
-//! nothing; a page is decoded when drawn and kept until another page is
-//! drawn, so at most one comic page sits in memory.
+//! nothing. A page is decoded when first drawn, once even when several
+//! threads draw its tiles, and kept for redraws with the pages around it
+//! up to 64 MB (always the last one used); `trim` frees them.
 
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -21,6 +22,14 @@ const MAX_PIXELS: u64 = 40_000_000;
 /// A decoded page is kept at most this big; larger ones are scaled down
 /// once (to about 12 megapixels, still sharp at 3x zoom on a phone).
 const KEEP_PIXELS: u64 = 12_000_000;
+
+/// Decoded pages kept for redraws, the page being drawn ahead and a turn
+/// back: at most this many bytes, and always the last one used.
+const KEEP_BYTES: usize = 64 << 20;
+
+/// A page being decoded or decoded: threads wanting the same page wait for
+/// one decode instead of each doing it.
+type Slot = Arc<OnceLock<Option<Arc<DecodedImage>>>>;
 
 const PICTURES: [&str; 6] = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".jfif"];
 
@@ -49,8 +58,8 @@ pub struct CbzBook {
     /// Archive names of the pages, in reading order.
     pages: Vec<String>,
     pub metadata: Metadata,
-    /// The last page decoded.
-    decoded: Mutex<Option<(usize, Arc<DecodedImage>)>>,
+    /// Pages decoded, most recently used last.
+    decoded: Mutex<Vec<(usize, Slot)>>,
     /// Each page's size, read once from its picture's header.
     sizes: Vec<OnceLock<Option<(u32, u32)>>>,
 }
@@ -94,7 +103,7 @@ impl CbzBook {
             zip,
             pages,
             metadata,
-            decoded: Mutex::new(None),
+            decoded: Mutex::new(Vec::new()),
             sizes,
         })
     }
@@ -125,15 +134,36 @@ impl CbzBook {
     }
 
     fn decode(&self, index: usize) -> Result<Arc<DecodedImage>> {
-        if let Ok(g) = self.decoded.lock()
-            && let Some((i, img)) = g.as_ref()
-            && *i == index
-        {
-            return Ok(img.clone());
+        if index >= self.pages.len() {
+            return Err(Error::OutOfRange);
         }
-        let bytes = self.page_bytes(index)?;
-        let mut img =
-            decode_up_to(&bytes, MAX_PIXELS).ok_or(Error::malformed("undecodable picture"))?;
+        let slot = {
+            let mut g = self.decoded.lock().unwrap_or_else(|e| e.into_inner());
+            let slot = match g.iter().position(|(i, _)| *i == index) {
+                Some(p) => g.remove(p).1,
+                None => Slot::default(),
+            };
+            g.push((index, slot.clone()));
+            slot
+        };
+        let img = slot.get_or_init(|| self.decode_page(index)).clone();
+        self.keep_within_budget();
+        img.ok_or(Error::malformed("undecodable picture"))
+    }
+
+    /// Drops the least recently used pages beyond [`KEEP_BYTES`].
+    fn keep_within_budget(&self) {
+        let mut g = self.decoded.lock().unwrap_or_else(|e| e.into_inner());
+        let size = |s: &Slot| s.get().and_then(|o| o.as_ref()).map_or(0, |i| i.rgba.len());
+        let mut total: usize = g.iter().map(|(_, s)| size(s)).sum();
+        while total > KEEP_BYTES && g.len() > 1 {
+            total -= size(&g.remove(0).1);
+        }
+    }
+
+    fn decode_page(&self, index: usize) -> Option<Arc<DecodedImage>> {
+        let bytes = self.page_bytes(index).ok()?;
+        let mut img = decode_up_to(&bytes, MAX_PIXELS)?;
         let px = u64::from(img.width) * u64::from(img.height);
         if px > KEEP_PIXELS {
             let k = (KEEP_PIXELS as f64 / px as f64).sqrt();
@@ -147,11 +177,7 @@ impl CbzBook {
                 rgba: akkhor_flow::image::resize(&img, w, h),
             };
         }
-        let img = Arc::new(img);
-        if let Ok(mut g) = self.decoded.lock() {
-            *g = Some((index, img.clone()));
-        }
-        Ok(img)
+        Some(Arc::new(img))
     }
 
     /// Draws `tile` (pixels of the page shown at `scale`; 1.0 = the
@@ -283,18 +309,16 @@ impl CbzBook {
         self.render_tile(index, scale, Tile::new(0, 0, w, h), theme)
     }
 
-    /// Frees the decoded page.
+    /// Frees the decoded pages; returns the bytes they held.
     pub fn trim(&self) -> usize {
-        self.decoded
-            .lock()
-            .ok()
-            .and_then(|mut g| g.take())
-            .map_or(0, |(_, img)| img.rgba.len())
+        let mut g = self.decoded.lock().unwrap_or_else(|e| e.into_inner());
+        g.drain(..)
+            .filter_map(|(_, s)| s.get().cloned().flatten())
+            .map(|img| img.rgba.len())
+            .sum()
     }
 }
 
-/// The average colour of the source area `[x0, x1) x [y0, y1)` (box
-/// filter when shrinking, nearest pixel when enlarging).
 fn is_page_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     let file = lower.rsplit('/').next().unwrap_or(&lower);

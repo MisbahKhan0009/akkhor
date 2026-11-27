@@ -105,3 +105,40 @@ fn rar_7z_and_damaged_archives() {
         }
     }
 }
+
+/// Two pages drawn in turn, tile by tile (the page on screen and the one
+/// drawn ahead), from several threads: each page is decoded once and kept;
+/// trim frees both.
+#[test]
+fn pages_drawn_side_by_side_stay_decoded() {
+    let book = std::sync::Arc::new(open("mixed.cbz"));
+    std::thread::scope(|s| {
+        for t in 0..4u32 {
+            let book = book.clone();
+            s.spawn(move || {
+                for k in 0..8u32 {
+                    let page = ((t + k) % 2) as usize;
+                    let tile = Tile::new(8 * k, 8 * t, 16, 16);
+                    book.render_tile(page, 0.5, tile, &Theme::PAPER).unwrap();
+                }
+            });
+        }
+    });
+    // Drawn again: no decode, so fast even in a debug build.
+    let t = std::time::Instant::now();
+    for _ in 0..20 {
+        for page in 0..2 {
+            book.render_tile(page, 0.5, Tile::new(0, 0, 4, 4), &Theme::PAPER)
+                .unwrap();
+        }
+    }
+    let again = t.elapsed();
+    assert!(book.trim() > 0);
+    assert_eq!(book.trim(), 0);
+    let t = std::time::Instant::now();
+    book.render_tile(0, 0.5, Tile::new(0, 0, 4, 4), &Theme::PAPER)
+        .unwrap();
+    let decode = t.elapsed();
+    // 40 cached draws cost less than one decode.
+    assert!(again < decode, "{again:?} vs one decode {decode:?}");
+}
