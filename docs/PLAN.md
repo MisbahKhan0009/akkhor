@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-27 (Phase 6 planned)
+Last updated: 2026-11-27 (Phases 6 and 6b planned)
 
 ---
 
@@ -218,6 +218,10 @@ Review: [reviews/phase-5.md](reviews/phase-5.md), 12 findings; four 🔴 fixed: 
 
 Detailed design: [phases/phase-6.md](phases/phase-6.md). The engine is finished before the reader app starts, so the app is written once. MOBI/AZW3 (PalmDB, PalmDOC and HUFF/CDIC decompression, KF8 skeleton/fragments → HTML → `Document`), FB2, CBZ behind the same calls as EPUB, PDF and TXT; DRM-protected files are detected and reported, never opened. Also the engine items Phase 5 carried: reference-font tables kept on disk, a glyph bitmap cache, upright pictures from turned pages, no hyphen on a page's last line, and neutral names for page-view calls while no app exists.
 
+### Phase 6b: What the app's screens need from the engine ⬜
+
+Detailed design: [phases/phase-6b.md](phases/phase-6b.md). Read from the finished screen spec (79 boards), board by board: layout options (justify off by default, margins, line height, font family), links drawn and followed (footnote pop-ups), pictures on a screen for figure zoom, paragraphs for TalkBack, one outline call for every format, `peek` for protected and unsupported files, error codes and PDF passwords, file fingerprints, finding a stored quote again, PDF export with progress and cancel, and the engine version. After this, the reader app starts.
+
 ### Phase 7: More scripts ⬜
 
 Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam fonts and test corpora; Sinhala syllable rules; then bidi and right-to-left (Arabic, Urdu), then CJK line breaking.
@@ -226,7 +230,7 @@ Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam fonts and test corpo
 
 Fuzzing kept up as formats arrive (started in Phase 5), a real-world file corpus in CI, benchmarks against MuPDF as the bar to beat, Android AAR packaging, crates.io release, API docs.
 
-After Phase 6: the reader app, in its own repository (designed separately); Phases 7 and 8 continue alongside it without changing what the app calls.
+After Phase 6b: the reader app, in its own repository (designed separately); Phases 7 and 8 continue alongside it without changing what the app calls.
 
 ## 5. Targets (to measure, not promises)
 

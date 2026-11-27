@@ -4,8 +4,10 @@ Status: planned (2026-11-27). Misbah's call: finish the engine before the
 reader app, so the app is written once against an engine that does not
 change under it. This phase adds MOBI/AZW3, FB2 and CBZ behind the same
 calls as EPUB, PDF and TXT, and clears the engine items Phase 5 carried.
-More scripts stay in Phase 7, release work in Phase 8; neither changes
-what the app calls.
+What the app's screens need beyond formats (layout options, links,
+TalkBack paragraphs, error codes and more) is Phase 6b, also before the
+app. More scripts stay in Phase 7, release work in Phase 8; neither
+changes what the app calls.
 
 ## Starting point (2026-11-27)
 
