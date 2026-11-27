@@ -24,6 +24,7 @@ additions only.
 | S08 Page range | the size of the PDF that chosen pages will make, before making it | none |
 | S14 PDF export | real progress while writing, and stopping it (the partial file removed) | `pdfWritePages` runs to the end in one call |
 | T07 About | the engine's version | none |
+| R01 Reader (review of Phase 6, finding 11) | the first screen of any book quickly, whatever its chapters | `layoutChapter` lays a whole chapter out first: a 2.6 MB single-chapter book takes about 0.4 s on the VM, likely over a second on a phone |
 
 ## 6b.1 Layout options
 
@@ -95,6 +96,18 @@ small ranges.
 `version()`: the engine's version string (the crate version and the git
 commit CI built).
 
+## 6b.11 Long chapters in parts
+
+A chapter longer than about 64 KB of text is split into parts at
+paragraph boundaries, inside the engine: `chapterCount`, `layoutChapter`,
+locators, progress, search and the contents all count parts, so the app
+never sees a long chapter and calls nothing new. The split is fixed by
+the chapter's text (not the screen), so locators stay valid across font
+and screen sizes. The contents point at the part holding each entry.
+Applies to every reflowable format (TXT, EPUB, MOBI, FB2, PDF reflow).
+Target: first screen of the 2.6 MB single-chapter Bangla book under
+50 ms on the VM; memory under 20 MB.
+
 ## Done when
 
 - [ ] Layout options (justify off by default, margins, line height, font family, hyphenation)
@@ -107,4 +120,5 @@ commit CI built).
 - [ ] Fingerprints; `findQuote`
 - [ ] PDF export estimate, progress and cancel
 - [ ] `version()`
+- [ ] Long chapters split into parts; locators, progress, search and contents follow
 - [ ] Native.kt, JVM test and API doc cover every new call; review; CI green

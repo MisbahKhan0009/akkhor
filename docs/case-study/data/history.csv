@@ -63,3 +63,9 @@ date,milestone,metric,value,unit,where_measured,source
 2026-11-27,Phase 5,first PDF page at phone width (1080 px) on a phone,29.8,ms median,akkhor-bench phone,Realme 9i; 21 to 36 ms across 4 PDFs
 2026-11-27,Phase 5,reflowed screen drawn on a phone,17.0,ms median,akkhor-bench phone,Realme 9i; 14 to 17 ms when drawn again
 2026-11-27,Phase 5,first Indic PDF library card on a phone (one-time set-up included),260,ms median,akkhor-bench phone,Realme 9i; 110 to 400 ms; later books on the VM 5 to 16 ms
+2026-11-27,Phase 6,words found in order in 15 Calibre-made Kindle and FB2 books,100,%,score_formats.py,MuPDF 0% on AZW3 and 49% on Bangla; Calibre 98% on AZW3
+2026-11-27,Phase 6,arm64 cost of MOBI + FB2 + comics,306,KB,GitHub Actions (cargo-ndk),MOBI 56 KB FB2 38 KB comics 209 KB; budget 512 KB
+2026-11-27,Phase 6,redraw of a reflowed screen (glyph masks) vs outlines,2.1-2.7,x faster,drawtime example on the VM,8 books; first and next screens never slower
+2026-11-27,Phase 6,reference-font tables read from disk,0.04-0.8,ms,reftimes example on the VM,built in 2 to 85 ms
+2026-11-27,Phase 6,comic page at phone width (1080 px),12-16,ms,akkhor-bench phone on the VM,was 44 ms
+2026-11-27,Phase 6,crash bugs found by fuzzing and review,5,bugs,cargo fuzz (stable) + review,all fixed with tests

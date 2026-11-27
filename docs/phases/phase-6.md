@@ -166,8 +166,9 @@ phone` and `library`); case study, CSVs, `history.csv`; review in
 - [x] Same calls for every format; page-view calls renamed; Native.kt, JVM test, API doc
 - [x] Reference-font tables on disk; glyph bitmap cache; turned pictures upright; no hyphen on a page's last line
 - [x] Fuzz targets for the new formats (3 bugs found and fixed, 2 more by review: `data/fuzz_phase6.csv`)
-- [ ] Size per switch measured
-- [ ] Case study, review, CI green, phone numbers
+- [x] Size per switch measured (MOBI 56 KB, FB2 38 KB, comics 209 KB, together 306 KB on arm64)
+- [x] Case study data, review (`docs/reviews/phase-6.md`), CI green
+- [ ] Phone numbers for the new formats (needs a run on the phone)
 
 ## Risks
 

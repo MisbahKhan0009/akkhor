@@ -26,6 +26,12 @@ run: `environment.json`.
 | `history.csv` | one row per milestone and metric | each row names where it was measured and its source |
 | `page_copies.csv` | Phase 5 page writer: per test PDF, the pages copied by Akkhor, then read in MuPDF, PDFium and Poppler | `scripts/bench/check_page_copies.py`: every page of files up to 4 pages (last first), else the last and first; same text (whitespace collapsed) and pixels at 72 dpi (a channel off by more than 8 counts); `qpdf --check` on the copy |
 | `phase5_fixes.csv` | the four wrong-output, crash and hang bugs fixed in Phase 5, with how each was found | from `docs/reviews/phase-5.md` |
+| `formats_scores.csv` | Phase 6: words found in order, words found, extra words and time, per Kindle or FB2 book and engine (Akkhor, MuPDF, KindleUnpack, Calibre), against the source EPUB's text | `scripts/bench/score_formats.py` |
+| `phase6_vm.csv` | Phase 6: every new-format test book through `akkhor-bench phone` on the VM, cold and warm | `akkhor-bench phone` |
+| `size_phase6.csv` | Phase 6: arm64 `libakkhor.so` for the app build with and without each new format | CI, "Sizes per feature set (arm64)" |
+| `glyph_masks.csv` | Phase 6: reflowed screens drawn from outlines and from cached glyph masks: first, next and repeat draws, cache size, pixel difference | `crates/akkhor/examples/drawtime.rs` |
+| `ref_tables.csv` | Phase 6: reference-font tables built, then read back from the cache folder | `crates/akkhor-pdf/examples/reftimes.rs` |
+| `fuzz_phase6.csv` | Phase 6: fuzz rounds for the MOBI, FB2 and comic targets and what each found | `cargo fuzz run -s none` |
 | `phone.csv` | Phase 5 on a real phone (Realme 9i, Snapdragon 680, Android 13) and the cloud VM, same books and steps; one row per book and pass (each pass a new process, like the app starting) | `akkhor-bench phone FILE` (`scripts/phone/`): 1080 × 2200 screen, 42 px text; times in ms, memory in MB added at peak |
 | `phone_summary.csv` | median of the warm passes per format and measure, phone against VM | from `phone.csv` |
 

@@ -214,13 +214,15 @@ Results: 54 engine calls documented in `Native.kt` and [api/android.md](api/andr
 
 Review: [reviews/phase-5.md](reviews/phase-5.md), 12 findings; four 🔴 fixed: a parser hang and an EPUB panic found by fuzzing, a close-while-searching deadlock, pages turned by `/Rotate` read letter by letter. Carried: turned pictures in reflow, the reference-font start-up cost, slow no-hit search on huge books.
 
-### Phase 6: Every format, and the engine finished for the app 🔄
+### Phase 6: Every format, and the engine finished for the app ✅ (phone run pending)
 
 Detailed design: [phases/phase-6.md](phases/phase-6.md). The engine is finished before the reader app starts, so the app is written once. MOBI/AZW3 (PalmDB, PalmDOC and HUFF/CDIC decompression, KF8 skeleton/fragments → HTML → `Document`), FB2, CBZ behind the same calls as EPUB, PDF and TXT; DRM-protected files are detected and reported, never opened. Also the engine items Phase 5 carried: reference-font tables kept on disk, a glyph bitmap cache, upright pictures from turned pages, no hyphen on a page's last line, and neutral names for page-view calls while no app exists.
 
+**Results:** every word in order from all 15 Calibre-made Kindle and FB2 test books (MuPDF: none from AZW3, half the Bangla words elsewhere); the three formats cost 306 KB on arm64 (budget 0.5 MB); redrawing a reflowed screen 2.1 to 2.7 times faster; reference-font tables read from disk in under 1 ms; 5 crash bugs found by fuzzing and review, all fixed. Review: [reviews/phase-6.md](reviews/phase-6.md).
+
 ### Phase 6b: What the app's screens need from the engine ⬜
 
-Detailed design: [phases/phase-6b.md](phases/phase-6b.md). Read from the finished screen spec (79 boards), board by board: layout options (justify off by default, margins, line height, font family), links drawn and followed (footnote pop-ups), pictures on a screen for figure zoom, paragraphs for TalkBack, one outline call for every format, `peek` for protected and unsupported files, error codes and PDF passwords, file fingerprints, finding a stored quote again, PDF export with progress and cancel, and the engine version. After this, the reader app starts.
+Detailed design: [phases/phase-6b.md](phases/phase-6b.md). Read from the finished screen spec (79 boards), board by board: layout options (justify off by default, margins, line height, font family), links drawn and followed (footnote pop-ups), pictures on a screen for figure zoom, paragraphs for TalkBack, one outline call for every format, `peek` for protected and unsupported files, error codes and PDF passwords, file fingerprints, finding a stored quote again, PDF export with progress and cancel, the engine version, and long chapters split into parts (from the Phase 6 review: a single-chapter book is laid out whole before its first screen). After this, the reader app starts.
 
 ### Phase 7: More scripts ⬜
 
