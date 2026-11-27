@@ -4,7 +4,8 @@
 //! package document (OPF): the metadata, reading order (spine) and table of
 //! contents. Chapters are inflated and parsed one at a time, on demand.
 
-pub mod zip;
+/// The zip reader (in `akkhor-core`, shared with FB2.ZIP and CBZ).
+pub use akkhor_core::zip;
 
 use akkhor_core::{Error, Result, Source};
 use akkhor_flow::Document;

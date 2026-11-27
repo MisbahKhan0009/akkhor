@@ -1,0 +1,16 @@
+[package]
+name = "akkhor-fb2"
+description = "FictionBook 2 (FB2, FB2.ZIP) support for the Akkhor reading engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+akkhor-core = { workspace = true, features = ["zip"] }
+akkhor-flow.workspace = true
+
+[dev-dependencies]
+akkhor-epub.workspace = true

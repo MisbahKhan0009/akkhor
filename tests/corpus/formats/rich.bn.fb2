@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
+<description><title-info><genre>poetry</genre>
+<author><first-name>অক্ষর</first-name><last-name>পরীক্ষা</last-name></author>
+<author><nickname>দ্বিতীয় লেখক</nickname></author>
+<book-title>কবিতা ও গল্প</book-title>
+<annotation><p>একটি ছোট পরীক্ষার বই।</p></annotation>
+<coverpage><image l:href="#cover.png"/></coverpage><lang>bn</lang>
+<sequence name="অক্ষর সিরিজ" number="2"/></title-info>
+<publish-info><publisher>অক্ষর প্রকাশনী</publisher></publish-info></description>
+<body><title><p>কবিতা ও গল্প</p></title>
+<epigraph><p>শব্দই পথ দেখায়।</p><text-author>অজানা</text-author></epigraph>
+<section id="s1"><title><p>প্রথম অংশ</p><p>সকালের গান</p></title>
+<p>নদীর <emphasis>ধারে</emphasis> একটি <strong>ছোট</strong> গ্রাম।<a l:href="#n1" type="note">[1]</a></p>
+<poem><title><p>ছড়া</p></title><stanza><v>আকাশ জুড়ে মেঘ,</v><v>বাতাসে ভেজা গন্ধ।</v></stanza></poem>
+<empty-line/>
+<image l:href="#pic.png"/>
+<section><title><p>উপ-অংশ</p></title><p>ভেতরের অংশের লেখা।</p></section>
+</section>
+<section id="s2"><title><p>দ্বিতীয় অংশ</p></title><subtitle>* * *</subtitle>
+<cite><p>উদ্ধৃতির লেখা।</p></cite>
+<table><tr><th>ফসল</th><th>মাস</th></tr><tr><td>ধান</td><td>অগ্রহায়ণ</td></tr></table></section>
+</body>
+<body name="notes"><title><p>টীকা</p></title>
+<section id="n1"><title><p>1</p></title><p>গ্রামটি নদীর পূর্ব পাড়ে।</p></section></body>
+<binary id="cover.png" content-type="image/png">iVBORw0KGgoAAAANSUhEUgAAASwAAAHCCAIAAADaUWPQAAAG20lEQVR4Xu3YX6jfYxzA8e+xrXZw
+5k+hSa7cKFJqKLNh0pwjLkj+zJW0ZFEuWFhNrFi5WOZCUmpXFIXmlCU2UiTKhZKkJBeiiJzjsHOk
+lSTTcs7x7szrdfWr37ee5/nUu+f7+42sG980AJ1juqWB34kQYiKEmAghJkKIiRBiIoTY8sOtv3/v
+nnhrcHRZP3Hr3x7ITQgxEUJMhBA77G/CPzvcuyzwz47kvxU3IcRECDERQkyEEBMhxEQIMRFCTIQQ
+EyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMh
+xEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRE
+CDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgx
+EUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFC
+TIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyE
+EBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBAT
+IcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHE
+RAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQI
+MRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDER
+QkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQmy+EZ55xuk3X3/1cccdG58Dlqz5Rrhj
+290/z8wcPHjw1eef+ssQxq9cv3vntmd271hz/rlLdj6w6OYb4cknnfjCy69NT//8l52eeMLYxg1r
+77rvkYceffKuzZsW/RywZM0rwmsnNhw7unLXow+Mjq4chuGO227avXPbEzsfXH3aKavGxl58Zd/s
+3NzX33y7amxsyc4HFt28Inxp7+tTU9N3b90xNTW9YsWKTz79fMu9D78y+cadt9/yxZdfvfn2e8Mw
+XHrxBe+8+8GinwOWrHlF+Gdzw9xb77w/DMMbb797ztlnHfrq9NWn3njdxFPPPrdk5wOLbuEinJ07
+ODt7aL8zv/w6DMPo6MrtW7fs3PX0d9//sOjngCVrwSJctmzZRWvOG4bhsrUXfvjRxyMjI/ffs/m5
+Fyc//uSzJTsc+C8sX6hFZmZm1l+85qbrJn788afHdj298YpLLjj/3FVjx19z1eVT09Nbtz++UAvB
+UWa+EY7fsPnQRP74cMjkvgOT+w4cZcOCxbBgr6PAvyNCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJ
+EGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBi
+IoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKE
+mAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgI
+ISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEm
+QoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKI
+iRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQ
+YiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIi
+hJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSY
+CCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAgh
+JkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKE2PIjWX//3j1H8hjwL7gJISZCiIkQYiPrxjfF
+W4D/NzchxEQIMRFCTIQQEyHERAgxEULsN/RliLmeKc/UAAAAAElFTkSuQmCC</binary>
+<binary id="pic.png" content-type="image/png">iVBORw0KGgoAAAANSUhEUgAAAMgAAABkCAIAAABM5OhcAAACsklEQVR4Xu3cv2sTcRzG8U8S69jg
+f6DgpFEHHZqq/SFihyAqHVQcJCCitrUOxWoRxapVdBAEEf8GXaxWSUv1qJSCgw5BqlBoobTdLGgy
+mJhEpHAWSeDgm2cw937N4S55ePO9mxJpbU8YUG/Rel8Q+IOwIEFYkCAsSBAWJAgLEoQFiQ21rjrt
+ZSU3RGPZ27Gj6g/ixIIEYUGCsCBR8x1rvVrPUYRTkPdvTixIEBYkCAsShAUJwoIEYUGCsCBBWJAg
+LEgQFiQICxKEBQnCggRhQYKwIEFYkCAsSBAWJAgLEoQFCcKCBGFBgrAgQViQICxIEBYkCAsShAUJ
+woIEYUGCsCBBWJAgLEjUOawtm7ceO3Jc8k3xXwn0V5HBzS/MzS/MBf88GpVrWJmxmdFXzxPbdlYq
+duvu0MrKUmZspiuVjMc3DQ7caG6O/yoWb965srr6rVEXRFWuj8KNTU1fvn4+33f6xctnF3su+/fo
+uzDwzhvv7U9PTL4+k+5h/bBxDatSsan3k2b21htPbN/lz7dnd4s3NWFmbzKjT54+DNuscA+rXCqV
+1nYsFgr+oNFo1CxiZuVyOZfPMXTYuIYVi8WSLW1mdqDj0MdPH/z5Zmez+/d1mtnhVPe5s5fCNitc
+X95/FgqdbQdPnUjnct9H7l/3B330+MHVweHuoyfz+R/DI0MMHTauYZnZ7XvX1q/WlUqa2dLyYm9/
+Omxr4u+7EFtAwTWstfMJ+IdrWEBVhAUJwoIEYUGCsCBBWJAgLEgQFiQICxKEBQnCggRhQYKwIEFY
+kCAsSBAWJAgLEoQFCcKCBGFBgrAgQViQICxIEBYkCAsShAUJwoIEYUGCsCBBWJAgLEgE+ke/aS8r
+uTkaFycWJAgLEoQFiUhre0JyYYQbJxYkCAsShAUJwoIEYUGCsCBBWJD4DUrldclRjin5AAAAAElF
+TkSuQmCC</binary>
+</FictionBook>

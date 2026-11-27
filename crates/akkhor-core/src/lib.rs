@@ -15,6 +15,8 @@ mod error;
 mod format;
 mod source;
 mod theme;
+#[cfg(feature = "zip")]
+pub mod zip;
 
 pub use cache::LruCache;
 pub use error::{Error, Result};

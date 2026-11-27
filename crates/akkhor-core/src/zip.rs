@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use akkhor_core::{Error, Result, Source};
+use crate::{Error, Result, Source};
 use miniz_oxide::inflate::decompress_to_vec_with_limit;
 
 #[derive(Clone, Debug)]

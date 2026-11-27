@@ -2,7 +2,8 @@
 """Makes tests/corpus/formats: the same three books (Bangla, Hindi,
 English) as EPUB sources and as MOBI (KF7), AZW3 (KF8), combined MOBI
 (KF7 + KF8) and FB2, written by Calibre (an independent implementation),
-plus comics as CBZ.
+hand-written FB2 files (titles, nested sections, poems, notes,
+pictures, Windows-1251, zipped), plus comics as CBZ.
 
   sudo apt-get install calibre      # 7.6 used for the committed files
   python3 scripts/make_format_corpus.py
@@ -146,8 +147,61 @@ def convert(src, dst, *opts):
     subprocess.run(["ebook-convert", src, dst, *opts], check=True, capture_output=True)
 
 
+FB2_RICH = """<?xml version="1.0" encoding="UTF-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
+<description><title-info><genre>poetry</genre>
+<author><first-name>অক্ষর</first-name><last-name>পরীক্ষা</last-name></author>
+<author><nickname>দ্বিতীয় লেখক</nickname></author>
+<book-title>কবিতা ও গল্প</book-title>
+<annotation><p>একটি ছোট পরীক্ষার বই।</p></annotation>
+<coverpage><image l:href="#cover.png"/></coverpage><lang>bn</lang>
+<sequence name="অক্ষর সিরিজ" number="2"/></title-info>
+<publish-info><publisher>অক্ষর প্রকাশনী</publisher></publish-info></description>
+<body><title><p>কবিতা ও গল্প</p></title>
+<epigraph><p>শব্দই পথ দেখায়।</p><text-author>অজানা</text-author></epigraph>
+<section id="s1"><title><p>প্রথম অংশ</p><p>সকালের গান</p></title>
+<p>নদীর <emphasis>ধারে</emphasis> একটি <strong>ছোট</strong> গ্রাম।<a l:href="#n1" type="note">[1]</a></p>
+<poem><title><p>ছড়া</p></title><stanza><v>আকাশ জুড়ে মেঘ,</v><v>বাতাসে ভেজা গন্ধ।</v></stanza></poem>
+<empty-line/>
+<image l:href="#pic.png"/>
+<section><title><p>উপ-অংশ</p></title><p>ভেতরের অংশের লেখা।</p></section>
+</section>
+<section id="s2"><title><p>দ্বিতীয় অংশ</p></title><subtitle>* * *</subtitle>
+<cite><p>উদ্ধৃতির লেখা।</p></cite>
+<table><tr><th>ফসল</th><th>মাস</th></tr><tr><td>ধান</td><td>অগ্রহায়ণ</td></tr></table></section>
+</body>
+<body name="notes"><title><p>টীকা</p></title>
+<section id="n1"><title><p>1</p></title><p>গ্রামটি নদীর পূর্ব পাড়ে।</p></section></body>
+<binary id="cover.png" content-type="image/png">COVER</binary>
+<binary id="pic.png" content-type="image/png">PIC</binary>
+</FictionBook>
+"""
+
+FB2_1251 = """<?xml version="1.0" encoding="windows-1251"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+<description><title-info><author><first-name>Тест</first-name><last-name>Акхор</last-name></author>
+<book-title>Деревня у реки</book-title><lang>ru</lang></title-info></description>
+<body><section><title><p>Глава первая</p></title><p>Утром над рекой стоит туман. «Ёлка» — №1.</p></section>
+<section><title><p>Глава вторая</p></title><p>Рынок собирается дважды в неделю.</p></section></body>
+</FictionBook>
+"""
+
+
+def fb2_samples():
+    import base64
+    cover = base64.b64encode(png(300, 450, (62, 74, 92), "fb2")).decode()
+    pic = base64.b64encode(png(200, 100, (58, 63, 44), "pic")).decode()
+    wrapped = lambda s: "\n".join(s[i:i + 76] for i in range(0, len(s), 76))
+    rich = FB2_RICH.replace("COVER", wrapped(cover)).replace("PIC", wrapped(pic))
+    open(f"{OUT}/rich.bn.fb2", "w", encoding="utf-8").write(rich)
+    with zipfile.ZipFile(f"{OUT}/rich.bn.fb2.zip", "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("rich.bn.fb2", rich)
+    open(f"{OUT}/cp1251.ru.fb2", "wb").write(FB2_1251.encode("cp1251"))
+
+
 def main():
     os.makedirs(f"{OUT}/src", exist_ok=True)
+    fb2_samples()
     for lang, book in BOOKS.items():
         src = f"{OUT}/src/{lang}.epub"
         epub(lang, book, src)

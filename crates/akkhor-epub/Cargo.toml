@@ -9,9 +9,8 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-akkhor-core.workspace = true
+akkhor-core = { workspace = true, features = ["zip"] }
 akkhor-flow.workspace = true
-miniz_oxide.workspace = true
 
 [dev-dependencies]
 akkhor-flow = { workspace = true, features = ["bundled-fonts"] }

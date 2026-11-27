@@ -10,3 +10,8 @@ authors.workspace = true
 
 [dependencies]
 memmap2.workspace = true
+miniz_oxide = { workspace = true, optional = true }
+
+[features]
+# The zip reader EPUB, FB2.ZIP and CBZ share.
+zip = ["dep:miniz_oxide"]

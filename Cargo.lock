@@ -45,6 +45,7 @@ name = "akkhor-core"
 version = "0.1.0"
 dependencies = [
  "memmap2",
+ "miniz_oxide 0.8.9",
 ]
 
 [[package]]
@@ -53,7 +54,15 @@ version = "0.1.0"
 dependencies = [
  "akkhor-core",
  "akkhor-flow",
- "miniz_oxide 0.8.9",
+]
+
+[[package]]
+name = "akkhor-fb2"
+version = "0.1.0"
+dependencies = [
+ "akkhor-core",
+ "akkhor-epub",
+ "akkhor-flow",
 ]
 
 [[package]]
