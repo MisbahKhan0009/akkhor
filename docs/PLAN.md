@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-27 (Phase 5 done, with numbers from a real phone)
+Last updated: 2026-11-27 (Phase 6 planned)
 
 ---
 
@@ -214,9 +214,9 @@ Results: 54 engine calls documented in `Native.kt` and [api/android.md](api/andr
 
 Review: [reviews/phase-5.md](reviews/phase-5.md), 12 findings; four 🔴 fixed: a parser hang and an EPUB panic found by fuzzing, a close-while-searching deadlock, pages turned by `/Rotate` read letter by letter. Carried: turned pictures in reflow, the reference-font start-up cost, slow no-hit search on huge books.
 
-### Phase 6: More formats ⬜
+### Phase 6: Every format, and the engine finished for the app 🔄
 
-MOBI/AZW3 (PalmDB, PalmDOC and HUFF/CDIC decompression, KF8 skeleton/fragments → HTML → `Document`), FB2, CBZ. DRM-protected files are detected and reported, never opened.
+Detailed design: [phases/phase-6.md](phases/phase-6.md). The engine is finished before the reader app starts, so the app is written once. MOBI/AZW3 (PalmDB, PalmDOC and HUFF/CDIC decompression, KF8 skeleton/fragments → HTML → `Document`), FB2, CBZ behind the same calls as EPUB, PDF and TXT; DRM-protected files are detected and reported, never opened. Also the engine items Phase 5 carried: reference-font tables kept on disk, a glyph bitmap cache, upright pictures from turned pages, no hyphen on a page's last line, and neutral names for page-view calls while no app exists.
 
 ### Phase 7: More scripts ⬜
 
@@ -226,7 +226,7 @@ Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam fonts and test corpo
 
 Fuzzing kept up as formats arrive (started in Phase 5), a real-world file corpus in CI, benchmarks against MuPDF as the bar to beat, Android AAR packaging, crates.io release, API docs.
 
-After Phase 5: the reader app, in its own repository (designed separately); Phases 6 to 8 continue alongside it.
+After Phase 6: the reader app, in its own repository (designed separately); Phases 7 and 8 continue alongside it without changing what the app calls.
 
 ## 5. Targets (to measure, not promises)
 
