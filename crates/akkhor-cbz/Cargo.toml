@@ -1,0 +1,13 @@
+[package]
+name = "akkhor-cbz"
+description = "Comic book archives (CBZ) for the Akkhor reading engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+akkhor-core = { workspace = true, features = ["zip"] }
+akkhor-flow = { workspace = true, features = ["images-more"] }

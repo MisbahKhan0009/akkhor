@@ -13,6 +13,8 @@ default = ["hyphenation", "images"]
 # PNG and JPEG decoding for pictures in books. Both decoders are already in
 # the binary when PDF support is on.
 images = ["dep:png", "dep:zune-jpeg"]
+# WebP and GIF (first frame) too: common in comics, sometimes in EPUBs.
+images-more = ["images", "dep:image-webp", "dep:gif"]
 # English hyphenation patterns (31 KB).
 hyphenation = []
 # Compiles Noto Serif (Latin), Noto Serif Bengali and Noto Serif Devanagari
@@ -27,6 +29,8 @@ vello_cpu.workspace = true
 kurbo.workspace = true
 png = { version = "0.18", optional = true }
 zune-jpeg = { version = "0.5", default-features = false, features = ["std"], optional = true }
+image-webp = { version = "0.2", optional = true }
+gif = { version = "0.14", default-features = false, features = ["std"], optional = true }
 
 [dev-dependencies]
 # Unicode to Bijoy, to test our Bijoy to Unicode by round trip (MIT).

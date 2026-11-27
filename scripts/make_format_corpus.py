@@ -199,9 +199,48 @@ def fb2_samples():
     open(f"{OUT}/cp1251.ru.fb2", "wb").write(FB2_1251.encode("cp1251"))
 
 
+def comic_page(n, w, h, colour):
+    img = Image.new("RGB", (w, h), colour)
+    d = ImageDraw.Draw(img)
+    d.rectangle([20, 20, w - 21, h - 21], outline=(250, 250, 250), width=6)
+    d.ellipse([w // 3, h // 3, 2 * w // 3, 2 * h // 3], fill=(250, 220, 40))
+    d.text((40, 40), f"page {n}", fill=(255, 255, 255))
+    return img
+
+
+def save(img, fmt):
+    b = io.BytesIO()
+    if fmt == "GIF":
+        img = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=8)
+    img.save(b, fmt, quality=85) if fmt in ("JPEG", "WEBP") else img.save(b, fmt)
+    return b.getvalue()
+
+
+def comics():
+    """Two comics: one with every picture format and junk entries, names
+    that sort wrongly as text and a double-page spread; a manga with
+    ComicInfo (right to left, front cover not first)."""
+    pages = [("p1.jpg", "JPEG", 400, 600), ("p2.png", "PNG", 400, 600), ("p3.webp", "WEBP", 400, 600),
+             ("p10.jpg", "JPEG", 800, 600), ("p11.gif", "GIF", 400, 600)]
+    with zipfile.ZipFile(f"{OUT}/mixed.cbz", "w") as z:
+        z.writestr("__MACOSX/._p1.jpg", b"junk")
+        z.writestr("Thumbs.db", b"junk")
+        z.writestr("notes.txt", b"not a page")
+        for i, (name, fmt, w, h) in enumerate(reversed(pages)):
+            z.writestr(name, save(comic_page(name, w, h, (40 + 30 * i, 60, 110)), fmt))
+    info = ('<?xml version="1.0"?><ComicInfo><Title>নদীর গল্প</Title><Series>অক্ষর কমিক</Series><Number>3</Number>'
+            '<Writer>লেখক এক, Writer Two</Writer><LanguageISO>bn</LanguageISO><Manga>YesAndRightToLeft</Manga>'
+            '<Pages><Page Image="0" Type="Story"/><Page Image="2" Type="FrontCover"/></Pages></ComicInfo>')
+    with zipfile.ZipFile(f"{OUT}/manga.cbz", "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("ComicInfo.xml", info)
+        for n in range(1, 4):
+            z.writestr(f"ch1/{n:03}.jpg", save(comic_page(n, 600, 900, (90, 40 + 50 * n, 60)), "JPEG"))
+
+
 def main():
     os.makedirs(f"{OUT}/src", exist_ok=True)
     fb2_samples()
+    comics()
     for lang, book in BOOKS.items():
         src = f"{OUT}/src/{lang}.epub"
         epub(lang, book, src)

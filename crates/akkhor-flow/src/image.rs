@@ -91,7 +91,8 @@ pub fn image_size(b: &[u8]) -> Option<(u32, u32)> {
     None
 }
 
-/// Decodes PNG and JPEG. Other formats return `None` (the layout still
+/// Decodes PNG and JPEG (and WebP and GIF with `images-more`). Other
+/// formats return `None` (the layout still
 /// reserves their space and shows nothing).
 #[cfg(feature = "images")]
 pub fn decode(b: &[u8]) -> Option<DecodedImage> {
@@ -101,7 +102,100 @@ pub fn decode(b: &[u8]) -> Option<DecodedImage> {
     if b.starts_with(&[0xFF, 0xD8]) {
         return decode_jpeg(b);
     }
+    #[cfg(feature = "images-more")]
+    if b.starts_with(b"RIFF") && b.get(8..12) == Some(b"WEBP") {
+        return decode_webp(b);
+    }
+    #[cfg(feature = "images-more")]
+    if b.starts_with(b"GIF8") {
+        return decode_gif(b);
+    }
     None
+}
+
+/// The largest picture decoded, in pixels: 16 million for book pictures
+/// (64 MB while decoding, and it stops decompression bombs), more where a
+/// caller (a comic page) asks for it.
+#[cfg(feature = "images")]
+pub fn decode_up_to(b: &[u8], max_pixels: u64) -> Option<DecodedImage> {
+    let (w, h) = image_size(b)?;
+    if u64::from(w) * u64::from(h) > max_pixels {
+        return None;
+    }
+    if u64::from(w) * u64::from(h) <= MAX_PIXELS {
+        return decode(b);
+    }
+    LIMIT.with(|l| {
+        let old = l.replace(max_pixels);
+        let out = decode(b);
+        l.set(old);
+        out
+    })
+}
+
+#[cfg(feature = "images")]
+thread_local! {
+    static LIMIT: std::cell::Cell<u64> = const { std::cell::Cell::new(MAX_PIXELS) };
+}
+
+#[cfg(feature = "images")]
+fn too_big(w: u32, h: u32) -> bool {
+    u64::from(w) * u64::from(h) > LIMIT.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "images-more")]
+fn decode_webp(b: &[u8]) -> Option<DecodedImage> {
+    let mut dec = image_webp::WebPDecoder::new(std::io::Cursor::new(b)).ok()?;
+    let (w, h) = dec.dimensions();
+    if too_big(w, h) {
+        return None;
+    }
+    let mut buf = vec![0u8; dec.output_buffer_size()?];
+    dec.read_image(&mut buf).ok()?;
+    let rgba = if dec.has_alpha() {
+        buf
+    } else {
+        let mut out = Vec::with_capacity(buf.len() / 3 * 4);
+        for p in buf.as_chunks::<3>().0 {
+            out.extend_from_slice(&[p[0], p[1], p[2], 255]);
+        }
+        out
+    };
+    Some(DecodedImage {
+        width: w,
+        height: h,
+        rgba,
+    })
+}
+
+#[cfg(feature = "images-more")]
+fn decode_gif(b: &[u8]) -> Option<DecodedImage> {
+    let mut opts = gif::DecodeOptions::new();
+    opts.set_color_output(gif::ColorOutput::RGBA);
+    let mut dec = opts.read_info(std::io::Cursor::new(b)).ok()?;
+    let (w, h) = (u32::from(dec.width()), u32::from(dec.height()));
+    if too_big(w, h) {
+        return None;
+    }
+    // The first frame, placed on a transparent canvas of the screen size.
+    let frame = dec.read_next_frame().ok()??;
+    let mut rgba = vec![0u8; (w * h * 4) as usize];
+    let (fl, ft) = (u32::from(frame.left), u32::from(frame.top));
+    let (fw, fh) = (u32::from(frame.width), u32::from(frame.height));
+    for y in 0..fh.min(h.saturating_sub(ft)) {
+        for x in 0..fw.min(w.saturating_sub(fl)) {
+            let s = ((y * fw + x) * 4) as usize;
+            let d = (((y + ft) * w + x + fl) * 4) as usize;
+            if let (Some(src), Some(dst)) = (frame.buffer.get(s..s + 4), rgba.get_mut(d..d + 4)) {
+                dst.copy_from_slice(src);
+            }
+        }
+    }
+    Some(DecodedImage {
+        width: w,
+        height: h,
+        rgba,
+    })
 }
 
 #[cfg(not(feature = "images"))]
@@ -118,7 +212,7 @@ const MAX_PIXELS: u64 = 16_000_000;
 fn decode_png(b: &[u8]) -> Option<DecodedImage> {
     use png::{ColorType, Transformations};
     let (w, h) = image_size(b)?;
-    if w as u64 * h as u64 > MAX_PIXELS {
+    if too_big(w, h) {
         return None;
     }
     let mut dec = png::Decoder::new(std::io::Cursor::new(b));
@@ -159,7 +253,7 @@ fn decode_jpeg(b: &[u8]) -> Option<DecodedImage> {
     use zune_jpeg::zune_core::colorspace::ColorSpace;
     use zune_jpeg::zune_core::options::DecoderOptions;
     let (w, h) = image_size(b)?;
-    if w as u64 * h as u64 > MAX_PIXELS {
+    if too_big(w, h) {
         return None;
     }
     let opts = DecoderOptions::default().jpeg_set_out_colorspace(ColorSpace::RGBA);
