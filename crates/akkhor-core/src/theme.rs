@@ -28,20 +28,20 @@ impl Theme {
         text: Rgba::rgb(0x00, 0x00, 0x00),
     };
     pub const PAPER: Theme = Theme {
-        background: Rgba::rgb(0xFB, 0xF8, 0xF1),
-        text: Rgba::rgb(0x22, 0x1F, 0x1A),
+        background: Rgba::rgb(0xF7, 0xF3, 0xEA),
+        text: Rgba::rgb(0x2A, 0x26, 0x20),
     };
     pub const SEPIA: Theme = Theme {
-        background: Rgba::rgb(0xF1, 0xE4, 0xC8),
+        background: Rgba::rgb(0xF1, 0xE4, 0xCC),
         text: Rgba::rgb(0x43, 0x34, 0x22),
     };
     pub const DUSK: Theme = Theme {
-        background: Rgba::rgb(0x23, 0x22, 0x20),
-        text: Rgba::rgb(0xD8, 0xCF, 0xBF),
+        background: Rgba::rgb(0x2A, 0x28, 0x25),
+        text: Rgba::rgb(0xDD, 0xD3, 0xC2),
     };
     pub const NIGHT: Theme = Theme {
         background: Rgba::rgb(0x00, 0x00, 0x00),
-        text: Rgba::rgb(0xA8, 0xA1, 0x95),
+        text: Rgba::rgb(0xB8, 0xB2, 0xA6),
     };
 
     pub fn is_dark(&self) -> bool {

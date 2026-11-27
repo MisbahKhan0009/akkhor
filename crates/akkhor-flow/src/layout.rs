@@ -496,21 +496,34 @@ fn break_lines(
 
     // Where the English word starting at `from` may be hyphenated so that the
     // line from `start` still fits (with the hyphen). Picks the latest point.
-    let hyphen_point = |start: usize, from: usize| -> Option<usize> {
+    // A hyphen that is only nicer than a ragged line (`optional`) is not
+    // used on a paragraph's last word, nor on its next-to-last line (the
+    // rest of the paragraph would fit on one line).
+    let hyphen_point = |start: usize, from: usize, optional: bool| -> Option<usize> {
         let avail = avail_for(start);
         let hy = hyphen?;
         let word_end = text[from..]
             .find(|c: char| !c.is_ascii_alphabetic())
             .map_or(text.len(), |e| from + e);
-        hyphenate(&text[from..word_end])
+        if optional && !text[word_end..].trim_end().contains(char::is_whitespace) {
+            return None;
+        }
+        let p = hyphenate(&text[from..word_end])
             .into_iter()
             .rev()
             .map(|p| from + p)
-            .find(|&p| width(start, p) + hy.advance <= avail)
+            .find(|&p| width(start, p) + hy.advance <= avail)?;
+        if optional && width(p, text.len()) <= avail_for(p) {
+            return None;
+        }
+        Some(p)
     };
 
     let mut lines = Vec::new();
     let mut start = 0;
+    // Hyphenated lines in a row: at most two by choice (a word too long
+    // for a line is still broken).
+    let mut run = 0;
     while start < text.len() {
         let avail = avail_for(start);
         let left = shape.left + if start == 0 { shape.first_indent } else { 0.0 };
@@ -528,8 +541,8 @@ fn break_lines(
         let mut hyphenated = false;
         let end = match end {
             // Lots of room left and an English word next: hyphenate it.
-            Some(e) if e < text.len() && avail - width(start, e) > size * 2.0 => {
-                match hyphen_point(start, e) {
+            Some(e) if e < text.len() && run < 2 && avail - width(start, e) > size * 2.0 => {
+                match hyphen_point(start, e, true) {
                     Some(p) => {
                         hyphenated = true;
                         p
@@ -539,7 +552,7 @@ fn break_lines(
             }
             Some(e) => e,
             None => {
-                if let Some(p) = hyphen_point(start, start) {
+                if let Some(p) = hyphen_point(start, start, false) {
                     hyphenated = true;
                     p
                 } else {
@@ -566,6 +579,7 @@ fn break_lines(
                 }
             }
         };
+        run = if hyphenated { run + 1 } else { 0 };
         let is_last = end >= text.len();
         // The last line of a justified paragraph is set ragged.
         let align = match shape.align {
@@ -738,6 +752,51 @@ mod tests {
         // Text is preserved: lines cover the block without gaps.
         for w in lines.windows(2) {
             assert_eq!(w[0].range.end, w[1].range.start);
+        }
+    }
+
+    #[test]
+    fn hyphens_follow_the_design_rules() {
+        // Long words only, on a narrow page: plenty of chances to hyphenate.
+        let fonts = FontSet::bundled();
+        let text = "Considerations notwithstanding, internationalization substantially \
+                    complicates characterization, documentation, specification and \
+                    implementation, extraordinarily."
+            .repeat(6);
+        let doc = Document::from_plain_text(&text);
+        // Wide enough for every word: a word too long for a line is still
+        // broken, hyphen or not.
+        for width in [640.0, 800.0, 1000.0] {
+            let opts = LayoutOptions {
+                width,
+                ..Default::default()
+            };
+            let pages = paginate(&doc, &opts, &fonts);
+            let t = &doc.blocks[0].text;
+            let lines: Vec<_> = pages.iter().flat_map(|p| p.lines.iter()).collect();
+            let hyphenated: Vec<bool> = lines
+                .iter()
+                .map(|l| {
+                    l.range.end < t.len() && t.as_bytes()[l.range.end - 1].is_ascii_alphabetic()
+                })
+                .collect();
+            assert!(
+                hyphenated.iter().any(|&h| h),
+                "width {width}: no hyphen at all"
+            );
+            // Never three in a row.
+            assert!(
+                !hyphenated.windows(3).any(|w| w.iter().all(|&h| h)),
+                "width {width}: three hyphenated lines in a row"
+            );
+            // Never the paragraph's last word.
+            let n = lines.len();
+            assert!(
+                !hyphenated[n - 2],
+                "width {width}: last word hyphenated: {:?} / {:?}",
+                &t[lines[n - 2].range.clone()],
+                &t[lines[n - 1].range.clone()]
+            );
         }
     }
 

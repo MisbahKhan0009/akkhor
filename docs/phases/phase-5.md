@@ -164,7 +164,7 @@ Page / Reflow switch are the app's.
 - [x] Missing-font hint
 - [ ] Phone numbers (with Misbah's phone): the benchmark is built by CI, waiting for a run
 - [x] Case study, review, CI green
-- [ ] Design answers (5.12)
+- [x] Design answers (5.12)
 
 ## Risks
 

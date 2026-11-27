@@ -1070,8 +1070,8 @@ mod tests {
         // Top-left origin: the PDF's y = 50..150 is rows 50..150 here too.
         assert_eq!(
             pixel_at(&page, 100, 100),
-            [0, 200, 0],
-            "image keeps its colour"
+            [0, 169, 0],
+            "image keeps its colour, at 85% on a dark theme"
         );
         assert_eq!(
             pixel_at(&page, 250, 100),

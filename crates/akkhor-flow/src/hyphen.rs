@@ -7,8 +7,10 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-const LEFT_MIN: usize = 2;
+const LEFT_MIN: usize = 3;
 const RIGHT_MIN: usize = 3;
+/// Shorter words are never hyphenated.
+const MIN_WORD: usize = 6;
 
 struct Patterns {
     table: HashMap<Vec<u8>, Vec<u8>>,
@@ -69,13 +71,18 @@ fn patterns() -> &'static Patterns {
 /// for words that are not plain ASCII letters (apart from a trailing
 /// apostrophe-s), or that are too short.
 pub fn hyphenate(word: &str) -> Vec<usize> {
-    if word.len() < LEFT_MIN + RIGHT_MIN || !word.bytes().all(|b| b.is_ascii_alphabetic()) {
+    if word.len() < MIN_WORD || !word.bytes().all(|b| b.is_ascii_alphabetic()) {
         return Vec::new();
     }
     let p = patterns();
     let lower = word.to_ascii_lowercase();
     if let Some(points) = p.exceptions.get(&lower) {
-        return points.clone();
+        let allowed = LEFT_MIN..=word.len() - RIGHT_MIN;
+        return points
+            .iter()
+            .copied()
+            .filter(|c| allowed.contains(c))
+            .collect();
     }
     let mut w = Vec::with_capacity(lower.len() + 2);
     w.push(b'.');
@@ -115,11 +122,14 @@ mod tests {
 
     #[test]
     fn hyphenates_english() {
-        assert_eq!(show("hyphenation"), "hy-phen-ation");
-        assert_eq!(show("associate"), "as-so-ciate");
-        assert_eq!(show("table"), "ta-ble");
-        assert_eq!(show("computer"), "com-puter"); // "er" is shorter than the 3-letter minimum
+        // At least 3 letters before and after a break, words of 6 or more
+        // (the design's rules).
+        assert_eq!(show("hyphenation"), "hyphen-ation");
+        assert_eq!(show("associate"), "asso-ciate");
+        assert_eq!(show("computer"), "com-puter");
         assert_eq!(show("Reading"), "Read-ing");
+        assert_eq!(show("table"), "table");
+        assert_eq!(show("people"), "peo-ple");
     }
 
     #[test]

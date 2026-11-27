@@ -5,7 +5,8 @@
 //! turns photographs into negatives. Instead the page is drawn on white and
 //! then every pixel outside a colour image is remapped by lightness: white
 //! becomes the theme's background, black its text colour, and colours keep
-//! their hue. Colour images keep their real colours. Greyscale and 1-bit
+//! their hue. Colour images keep their real colours (at 85% brightness on
+//! dark themes, so a photo does not glare at night). Greyscale and 1-bit
 //! images (scanned pages) are remapped like text, so a scanned book reads
 //! in the theme too.
 
@@ -232,7 +233,8 @@ pub(crate) fn is_original(theme: &Theme) -> bool {
 }
 
 /// Remaps a rendered tile (opaque RGBA8, drawn on white) to `theme`,
-/// leaving pixels inside colour images as they are.
+/// leaving pixels inside colour images as they are (dimmed to 85% on dark
+/// themes).
 pub(crate) fn apply(out: &mut [u8], tile: Tile, scale: f32, boxes: &ImageBoxes, theme: &Theme) {
     if is_original(theme) {
         return;
@@ -264,6 +266,8 @@ pub(crate) fn apply(out: &mut [u8], tile: Tile, scale: f32, boxes: &ImageBoxes, 
     // Colour is kept a little softer on dark themes, where full saturation
     // glares.
     let chroma = if theme.is_dark() { 200 } else { 256 };
+    // Photos on dark themes: 85% brightness (217 / 256).
+    let photo = if theme.is_dark() { 217u16 } else { 256 };
     // Rows are swept top to bottom with the boxes that cover them; each row
     // gets a coverage count per pixel from a difference array, so the cost
     // is the tile's pixels plus the boxes' heights, however many images a
@@ -295,6 +299,11 @@ pub(crate) fn apply(out: &mut [u8], tile: Tile, scale: f32, boxes: &ImageBoxes, 
         }
         for (x, px) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             if covered && cover[x] > 0 {
+                if photo < 256 {
+                    for c in &mut px[..3] {
+                        *c = ((u16::from(*c) * photo) >> 8) as u8;
+                    }
+                }
                 continue;
             }
             // Most of a page is blank paper.
@@ -349,18 +358,23 @@ mod tests {
     }
 
     #[test]
-    fn image_pixels_are_left_alone() {
-        let mut px = [10u8, 200, 30, 255].repeat(4); // 2×2 tile
+    fn image_pixels_keep_their_colour() {
         let boxes = ImageBoxes(vec![Rect::new(0.0, 0.0, 1.0, 2.0)]);
-        apply(&mut px, Tile::new(0, 0, 2, 2), 1.0, &boxes, &Theme::NIGHT);
+        // Light themes: untouched.
+        let mut px = [10u8, 200, 30, 255].repeat(4); // 2×2 tile
+        apply(&mut px, Tile::new(0, 0, 2, 2), 1.0, &boxes, &Theme::SEPIA);
         assert_eq!(&px[0..4], &[10, 200, 30, 255]); // inside the image
         assert_ne!(&px[4..8], &[10, 200, 30, 255]); // outside
+        // Dark themes: the same colour at 85% brightness.
+        let mut px = [10u8, 200, 30, 255].repeat(4);
+        apply(&mut px, Tile::new(0, 0, 2, 2), 1.0, &boxes, &Theme::NIGHT);
+        assert_eq!(&px[0..4], &[8, 169, 25, 255]);
     }
 
     #[test]
     fn many_overlapping_images_are_kept_exactly() {
         // Pseudo-random boxes, many overlapping; every pixel inside any box
-        // must keep its colour, every other pixel must be themed.
+        // must keep its colour (dimmed), every other pixel must be themed.
         let (w, h) = (64u32, 48u32);
         let mut seed = 7u64;
         let mut rnd = |m: f64| {
@@ -377,6 +391,7 @@ mod tests {
             .collect();
         let tile = Tile::new(3, 2, w, h);
         let colour = [10u8, 200, 90, 255];
+        let dimmed = [8u8, 169, 76, 255]; // 85% on a dark theme
         let mut out: Vec<u8> = colour.repeat((w * h) as usize);
         apply(
             &mut out,
@@ -395,7 +410,7 @@ mod tests {
                     x0 <= x && x < x1 && y0 <= y && y < y1
                 });
                 let px = &out[(y * w as usize + x) * 4..][..4];
-                assert_eq!(px == colour, inside, "pixel {x},{y}");
+                assert_eq!(px == dimmed, inside, "pixel {x},{y}");
             }
         }
     }
