@@ -6,7 +6,7 @@ This is the full plan for the engine. The reader app is a separate project
 that starts once the engine is ready. Every phase below is planned here
 before any code for it is written, and this file is updated as phases finish.
 
-Last updated: 2026-11-26 (Phase 5 done; phone numbers pending)
+Last updated: 2026-11-27 (Phase 5 done, design answers applied; phone numbers pending)
 
 ---
 
@@ -207,6 +207,8 @@ Review: [reviews/phase-4b.md](reviews/phase-4b.md), 18 findings; the six wrong-o
 ### Phase 5: Ready for the app ✅
 
 Detailed design: [phases/phase-5.md](phases/phase-5.md). What the reader app needs from the engine, behind an interface that stops changing: book info and covers, locators that survive font and view changes, progress, whole-book search, ranges for highlights, sentences for read aloud, a PDF page-range writer, colour themes from the app, a documented and tested JNI interface (`docs/api/android.md`, `Native.kt`, `apiVersion`), fuzzing in CI, a missing-font hint, and numbers from a real phone.
+
+Design answers from the app's design chat (5.12): the built-in themes take the final colours, photos show at 85% on dark themes, and English hyphenation follows the design's rules.
 
 Results: 53 engine calls documented in `Native.kt` and [api/android.md](api/android.md), checked against the library and called from a JVM in CI. Pages copied from all 79 test PDFs read and draw the same in MuPDF, PDFium and Poppler. Eight fuzz targets run on every push. The phone benchmark is built for arm64 by CI; its numbers wait for a run on a phone.
 

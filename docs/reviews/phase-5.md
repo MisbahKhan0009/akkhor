@@ -49,6 +49,18 @@ Severity: 🔴 must fix (wrong output, crash, hang) · 🟠 should fix ·
   the library fails CI, not the app.
 - Each 🔴 above has a test that fails (or hangs) without its fix.
 
+## After the review: design answers (5.12)
+
+The app's design chat answered the engine's questions. Applied in the
+engine: final theme colours, photos at 85% on dark themes, English
+hyphenation rules (6+ letter words, 3 letters each side, at most 2
+hyphenated lines in a row, never the last word or the next-to-last
+line of a paragraph; a test checks each and fails without the run
+limit). Sent back: the font-pack hint should follow the engine's
+`needs_fonts` flag (below 0.98), because books that need fonts score
+0.94 to 0.95 and a 0.85 threshold would miss them all. Open: no hyphen
+across a page break (needs the paginator).
+
 ## Result
 
 🔴 four found, all fixed (two by fuzzing, one by review, one by a new

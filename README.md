@@ -7,7 +7,7 @@ every conjunct whole: ক্ষ, ন্ত্র, র্ম, क्ष, त्�
 Rust, memory-maps books instead of reading them, and lets you switch each
 format on or off at build time.
 
-> Status: early. The spike works (see [the plan](docs/PLAN.md) for results and the roadmap). The API will change.
+> Status: engine ready for its reader app (Phases 0 to 5 done; see [the plan](docs/PLAN.md) for results and the roadmap). The Android interface is versioned (`apiVersion` 1); the Rust API may still change.
 
 ## Why
 
@@ -25,9 +25,11 @@ Akkhor aims to be light **and** correct. The full gap analysis is in
 - **Plain text:** UTF-8, UTF-16 and Windows-1252, and detection of Bijoy-encoded Bangla.
 - **Indic-correct text:** OpenType shaping (HarfRust), and orthographic-syllable rules for Bangla, Devanagari, Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada and Malayalam. Line breaks, taps, selections and highlights never split a conjunct.
 - **Search that understands Indic spellings:** nukta letters, split vowels, ৎ / ত্‍, ZWJ/ZWNJ and case all match their equivalents, and a search for ক never matches half of ক্ষ.
-- **Layout:** a CSS subset (alignment, indents, margins, sizes, bold/italic, hidden elements, page breaks), font fallback by coverage, real or synthetic bold and italic, English hyphenation, no line starting with । or a closing mark, page-by-page layout (the first page of a 1,000-page Bangla text is ready in under 1 ms), themes (paper, sepia, dusk, night).
+- **Layout:** a CSS subset (alignment, indents, margins, sizes, bold/italic, hidden elements, page breaks), font fallback by coverage, real or synthetic bold and italic, English hyphenation (words of 6+ letters, at most 2 hyphenated lines in a row; Bangla and Devanagari never hyphenate), no line starting with । or a closing mark, page-by-page layout (the first page of a 1,000-page Bangla text is ready in under 1 ms), themes (paper, sepia, dusk, night, or any colours the app gives; photos dimmed to 85% on dark themes).
+- **For a reader app:** book info and covers (under 50 ms a book), saved places (locators) that survive font, screen and theme changes, progress, whole-book search in stoppable batches with snippets, text and boxes for highlights, sentences for read aloud, a "fonts may be missing" hint for Indic PDFs, and chosen PDF pages saved as a new PDF (copies read and draw the same in MuPDF, PDFium and Poppler).
+- **Hard to break:** eight fuzz targets run on every push; every input that crashed or hung is kept as a test.
 - **Fonts on demand:** a script's font is only loaded when a book uses that script.
-- **Android:** a JNI bridge that draws straight into a `Bitmap`, with hit-testing, selection, copy and search.
+- **Android:** a JNI bridge that draws straight into a `Bitmap`; the whole interface is one Kotlin file, [`android/Native.kt`](android/Native.kt) (53 calls, explained in [docs/api/android.md](docs/api/android.md)), checked against the library and called from a JVM in CI.
 
 ## How it compares
 
@@ -51,6 +53,7 @@ akkhor = { version = "0.1", default-features = false, features = ["epub"] }  # E
 | `txt` (default) | plain text |
 | `pdf-scans` (default) | JBIG2, CCITT fax and JPEG 2000 decoders for scanned PDFs (about 0.45 MB on arm64) |
 | `pdf-cjk` | CJK character maps for Chinese, Japanese and Korean PDFs |
+| `pdf-write` | chosen PDF pages saved as a new PDF (no extra dependency; on in the Android build) |
 | `bundled-fonts` | Noto Serif Latin, Bengali and Devanagari compiled in |
 
 `akkhor-flow` also has `hyphenation` (English patterns, 31 KB) and `images` (PNG/JPEG decoding), both on by default.
