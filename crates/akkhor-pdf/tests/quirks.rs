@@ -100,3 +100,55 @@ fn a_turned_page_is_read_in_lines() {
             .any(|b| b.text.contains("Page one"))
     );
 }
+
+/// A picture cut from a turned page is given upright, as the page's text is
+/// read: the words above the blue bar, the bar wide rather than tall.
+#[test]
+fn a_turned_pages_picture_is_upright() {
+    use akkhor_flow::ImageProvider;
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/corpus/write/inherited.pdf"
+    );
+    let pdf = PdfDocument::open(&Source::open(path).unwrap()).unwrap();
+    let page = pdf
+        .render_page(0, 1.0, &akkhor_core::Theme::ORIGINAL)
+        .unwrap();
+    // Everything drawn, on the page as displayed.
+    let (mut x0, mut y0, mut x1, mut y1) = (u32::MAX, u32::MAX, 0, 0);
+    for y in 0..page.height {
+        for x in 0..page.width {
+            let i = ((y * page.width + x) * 4) as usize;
+            if page.pixels[i] < 200 || page.pixels[i + 1] < 200 {
+                (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x + 1), y1.max(y + 1));
+            }
+        }
+    }
+    // Displayed, the content runs down the page: taller than wide.
+    assert!(y1 - y0 > x1 - x0, "{x0},{y0} {x1},{y1}");
+    // As reflow::image_source writes it.
+    let src = format!("pdf:0:{x0}.0,{y0}.0,{x1}.0,{y1}.0");
+    let images = pdf.reflow_images();
+    let (w, h) = images.size(&src).unwrap();
+    assert!(w > h, "given upright: {w} x {h}");
+    let img = images.decoded(&src, w, h).unwrap();
+    assert_eq!((img.width, img.height), (w, h));
+    let row_kind = |y: u32| {
+        let row = &img.rgba[(y * img.width * 4) as usize..((y + 1) * img.width * 4) as usize];
+        let blue = row.chunks_exact(4).any(|p| p[2] > 200 && p[0] < 60);
+        let ink = row.chunks_exact(4).any(|p| p[0] < 100 && p[2] < 100);
+        (ink, blue)
+    };
+    let top = (0..img.height / 3).map(row_kind).collect::<Vec<_>>();
+    let bottom = (img.height * 2 / 3..img.height)
+        .map(row_kind)
+        .collect::<Vec<_>>();
+    assert!(
+        top.iter().any(|r| r.0) && !top.iter().any(|r| r.1),
+        "words on top"
+    );
+    assert!(
+        bottom.iter().any(|r| r.1) && !bottom.iter().any(|r| r.0),
+        "bar below"
+    );
+}

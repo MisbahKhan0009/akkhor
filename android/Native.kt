@@ -80,7 +80,8 @@ object Native {
     external fun outlineTitles(handle: Long): Array<String>?
     external fun outlineLevelsAndPages(handle: Long): IntArray?
 
-    /** Frees caches; call from onTrimMemory. Bytes freed. */
+    /** Frees caches (PDF content, comic page, reflow glyphs and
+     *  pictures); call from onTrimMemory. 0, or -1 on error. */
     external fun trimMemory(handle: Long): Int
 
     // --- Page view: PDF and comics (CBZ) -----------------------------

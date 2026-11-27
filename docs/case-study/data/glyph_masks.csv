@@ -1,0 +1,9 @@
+book,format,screens,background_ms,outline_first_ms,outline_next_ms,outline_redraw_ms,outline_cache_kb,mask_first_ms,mask_next_ms,mask_redraw_ms,mask_cache_kb,max_channel_diff,channels_over_8,mean_channel_diff
+indic-sample.epub,epub,3,0.47,8.48,4.22,3.07,292,6.34,3.89,1.18,1047,44,251437,0.1743
+big-bn.txt,txt,12,0.39,8.23,5.92,5.20,135,6.06,2.78,2.08,904,46,2759427,0.4834
+bn.azw3,azw3,5,0.39,5.86,1.83,1.59,126,3.85,1.68,0.65,517,44,149643,0.0629
+hi.azw3,azw3,5,0.48,5.74,2.30,1.49,107,5.37,1.98,0.71,449,42,128043,0.0525
+en.azw3,azw3,5,0.42,6.31,2.07,1.86,49,6.22,1.46,0.71,384,45,177797,0.0742
+bn.kf7.mobi,mobi,5,0.47,6.10,2.01,1.60,126,3.81,1.82,0.77,524,44,145793,0.0605
+en.fb2,fb2,4,0.42,5.56,1.88,1.64,49,2.50,1.30,0.69,312,43,141229,0.0758
+rich.bn.fb2,fb2,4,0.43,4.44,2.50,1.42,82,1.22,1.91,0.53,293,49,48084,0.0254

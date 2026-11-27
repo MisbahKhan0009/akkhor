@@ -75,16 +75,27 @@ impl akkhor_flow::ImageProvider for ReflowImages<'_> {
     }
 
     /// Two pixels per point: sharp on a phone at the width a picture gets.
+    /// A picture on a turned page is given upright, as its text is read.
     fn size(&self, src: &str) -> Option<(u32, u32)> {
-        let (_, r) = reflow::parse_image_source(src)?;
-        Some((
+        let (page, r) = reflow::parse_image_source(src)?;
+        let (w, h) = (
             (r.width() * 2.0).round().max(1.0) as u32,
             (r.height() * 2.0).round().max(1.0) as u32,
-        ))
+        );
+        Some(match self.turn(page) {
+            Some(t) if t.swaps() => (h, w),
+            _ => (w, h),
+        })
     }
 
     fn decoded(&self, src: &str, w: u32, h: u32) -> Option<akkhor_flow::image::DecodedImage> {
         let (page, r) = reflow::parse_image_source(src)?;
+        let turn = self.turn(page);
+        // The region is cut from the page as displayed, then turned back.
+        let (w, h) = match turn {
+            Some(t) if t.swaps() => (h, w),
+            _ => (w, h),
+        };
         let scale = (w as f64 / r.width().max(1.0))
             .max(h as f64 / r.height().max(1.0))
             .clamp(0.1, 8.0);
@@ -98,11 +109,72 @@ impl akkhor_flow::ImageProvider for ReflowImages<'_> {
         self.doc
             .render_tile(page, scale as f32, tile, &Theme::ORIGINAL, &mut rgba)
             .ok()?;
+        let (width, height, rgba) = match turn {
+            Some(t) => t.apply(tile.width, tile.height, &rgba),
+            None => (tile.width, tile.height, rgba),
+        };
         Some(akkhor_flow::image::DecodedImage {
-            width: tile.width,
-            height: tile.height,
+            width,
+            height,
             rgba,
         })
+    }
+}
+
+impl ReflowImages<'_> {
+    /// How a turned page's upright content lies on the displayed page.
+    fn turn(&self, page: usize) -> Option<Turn> {
+        let p = self.doc.pdf.pages().get(page)?;
+        Turn::from_affine(glyphs::upright_to_display(p)?)
+    }
+}
+
+/// A quarter turn (or half) taking upright content to the displayed page:
+/// the linear part of that map, entries -1, 0 or 1.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Turn([i32; 4]);
+
+impl Turn {
+    fn from_affine(a: hayro::kurbo::Affine) -> Option<Self> {
+        let c = a.as_coeffs();
+        let mut m = [0i32; 4];
+        for (i, v) in c[..4].iter().enumerate() {
+            let r = v.round();
+            if (v - r).abs() > 1e-3 || r.abs() > 1.0 {
+                return None;
+            }
+            m[i] = r as i32;
+        }
+        let det = m[0] * m[3] - m[1] * m[2];
+        (det.abs() == 1 && m != [1, 0, 0, 1]).then_some(Self(m))
+    }
+
+    /// Whether width and height trade places.
+    fn swaps(self) -> bool {
+        self.0[0] == 0
+    }
+
+    /// Turns pixels cut from the displayed page (`dw` x `dh`, RGBA) back
+    /// upright.
+    fn apply(self, dw: u32, dh: u32, rgba: &[u8]) -> (u32, u32, Vec<u8>) {
+        let (uw, uh) = if self.swaps() { (dh, dw) } else { (dw, dh) };
+        let [a, b, c, d] = self.0.map(i64::from);
+        let mut out = vec![0u8; uw as usize * uh as usize * 4];
+        // Twice the pixel centres, about the middle, keep the maths exact.
+        for oy in 0..uh as i64 {
+            for ox in 0..uw as i64 {
+                let (px, py) = (2 * ox + 1 - uw as i64, 2 * oy + 1 - uh as i64);
+                let (qx, qy) = (a * px + c * py, b * px + d * py);
+                let (dx, dy) = ((qx + dw as i64 - 1) / 2, (qy + dh as i64 - 1) / 2);
+                if dx < 0 || dy < 0 || dx >= dw as i64 || dy >= dh as i64 {
+                    continue;
+                }
+                let s = (dy as usize * dw as usize + dx as usize) * 4;
+                let o = (oy as usize * uw as usize + ox as usize) * 4;
+                out[o..o + 4].copy_from_slice(&rgba[s..s + 4]);
+            }
+        }
+        (uw, uh, out)
     }
 }
 
@@ -1359,5 +1431,29 @@ mod tests {
         let first = page.glyphs.first().unwrap().origin.1;
         let last = page.glyphs.last().unwrap().origin.1;
         assert!(first < last);
+    }
+}
+
+#[cfg(test)]
+mod turn_tests {
+    use super::Turn;
+
+    #[test]
+    fn quarter_turns_round_trip() {
+        let (w, h) = (3u32, 5u32);
+        let img: Vec<u8> = (0..w * h * 4).map(|i| (i * 7 % 251) as u8).collect();
+        // A quarter turn each way and a half turn; the inverse of a
+        // rotation is its transpose.
+        for m in [[0, 1, -1, 0], [0, -1, 1, 0], [-1, 0, 0, -1]] {
+            let t = Turn(m);
+            let back = Turn([m[0], m[2], m[1], m[3]]);
+            let (dw, dh, shown) = back.apply(w, h, &img);
+            assert_eq!(t.swaps(), (dw, dh) == (h, w));
+            let (uw, uh, upright) = t.apply(dw, dh, &shown);
+            assert_eq!((uw, uh), (w, h));
+            assert_eq!(upright, img, "{m:?}");
+        }
+        assert!(Turn::from_affine(hayro::kurbo::Affine::IDENTITY).is_none());
+        assert!(Turn::from_affine(hayro::kurbo::Affine::scale(2.0)).is_none());
     }
 }

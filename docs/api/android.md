@@ -171,6 +171,8 @@ app's cache directory, then share the file.
 
 ## Memory
 
-`trimMemory(handle)` frees caches (fonts, glyphs, page text, images) and
-returns the bytes freed: call it from `onTrimMemory`. Every cache has a
+`trimMemory(handle)` frees caches (a PDF's fonts, page content and
+images; a comic's decoded page; the glyphs and pictures kept for
+reflowed screens) and returns 0, or -1 on error: call it from
+`onTrimMemory`. Every cache has a
 byte budget; a 308 MB, 2,000-page PDF stays near 30 MB.

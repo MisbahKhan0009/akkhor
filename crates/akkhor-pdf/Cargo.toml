@@ -39,3 +39,7 @@ skrifa.workspace = true
 
 [dev-dependencies]
 akkhor-flow = { workspace = true, features = ["bundled-fonts"] }
+
+[[example]]
+name = "copy_pages"
+required-features = ["write"]

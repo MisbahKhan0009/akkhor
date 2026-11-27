@@ -722,8 +722,9 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_outlineLevelsAndPages(
     })
 }
 
-/// Frees what reading a PDF has accumulated (decoded page content, fonts
-/// and images kept for redraws) by opening it afresh; call it from
+/// Frees what reading has accumulated: a PDF's decoded page content, fonts
+/// and images (by opening it afresh), a comic's decoded page, and the
+/// glyphs and pictures kept for reflowed screens; call it from
 /// `onTrimMemory`. Waits for a render in progress. Returns 0, or -1 on error.
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_dev_akkhor_Native_trimMemory(
@@ -746,6 +747,12 @@ pub unsafe extern "system" fn Java_dev_akkhor_Native_trimMemory(
                 }
                 #[allow(unreachable_patterns)]
                 _ => {}
+            }
+            // Reflowed screens: glyph outlines, masks and pictures are
+            // rebuilt as the next screens are drawn.
+            #[cfg(feature = "flow")]
+            if let Some(flow) = hd.flow.as_mut() {
+                flow.glyphs.clear();
             }
             Ok(0)
         })

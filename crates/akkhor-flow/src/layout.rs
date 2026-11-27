@@ -87,6 +87,14 @@ pub struct Line {
 }
 
 impl Line {
+    /// Whether the line ends in a hyphen the layout put in (an English word
+    /// carried on to the next line). That glyph alone sits at the line's end.
+    pub fn hyphenated(&self) -> bool {
+        self.glyphs
+            .last()
+            .is_some_and(|g| g.cluster == self.range.end)
+    }
+
     /// The x position where the text at byte `offset` starts on this line.
     /// Offsets at or past the end of the line map to its right edge.
     pub fn x_of(&self, offset: usize) -> f32 {
@@ -343,8 +351,28 @@ impl<'a> Paginator<'a> {
             };
             for (range, placed) in break_lines(segment, &glyphs, &shape, hyphen) {
                 if self.y + lh > bottom && !self.current.is_empty() {
+                    // A page does not end mid-word: hyphenated lines at its
+                    // foot (two at most) go on with the rest of the word.
+                    let mut carry = Vec::new();
+                    while carry.len() < 2
+                        && self.current.lines.last().is_some_and(Line::hyphenated)
+                        && self.current.lines.len() + self.current.images.len() > 1
+                    {
+                        carry.extend(self.current.lines.pop());
+                    }
                     self.new_page();
                     self.y = opts.margin_top;
+                    for mut line in carry.into_iter().rev() {
+                        let dy = self.y - line.top;
+                        line.top += dy;
+                        line.bottom += dy;
+                        line.baseline += dy;
+                        for g in &mut line.glyphs {
+                            g.y += dy;
+                        }
+                        self.y = line.bottom;
+                        self.current.lines.push(line);
+                    }
                 }
                 let baseline = self.y + lh * 0.72;
                 let glyphs: Vec<PlacedGlyph> = placed
@@ -753,6 +781,64 @@ mod tests {
         for w in lines.windows(2) {
             assert_eq!(w[0].range.end, w[1].range.start);
         }
+    }
+
+    #[test]
+    fn no_page_ends_on_a_hyphen() {
+        let fonts = FontSet::bundled();
+        let text = "Considerations notwithstanding, internationalization substantially \
+                    complicates characterization, documentation, specification and \
+                    implementation, extraordinarily. "
+            .repeat(40);
+        let doc = Document::from_plain_text(&text);
+        let (mut ends_seen, mut carried) = (0, 0);
+        // Many page heights, so page feet land on every kind of line.
+        for height in (300..900).step_by(37) {
+            let opts = LayoutOptions {
+                width: 640.0,
+                height: height as f32,
+                ..Default::default()
+            };
+            let pages = paginate(&doc, &opts, &fonts);
+            let mut next = 0;
+            for (i, page) in pages.iter().enumerate() {
+                for l in &page.lines {
+                    // Whole text, in order, every line on its page.
+                    assert_eq!(l.range.start, next, "height {height}, page {i}");
+                    next = l.range.end;
+                    assert!(l.bottom <= height as f32 - opts.margin_bottom + 0.01);
+                    assert!(l.top >= opts.margin_top - 0.01);
+                    for g in &l.glyphs {
+                        assert!(g.y > l.top && g.y <= l.bottom, "glyph off its line");
+                    }
+                }
+                for w in page.lines.windows(2) {
+                    assert!(w[1].top >= w[0].bottom - 0.01, "lines overlap");
+                }
+                if i + 1 < pages.len() {
+                    // A page of one or two lines keeps them: moving them
+                    // would leave it empty.
+                    let last = page.lines.last().unwrap();
+                    if page.lines.len() >= 3 {
+                        assert!(
+                            !last.hyphenated(),
+                            "height {height}: page {i} ends on a hyphen"
+                        );
+                        ends_seen += 1;
+                    }
+                }
+                // One block of text: a line of room left at a page's foot
+                // means lines were carried over.
+                let room = height as f32 - opts.margin_bottom - page.lines.last().unwrap().bottom;
+                if i + 1 < pages.len() && room >= opts.font_size * opts.line_height {
+                    carried += 1;
+                }
+            }
+            assert!(next >= doc.blocks[0].text.trim_end().len(), "text lost");
+        }
+        assert!(ends_seen > 50);
+        // Some page feet did fall on a hyphenated line and were moved.
+        assert!(carried > 0, "no page foot fell on a hyphen");
     }
 
     #[test]
