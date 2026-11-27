@@ -1,0 +1,11 @@
+target,round,seconds,runs,result
+mobi,1,100,50126,clean (cut short)
+mobi,2,301,98834,clean
+mobi,3,170,27781,8 GB allocation from an index count (fixed)
+mobi,4,301,46722,clean
+fb2,1,1,60,panic: text cut inside a letter (fixed)
+fb2,2,,,panic: unclosed heading paragraph (fixed; log overwritten)
+fb2,3,301,161497,clean
+fb2,4,301,159727,clean
+cbz,1,301,56811,clean
+cbz,2,301,72091,clean

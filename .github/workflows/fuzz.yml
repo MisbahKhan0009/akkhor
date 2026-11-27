@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [pdf, pdf_reflow, pdf_write, epub, zip, markup, text, locator]
+        target: [pdf, pdf_reflow, pdf_write, epub, zip, markup, text, locator, mobi, fb2, cbz]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly

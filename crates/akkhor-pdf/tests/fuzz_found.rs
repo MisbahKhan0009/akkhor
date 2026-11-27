@@ -38,7 +38,7 @@ fn inputs_found_by_fuzzing_finish_quickly() {
     let mut n = 0;
     for e in std::fs::read_dir(dir).unwrap().flatten() {
         let p = e.path();
-        if p.extension().is_none_or(|x| x != "bin") {
+        if !p.to_string_lossy().ends_with(".pdf.bin") {
             continue;
         }
         let t = Instant::now();

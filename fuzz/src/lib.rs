@@ -66,3 +66,13 @@ pub fn lay_out(doc: &Document) {
         std::hint::black_box(pages.len());
     });
 }
+
+/// Reads the pictures a chapter names: header size, and a small decode.
+pub fn pictures(doc: &Document, images: &dyn akkhor_flow::ImageProvider) {
+    for src in doc.blocks.iter().filter_map(|b| b.image.as_deref()).take(4) {
+        let _ = images.size(src);
+        if let Some(img) = images.decoded(src, 64, 64) {
+            std::hint::black_box(img.rgba.len());
+        }
+    }
+}

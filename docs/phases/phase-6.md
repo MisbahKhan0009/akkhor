@@ -165,7 +165,7 @@ phone` and `library`); case study, CSVs, `history.csv`; review in
 - [x] CBZ: page view, natural order, ComicInfo (right-to-left), cover
 - [x] Same calls for every format; page-view calls renamed; Native.kt, JVM test, API doc
 - [x] Reference-font tables on disk; glyph bitmap cache; turned pictures upright; no hyphen on a page's last line
-- [ ] Fuzz targets for the new formats
+- [x] Fuzz targets for the new formats (3 bugs found and fixed, 2 more by review: `data/fuzz_phase6.csv`)
 - [ ] Size per switch measured
 - [ ] Case study, review, CI green, phone numbers
 

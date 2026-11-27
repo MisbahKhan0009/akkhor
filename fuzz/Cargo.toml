@@ -16,6 +16,9 @@ akkhor-core = { path = "../crates/akkhor-core" }
 akkhor-pdf = { path = "../crates/akkhor-pdf", features = ["write"] }
 akkhor-flow = { path = "../crates/akkhor-flow", features = ["bundled-fonts"] }
 akkhor-epub = { path = "../crates/akkhor-epub" }
+akkhor-mobi = { path = "../crates/akkhor-mobi" }
+akkhor-fb2 = { path = "../crates/akkhor-fb2" }
+akkhor-cbz = { path = "../crates/akkhor-cbz" }
 akkhor = { path = "../crates/akkhor", features = ["pdf-write", "bundled-fonts"] }
 
 # The same vendored parser as the main workspace.
@@ -80,6 +83,27 @@ bench = false
 [[bin]]
 name = "locator"
 path = "fuzz_targets/locator.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mobi"
+path = "fuzz_targets/mobi.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fb2"
+path = "fuzz_targets/fb2.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cbz"
+path = "fuzz_targets/cbz.rs"
 test = false
 doc = false
 bench = false

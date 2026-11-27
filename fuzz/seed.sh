@@ -3,7 +3,7 @@
 # Run from the repository root: sh fuzz/seed.sh
 set -e
 c=fuzz/corpus
-mkdir -p $c/pdf $c/pdf_reflow $c/pdf_write $c/epub $c/zip $c/markup $c/text $c/locator
+mkdir -p $c/pdf $c/pdf_reflow $c/pdf_write $c/epub $c/zip $c/markup $c/text $c/locator $c/mobi $c/fb2 $c/cbz
 for f in tests/corpus/pdf/*.pdf tests/corpus/books/pdf/*.pdf tests/corpus/tables/pdf/*.pdf \
          tests/corpus/write/*.pdf tests/fixtures/small.pdf tests/fixtures/indic.pdf; do
     for t in pdf pdf_reflow pdf_write; do cp "$f" $c/$t/; done
@@ -23,3 +23,7 @@ i=0
 for l in "akkhor:1/c0/b0/o0" "akkhor:1/c12/b345/o6789" "akkhor:1/p0/o0" "akkhor:1/p41/o120"; do
     printf %s "$l" > $c/locator/l$i; i=$((i + 1))
 done
+# Kindle books, FictionBooks and comics from the format corpus.
+for f in tests/corpus/formats/*.mobi tests/corpus/formats/*.azw3; do cp "$f" $c/mobi/; done
+for f in tests/corpus/formats/*.fb2 tests/corpus/formats/*.fb2.zip; do cp "$f" $c/fb2/; done
+for f in tests/corpus/formats/*.cbz; do cp "$f" $c/cbz/; done

@@ -43,7 +43,10 @@ impl Index {
         let (control_bytes, table) = tag_table(tagx)?;
         let mut cncx = Vec::new();
         for j in 0..cncx_count.min(64) {
-            cncx.push(db.record(at + records + 1 + j).to_vec());
+            cncx.push(
+                db.record(at.saturating_add(records).saturating_add(1 + j))
+                    .to_vec(),
+            );
         }
         let mut entries = Vec::new();
         for i in 0..records.min(1024) {
@@ -52,7 +55,10 @@ impl Index {
                 continue;
             }
             let idxt = be32(rec, 20) as usize;
-            let count = be32(rec, 24) as usize;
+            // The count is the file's word: no more than the offset table
+            // after IDXT can hold.
+            let room = rec.len().saturating_sub(idxt.saturating_add(4)) / 2;
+            let count = (be32(rec, 24) as usize).min(room).min(MAX_ENTRIES);
             let ordt = ordt_map(rec);
             let mut starts: Vec<usize> = (0..count)
                 .map(|j| be16(rec, idxt + 4 + 2 * j) as usize)

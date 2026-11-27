@@ -84,7 +84,9 @@ impl Fb2Book {
             return Err(Error::malformed("FB2 file too large"));
         }
         let xml = decode(data);
-        if !xml[..xml.len().min(4096)].contains("<FictionBook") {
+        // Bytes, not text: 4096 may fall inside a letter.
+        let head = &xml.as_bytes()[..xml.len().min(4096)];
+        if !head.windows(12).any(|w| w == b"<FictionBook") {
             return Err(Error::malformed("not a FictionBook document"));
         }
         let metadata = metadata(&xml);
@@ -439,8 +441,12 @@ fn convert(xml: &str) -> Chapters {
                                 && t.chars().count() <= 120
                             {
                                 title = t;
-                                if let Some(i) = cur.find("<p><strong>") {
-                                    let close = cur[i..].find("</p>").map_or(cur.len(), |j| i + j);
+                                // Only a whole paragraph is rewritten; a
+                                // broken file may never close it.
+                                if let Some(i) = cur.find("<p><strong>")
+                                    && let Some(j) = cur[i..].find("</p>")
+                                {
+                                    let close = i + j;
                                     let inner = cur[i + 3..close].to_string();
                                     cur.replace_range(i..close + 4, &format!("<h1>{inner}</h1>"));
                                 }

@@ -54,7 +54,10 @@ impl Huff {
             }
             let total = be32(c, 8) as usize;
             let bits = be32(c, 12).min(31);
-            let n = (1usize << bits).min(total.saturating_sub(phrases.len()));
+            // No more phrases than the record has offsets for.
+            let n = (1usize << bits)
+                .min(total.saturating_sub(phrases.len()))
+                .min((c.len() - 16) / 2);
             for k in 0..n {
                 let off = c
                     .get(16 + k * 2..18 + k * 2)
@@ -193,6 +196,18 @@ mod tests {
         let mut out = Vec::new();
         h.decompress(&[255, 254, 253, 255], &mut out).unwrap();
         assert_eq!(String::from_utf8(out).unwrap(), "Akkhor বইবইAkkhor Akkhor ");
+    }
+
+    #[test]
+    fn a_dictionary_that_claims_billions_of_phrases() {
+        // A CDIC whose total and bit count claim 2^31 phrases but which
+        // holds two offsets: two phrases are read, nothing is allocated
+        // for the rest.
+        let mut c = cdic(&[(b"a", true), (b"b", true)]);
+        c[8..12].copy_from_slice(&u32::MAX.to_be_bytes());
+        c[12..16].copy_from_slice(&31u32.to_be_bytes());
+        let h = Huff::new(&huff_record(), &[&c]);
+        assert!(h.is_ok_and(|h| h.phrases.len() <= c.len()));
     }
 
     #[test]

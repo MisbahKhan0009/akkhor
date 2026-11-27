@@ -73,7 +73,11 @@ fn unescape(s: &str) -> String {
     while let Some(i) = rest.find('&') {
         out.push_str(&rest[..i]);
         rest = &rest[i..];
-        let Some(end) = rest[..rest.len().min(12)].find(';') else {
+        // Bytes, not text: 12 may fall inside a letter (`&` before Bengali).
+        let Some(end) = rest.as_bytes()[..rest.len().min(12)]
+            .iter()
+            .position(|&b| b == b';')
+        else {
             out.push('&');
             rest = &rest[1..];
             continue;
@@ -109,6 +113,14 @@ fn unescape(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_bare_ampersand_before_letters() {
+        // Found by the same sweep as an FB2 fuzz crash: the entity search
+        // cut the text 12 bytes on, inside a Bengali letter.
+        assert_eq!(unescape("নদী&গ্রাম"), "নদী&গ্রাম");
+        assert_eq!(unescape("&বাংলা &amp; ই"), "&বাংলা & ই");
+    }
 
     const XMP: &str = r#"<x:xmpmeta><rdf:RDF><rdf:Description rdf:about=""
         xmlns:dc="http://purl.org/dc/elements/1.1/">
